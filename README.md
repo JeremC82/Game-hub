@@ -124,6 +124,7 @@ Module **ampli I2S MAX98357A**, par exemple [Adafruit MAX98357A, réf. 3006](htt
 - **Démo :** elle reste muette.
 - **Sans module branché :** le jeu marche normalement.
 - **Mémoire :** le son prend environ 4 Ko et utilise le 2ᵉ canal I2S, car les dalles utilisent l'autre.
+- **Interruptions :** le son est calculé sans bloquer les interruptions, que le Bluetooth de la manette utilise sur le même cœur. Avant la V2.16, il les bloquait, et la manette perdait la plupart de ses paquets.
 
 ## Branchement
 
@@ -169,8 +170,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V2.15_complet.bin](firmware/GameHub_V2.15_complet.bin) | 0x0 | `701e19a181fc3cca282678b28e67d8af` |
-| [firmware/GameHub_V2.15.bin](firmware/GameHub_V2.15.bin) | 0x10000 | `f48335a44273a83c5de1405f3c1ca7ef` |
+| [firmware/GameHub_V2.16_complet.bin](firmware/GameHub_V2.16_complet.bin) | 0x0 | `9c6aeab0b7b2d2d65c76d7225030a6fd` |
+| [firmware/GameHub_V2.16.bin](firmware/GameHub_V2.16.bin) | 0x10000 | `efeaec59246fd4d33090c3dd98a4cb40` |
 
 Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB SPIFFS)** dans Outils → Partition Scheme.
 

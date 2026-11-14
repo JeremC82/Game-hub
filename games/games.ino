@@ -29,7 +29,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "2.15"
+#define GAMES_VERSION "2.16"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -174,7 +174,8 @@ void sndRaw(float f0, float f1, uint16_t ms, float vol, bool noise) {
   int best = 0;
   for (int i = 1; i < SND_VOICES; i++)
     if (voices[i].left < voices[best].left) best = i;  // voix libre, ou la plus proche de finir
-  voices[best] = { 0, f0 / SND_RATE, (f1 - f0) / SND_RATE / n, vol, vol / n, n, noise };
+  static uint32_t nextId = 0;
+  voices[best] = { 0, f0 / SND_RATE, (f1 - f0) / SND_RATE / n, vol, vol / n, n, noise, ++nextId };
   portEXIT_CRITICAL(&sndMux);
 }
 void sndMelody(const Note *m, uint8_t len) {
@@ -196,35 +197,51 @@ void sfxBoom() { sndPlay(900, 120, 260, 0.35f, true); }
 void sfxHit() { sndPlay(700, 60, 700, 0.5f, true); sndPlay(220, 40, 600, 0.3f, false); }
 void sfxDive() { sndPlay(1100, 350, 450, 0.10f, false); }
 
+// Le son est calcule SANS bloquer les interruptions : on copie l'etat des voix (quelques microsecondes),
+// on calcule le morceau, puis on remet l'etat a jour sauf pour les voix relancees entre-temps.
+// (V2.01 a V2.15 : tout le calcul se faisait interruptions bloquees sur le coeur 1, celui des interruptions
+// Bluetooth -> la manette PS4 perdait la plupart de ses rapports.)
 void audioTask(void *) {
   static int16_t buf[256 * 2];  // stereo : la meme valeur a gauche et a droite
+  static Voice loc[SND_VOICES];
   uint32_t rnd = 12345;
   for (;;) {
-    float g = volume * volume / 100.0f * 9000;  // volume progressif
+    bool any = false;
     portENTER_CRITICAL(&sndMux);
-    for (int i = 0; i < 256; i++) {
-      float acc = 0;
-      for (auto &v : voices) {
-        if (!v.left) continue;
-        float smp;
-        if (v.noise) {
-          v.ph += v.f;
-          if (v.ph >= 1) { v.ph -= 1; rnd = rnd * 1103515245 + 12345; }
-          smp = (rnd >> 16 & 1) ? 1 : -1;
-        } else {
-          v.ph += v.f;
-          if (v.ph >= 1) v.ph -= 1;
-          smp = v.ph < 0.5f ? 1 : -1;
-        }
-        acc += smp * v.vol;
-        v.f += v.df;
-        v.vol -= v.dv * 0.6f;  // decroissance douce
-        v.left--;
-      }
-      int32_t o = constrain((int32_t)(acc * g), -32000, 32000);
-      buf[i * 2] = buf[i * 2 + 1] = o;
-    }
+    memcpy(loc, voices, sizeof(loc));
     portEXIT_CRITICAL(&sndMux);
+    for (auto &v : loc) any |= v.left > 0;
+    if (!any || volume == 0) {  // rien a jouer : silence, sans calcul
+      memset(buf, 0, sizeof(buf));
+    } else {
+      float gain = volume * volume / 100.0f * 9000;  // volume progressif
+      for (int i = 0; i < 256; i++) {
+        float acc = 0;
+        for (auto &v : loc) {
+          if (!v.left) continue;
+          float smp;
+          if (v.noise) {
+            v.ph += v.f;
+            if (v.ph >= 1) { v.ph -= 1; rnd = rnd * 1103515245 + 12345; }
+            smp = (rnd >> 16 & 1) ? 1 : -1;
+          } else {
+            v.ph += v.f;
+            if (v.ph >= 1) v.ph -= 1;
+            smp = v.ph < 0.5f ? 1 : -1;
+          }
+          acc += smp * v.vol;
+          v.f += v.df;
+          v.vol -= v.dv * 0.6f;  // decroissance douce
+          v.left--;
+        }
+        int32_t o = constrain((int32_t)(acc * gain), -32000, 32000);
+        buf[i * 2] = buf[i * 2 + 1] = o;
+      }
+      portENTER_CRITICAL(&sndMux);
+      for (int k = 0; k < SND_VOICES; k++)
+        if (voices[k].id == loc[k].id) voices[k] = loc[k];  // voix pas relancee pendant le calcul
+      portEXIT_CRITICAL(&sndMux);
+    }
     size_t done;
     i2s_write(I2S_NUM_0, buf, sizeof(buf), &done, portMAX_DELAY);
   }
@@ -250,7 +267,7 @@ void audioBegin() {
     Serial.println("Son : I2S indisponible");
     return;
   }
-  xTaskCreatePinnedToCore(audioTask, "son", 3072, NULL, 2, NULL, 1);
+  xTaskCreatePinnedToCore(audioTask, "son", 3072, NULL, 1, NULL, 1);  // meme priorite que le jeu
   Serial.printf("Son : ampli I2S (BCLK %d, LRC %d, DIN %d), volume %u/10, memoire libre %u\n", SND_BCLK, SND_LRC, SND_DIN, volume,
                 ESP.getFreeHeap());
 }
