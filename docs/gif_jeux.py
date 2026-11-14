@@ -1055,8 +1055,6 @@ _o = c_rows('O_SPR[3][2][7]', 7)
 O_SPR = [[_o[(t * 2 + k) * 7:(t * 2 + k + 1) * 7] for k in range(2)] for t in range(3)]
 _t = c_rows('O_SAT[2][7]', 7)
 O_SAT = [_t[:7], _t[7:]]
-_s = c_rows('O_SHIP[2][11]', 11)
-O_SHIP = [_s[:11], _s[11:]]
 
 
 def orbite():
@@ -1237,23 +1235,22 @@ def orbite():
             for dx, dy in ((0, -1), (-1, 0), (1, 0), (0, 1)):
                 s.px(x + dx, y + dy, c)
             s.px(x, y, PAL['w'])
-        px, py = X(pa, 1), Y(pa, 1)
-        q = round((math.atan2(cy - py, cx - px) + math.pi / 2) / (math.pi / 4)) & 7
-        spr, rot, ix, iy = O_SHIP[q & 1], q >> 1, round(px), round(py)
-        for dy in range(-5, 6):
-            for dx in range(-5, 6):
-                sx, sy = dx, dy
-                for _ in range(rot):
-                    sx, sy = sy, -sx
-                ch = spr[sy + 5][sx + 5]
-                if ch == '.':
-                    continue
-                if ch == 'o' and (f // 3) & 1:
-                    ch = 'y'
-                if ch == 'b' and power:
-                    ch = 'g'
-                if iy + dy >= 8:
-                    s.px(ix + dx, iy + dy, PAL[ch])
+        px, py = X(pa, 1), Y(pa, 1)  # petite aile delta a l'angle exact (comme oDraw)
+        ux, uy = cx - px, cy - py
+        n = math.hypot(ux, uy)
+        ux, uy = ux / n, uy / n
+        vx, vy = -uy, ux
+
+        def P(fw, sd):
+            return (round(px + fw * ux + sd * vx), round(py + fw * uy + sd * vy))
+        d = ImageDraw.Draw(s.im)
+        d.polygon((P(3, 0), P(-2, 2.6), P(-2, -2.6)), fill=PAL['g'] if power else (60, 140, 255))
+        d.line((P(-1, 0), P(3, 0)), fill=PAL['c'])
+        s.px(*P(1, 0), PAL['w'])
+        flame = (f // 3) & 1
+        s.px(*P(-2, 0), PAL['y'] if flame else PAL['o'])
+        if flame:
+            s.px(*P(-3, 0), PAL['o'])
         for b in booms:
             boom(s, b)
         if stage_t:

@@ -29,7 +29,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "3.52"
+#define GAMES_VERSION "3.53"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -2846,9 +2846,6 @@ const char *const O_SPR[3][2][7] = {
 };
 const char *const O_SAT[2][7] = { { "...w...", "..wcw..", "b.wrw.b", "bwwwwwb", "b.wrw.b", "..wcw..", "...w..." },  // satellite (capsule)
                                   { "...w...", "..wrw..", "b.wcw.b", "bwwwwwb", "b.wcw.b", "..wrw..", "...w..." } };
-// vaisseau 11x11 : pointe vers le haut, et en diagonale (haut-droite) ; tourne par quarts de tour sans perte
-const char *const O_SHIP[2][11] = { { "...........", ".....w.....", "....cwc....", "....cbc....", "...rcbcr...", "..bbcccbb..", ".bbbcwcbbb.", ".b.bbbbb.b.", "...o...o...", "...o...o...", "..........." },
-  { "...........", "...........", ".......cw..", ".r....bcc..", "..b..ccb...", "..bbbwc....", "...bcb.....", ".o.cbb.....", "..o..bb....", "...o...r...", "..........." } };
 float ocx() { return W / 2.0f; }
 float ocy() { return 8 + (H - 8) / 2.0f; }
 float orx() { return W / 2.0f - 6; }
@@ -3113,24 +3110,20 @@ void oDraw() {
     uint16_t c = (gFrame & 4) ? palFull[2] : palFull[5];
     gPix(x, y - 1, c); gPix(x - 1, y, c); gPix(x + 1, y, c); gPix(x, y + 1, c); gPix(x, y, palFull[0]);
   }
-  if (gDead == 0) {  // vaisseau : 8 directions nettes (droit ou diagonale, tourne par quarts de tour) vers le centre
+  if (gDead == 0) {  // vaisseau : petite aile delta tracee a l'angle exact (tourne en douceur sur 360 degres)
     float px = oX(oPa, 1), py = oY(oPa, 1);
-    int q = (int)lroundf((atan2f(ocy() - py, ocx() - px) + 1.5708f) / 0.7854f) & 7;  // 0 haut, 1 haut-droite...
-    const char *const *spr = O_SHIP[q & 1];
-    int rot = q >> 1, ix = (int)roundf(px), iy = (int)roundf(py);
+    float ux = ocx() - px, uy = ocy() - py, n = sqrtf(ux * ux + uy * uy);
+    ux /= n; uy /= n;
+    float vx = -uy, vy = ux;
+#define OSP(f, s) (int)roundf(px + (f) * ux + (s) * vx), (int)roundf(py + (f) * uy + (s) * vy)
     bool flame = (gFrame / 3) & 1;
-    for (int dy = -5; dy <= 5; dy++)
-      for (int dx = -5; dx <= 5; dx++) {
-        int sx = dx, sy = dy;
-        for (int k = 0; k < rot; k++) { int t = sx; sx = sy; sy = -t; }  // quart de tour en arriere
-        char ch = spr[sy + 5][sx + 5];
-        if (ch == '.') continue;
-        if (ch == 'o' && flame) ch = 'y';
-        if (ch == 'b' && oPower) ch = 'g';  // double tir : ailes vertes
-        int k = gPalIdx(ch), X = ix + dx, Y = iy + dy;
-        if (k >= 0 && X >= 0 && X < W && Y >= 8 && Y < H) gfx->drawPixel(X, Y, palFull[k]);
-      }
-    gMark(ix - 5, iy - 5, 11, 11);
+    gfx->fillTriangle(OSP(3, 0), OSP(-2, 2.6f), OSP(-2, -2.6f), oPower ? palFull[5] : rgb(60, 140, 255));  // aile (verte : double tir)
+    gfx->drawLine(OSP(-1, 0), OSP(3, 0), palFull[4]);   // fuselage
+    gfx->drawPixel(OSP(1, 0), palFull[0]);              // cockpit
+    gfx->drawPixel(OSP(-2, 0), flame ? palFull[2] : palFull[7]);  // flamme qui scintille
+    if (flame) gfx->drawPixel(OSP(-3, 0), palFull[7]);
+#undef OSP
+    gMark((int)px - 5, (int)py - 5, 11, 11);
   }
   altBooms(palFull);
   altHud(palFull);

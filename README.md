@@ -142,7 +142,7 @@ Ton vaisseau **tourne sur le bord de l'écran** et tire **vers le centre**. Les 
 - **Commandes :** pousse le stick ou la croix dans une direction, et le vaisseau **glisse sur son orbite** jusque-là. ✕ (ou carré, triangle, R1, L1, R2) pour tirer en continu.
 - **Les ennemis :** méduses, soucoupes et papillons, en couleurs et animés (tentacules qui ondulent, feux qui clignotent, ailes qui battent). Ils sortent du centre **en spirale**, prennent chacun leur place dans l'anneau, puis **plongent vers toi** en tirant. Ils grossissent en approchant : un point au loin, une petite croix, une silhouette, puis le sprite en couleurs.
 - **L'anneau :** sur une dalle (128x64), 20 ennemis sur un anneau ; en 128x128, 32 ennemis sur deux anneaux décalés. Les places sont réparties à égale distance, sans chevauchement.
-- **Ton vaisseau** pointe toujours vers le centre (8 directions), avec une flamme de réacteur qui scintille. Ses ailes deviennent vertes avec le double tir.
+- **Ton vaisseau** est une petite aile delta qui pointe toujours vers le centre et **tourne en douceur sur 360°**, avec une flamme de réacteur qui scintille. Ses ailes deviennent vertes avec le double tir.
 - **Points :** 50, 80 ou 100 selon l'ennemi, **doublés s'il est en piqué**.
 - **Ennemi blanc :** il lâche une capsule. Rattrape-la sur ton orbite pour avoir le **double tir**, jusqu'à la prochaine vie perdue.
 - **Stages :** 4 vagues d'ennemis. Tout détruire fait passer au stage suivant, avec un **saut en hyperespace** (les étoiles accélèrent). Les ennemis piquent plus souvent, et tu gagnes une vie.
@@ -298,8 +298,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V3.52_complet.bin](firmware/GameHub_V3.52_complet.bin) | 0x0 | `211b91014d940a74e3736d9167de0297` |
-| [firmware/GameHub_V3.52.bin](firmware/GameHub_V3.52.bin) | 0x10000 | `3ff80853e8f7dfeda8f13f15fc3c96c3` |
+| [firmware/GameHub_V3.53_complet.bin](firmware/GameHub_V3.53_complet.bin) | 0x0 | `a3db6a79b26d30b55d9d212112518adb` |
+| [firmware/GameHub_V3.53.bin](firmware/GameHub_V3.53.bin) | 0x10000 | `48ba9d688dc71dd6320e76263d71585e` |
 
 Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB SPIFFS)** dans Outils → Partition Scheme.
 
