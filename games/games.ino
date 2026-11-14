@@ -29,7 +29,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "3.51"
+#define GAMES_VERSION "3.52"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -611,6 +611,23 @@ void gBossKill() {  // explosion geante, gros bonus, et 5 petits vaisseaux qui p
     e.dir = k < 2 ? -1 : k > 2 ? 1 : (random(2) ? 1 : -1);
   }
 }
+// une meduse detruite libere 4 petits vaisseaux qui plongent aussitot (marques path 9 : ils replongent sans fin)
+void gSplit(float x, float y) {
+  int r = gRows - 1;
+  for (int k = 0; k < 4; k++) {
+    int i = 0;
+    while (i < gNE && gEn[i].alive) i++;  // une place libre (ennemi deja detruit) ou une nouvelle
+    if (i >= G_MAXE) return;
+    if (i == gNE) gNE++;
+    GEnemy &e = gEn[i];
+    e = {};
+    e.row = r; e.col = 0; e.type = gRowType[r];
+    e.alive = true; e.hp = 1; e.path = 9;
+    e.x = x + (k - 1.5f) * 3; e.y = y;
+    e.state = 1; e.vx = (k - 1.5f) * 0.9f; e.vy = -0.7f; e.t = -k * 3;
+    e.dir = k < 2 ? -1 : 1;
+  }
+}
 void gameStep() {
   gFrame++;
   float loud = gDemo ? 0.2f : 0.35f;  // vitesse du defilement des etoiles
@@ -661,7 +678,10 @@ void gameStep() {
       e.vx = constrain(e.vx * 0.96f + curve * 0.06f + (shipC - (e.x + 4)) * (e.t < 50 ? 0.0005f : 0.004f), -1.4f, 1.4f);
       e.vy = min(e.vy + 0.03f, 1.3f + 0.1f * gWave);
       e.x += e.vx + curve; e.y += e.vy;
-      if (e.y > H) { e.y = -8; e.state = 2; }
+      if (e.y > H) {
+        if (e.path == 9) { e.y = -8; e.x = random(W - GW); e.vx = 0; e.vy = 0.6f; e.t = 50; }  // eclat : replonge du haut
+        else { e.y = -8; e.state = 2; }
+      }
     } else if (e.state == 3) {  // arrivee en vol sur sa trajectoire
       if (++e.t < 0) continue;  // pas encore son tour (reste hors ecran)
       float px, py;
@@ -759,6 +779,7 @@ void gameStep() {
         if (!gDemo && gScore > gHi) gHi = gScore;
         gBoomAt(e.x + 4, e.y + 3);
         sfxBoom();
+        if (e.type == 0 && e.path != 9) gSplit(e.x, e.y);  // les plus rares (rangee du haut) eclatent en 4 petits vaisseaux
         break;
       }
     }
@@ -2814,6 +2835,20 @@ OEn oEn[O_EN];
 OShot oShot[O_SHOTS], oBul[O_BUL], oStar[O_STARS], oCap;
 float oPa = 1.5708f, oRot = 0;  // angle du vaisseau (en bas), rotation de l'anneau
 int oCool = 0, oSpawnT = 0, oDiveT = 0, oPower = 0;
+// sprites d'ORBITE (originaux) : ennemis 7x7 en 2 images, satellite porteur de capsule, vaisseau 9x9 pointe vers le haut
+const char *const O_SPR[3][2][7] = {
+  { { "..ppp..", ".ppwpp.", "pppvppp", ".ppppp.", "v.v.v.v", ".v.v.v.", "v.....v" },     // meduse (tentacules qui ondulent)
+    { "..ppp..", ".ppwpp.", "pppvppp", ".ppppp.", ".v.v.v.", "v.v.v.v", ".v...v." } },
+  { { "..ccc..", ".cwwcc.", "bbbbbbb", "wbybybw", ".bbbbb.", "..c.c..", ".c...c." },     // soucoupe (feux qui clignotent)
+    { "..ccc..", ".cwwcc.", "bbbbbbb", "ybwbwby", ".bbbbb.", "..c.c..", "..c.c.." } },
+  { { "o.....o", "oy.r.yo", "oyyryyo", ".oywyo.", "oyyryyo", "oy...yo", "o.....o" },     // papillon (ailes qui battent)
+    { ".......", ".o.r.o.", "oyyryyo", "yoywyoy", "oyyryyo", ".o...o.", "......." } }
+};
+const char *const O_SAT[2][7] = { { "...w...", "..wcw..", "b.wrw.b", "bwwwwwb", "b.wrw.b", "..wcw..", "...w..." },  // satellite (capsule)
+                                  { "...w...", "..wrw..", "b.wcw.b", "bwwwwwb", "b.wcw.b", "..wrw..", "...w..." } };
+// vaisseau 11x11 : pointe vers le haut, et en diagonale (haut-droite) ; tourne par quarts de tour sans perte
+const char *const O_SHIP[2][11] = { { "...........", ".....w.....", "....cwc....", "....cbc....", "...rcbcr...", "..bbcccbb..", ".bbbcwcbbb.", ".b.bbbbb.b.", "...o...o...", "...o...o...", "..........." },
+  { "...........", "...........", ".......cw..", ".r....bcc..", "..b..ccb...", "..bbbwc....", "...bcb.....", ".o.cbb.....", "..o..bb....", "...o...r...", "..........." } };
 float ocx() { return W / 2.0f; }
 float ocy() { return 8 + (H - 8) / 2.0f; }
 float orx() { return W / 2.0f - 6; }
@@ -2826,18 +2861,36 @@ float oAngDiff(float a, float b) {  // ecart d'angle ramene entre -pi et pi
   if (d < -3.1416f) d += 6.2832f;
   return d;
 }
+int oN = 32, oRings = 2;  // ennemis par stage et nombre d'anneaux (une dalle : 20 sur 1 anneau, sinon 32 sur 2)
+float oFr(int i) { return oRings == 1 ? 0.62f : 0.44f + (i & 1) * 0.12f; }  // rayon de l'anneau de l'ennemi i
 void oNewStage() {
+  oRings = H >= 128 ? 2 : 1;
+  oN = oRings == 2 ? 32 : 20;
+  int per = oN / oRings, wave = oN / 4;
+  // places sur l'anneau reparties a egale distance le long de l'ellipse (sinon serrees sur les cotes d'un ecran large)
+  static float acc[65];
+  acc[0] = 0;
+  for (int s = 1; s <= 64; s++) {
+    float a = (s - 0.5f) * 6.2832f / 64;
+    acc[s] = acc[s - 1] + sqrtf(sq(orx() * sinf(a)) + sq(ory() * cosf(a)));
+  }
   for (int i = 0; i < O_EN; i++) {
     OEn &e = oEn[i];
-    int w = i / 8, k = i % 8;
-    e.on = true;
-    e.state = 0;                         // attend son tour
-    e.t = -(w * 110 + k * 9);            // 4 vagues de 8, l'une apres l'autre
-    e.a0 = w * 1.5708f + gWave * 0.7f;   // chaque vague sort dans une direction differente
+    e.on = i < oN;
+    if (!e.on) continue;
+    int w = i / wave, k = i % wave;
+    e.state = 0;                          // attend son tour
+    e.t = -(w * 110 + k * 9);             // 4 vagues, l'une apres l'autre
+    e.a0 = w * 1.5708f + gWave * 0.7f;    // chaque vague sort dans une direction differente
     e.dir = (w & 1) ? -1 : 1;
     e.type = (w + gWave) % 3;
-    e.carrier = (i == 13);
+    e.carrier = (i == wave + wave / 2);
     e.r = 0; e.a = e.a0;
+    int ring = oRings == 2 ? (i & 1) : 0, slot = oRings == 2 ? i / 2 : i;
+    float target = (slot + 0.5f * ring + 0.25f) / per * acc[64];
+    int s = 1;
+    while (s < 64 && acc[s] < target) s++;
+    e.sa = (s - 1 + (target - acc[s - 1]) / max(0.001f, acc[s] - acc[s - 1])) * 6.2832f / 64;  // angle de sa place
   }
   for (auto &b : oBul) b.on = false;
   for (auto &s : oShot) s.on = false;
@@ -2939,12 +2992,13 @@ void oStep() {
       if (e.t >= 0) { e.state = 1; e.t = 0; }
       continue;
     }
-    float fr = 0.44f + ((&e - oEn) & 1) * 0.11f;  // anneau sur 2 rangs
-    if (e.state == 1) {  // sortie en spirale : va presque jusqu'au bord puis revient se ranger
+    float fr = oFr(&e - oEn);
+    if (e.state == 1) {  // sortie en spirale : va presque jusqu'au bord puis glisse jusqu'a sa place
       float u = min(1.0f, e.t / 100.0f);
-      e.r = fr * u + 0.5f * sinf(3.1416f * u);
-      e.a = e.a0 + e.dir * 4.4f * u;
-      if (u >= 1.0f) { e.state = 2; e.sa = e.a - oRot; }
+      e.r = fr * u + 0.45f * sinf(3.1416f * u);
+      float as = e.a0 + e.dir * 4.4f * u, w = max(0.0f, (u - 0.55f) / 0.45f);
+      e.a = as + oAngDiff(e.sa + oRot, as) * w * w;
+      if (u >= 1.0f) e.state = 2;
     } else if (e.state == 2) {  // dans l'anneau : tourne doucement et respire
       e.a = e.sa + oRot;
       e.r = fr + 0.04f * sinf(gFrame * 0.05f + e.sa);
@@ -3020,10 +3074,10 @@ void oDraw() {
     uint8_t g = 40 + min(1.0f, s.r) * 200;
     gPix(x, y, (i & 3) == 0 ? rgb(g / 2, g / 2, g) : rgb(g, g, g));
   }
-  // ennemis : 1 point au loin, une petite croix, puis le sprite 5x5 (2 images)
+  // ennemis : 1 point au loin, une petite croix, la silhouette 5x5, puis (des l'anneau) le sprite 7x7 en couleurs
   static const uint8_t SPR[3][2][5] = {
     { { 0x0E, 0x1F, 0x15, 0x1F, 0x0A }, { 0x0E, 0x1F, 0x15, 0x1F, 0x11 } },  // meduse
-    { { 0x0E, 0x11, 0x15, 0x11, 0x0E }, { 0x0E, 0x1B, 0x11, 0x1B, 0x0E } },  // disque
+    { { 0x0E, 0x11, 0x15, 0x11, 0x0E }, { 0x0E, 0x1B, 0x11, 0x1B, 0x0E } },  // soucoupe
     { { 0x11, 0x1B, 0x0E, 0x1B, 0x11 }, { 0x0A, 0x1B, 0x0E, 0x1B, 0x0A } }   // papillon
   };
   static const uint8_t EC[3][3] = { { 255, 60, 200 }, { 0, 220, 255 }, { 255, 200, 0 } };
@@ -3031,15 +3085,17 @@ void oDraw() {
     if (!e.on || e.state == 0) continue;
     int x = oX(e.a, e.r), y = oY(e.a, e.r);
     uint16_t c = e.carrier ? ((gFrame & 8) ? palFull[0] : rgb(150, 150, 150)) : rgb(EC[e.type][0], EC[e.type][1], EC[e.type][2]);
-    if (e.r < 0.18f) gPix(x, y, c);
-    else if (e.r < 0.4f) { gPix(x, y, c); gPix(x - 1, y, c); gPix(x + 1, y, c); gPix(x, y - 1, c); gPix(x, y + 1, c); }
-    else {
-      const uint8_t *sp = SPR[e.type][(gFrame / 8) & 1];
+    int fr = (gFrame / 8) & 1;
+    if (e.r < 0.1f) gPix(x, y, c);
+    else if (e.r < 0.2f) { gPix(x, y, palFull[0]); gPix(x - 1, y, c); gPix(x + 1, y, c); gPix(x, y - 1, c); gPix(x, y + 1, c); }
+    else if (e.r < 0.36f) {
+      const uint8_t *sp = SPR[e.type][fr];
       for (int r = 0; r < 5; r++)
         for (int cc = 0; cc < 5; cc++)
           if (sp[r] & (0x10 >> cc)) { int px = x - 2 + cc, py = y - 2 + r; if (py >= 8 && px >= 0 && px < W && py < H) gfx->drawPixel(px, py, c); }
       gMark(x - 2, y - 2, 5, 5);
-    }
+    } else if (e.carrier) gSprite(O_SAT[fr], 7, 7, x - 3, y - 3, palFull, 0, 0);
+    else gSprite(O_SPR[e.type][fr], 7, 7, x - 3, y - 3, palFull, 0, 0);
   }
   for (auto &s : oShot) {  // tirs : petit trait jaune dans l'axe
     if (!s.on) continue;
@@ -3057,21 +3113,24 @@ void oDraw() {
     uint16_t c = (gFrame & 4) ? palFull[2] : palFull[5];
     gPix(x, y - 1, c); gPix(x - 1, y, c); gPix(x + 1, y, c); gPix(x, y + 1, c); gPix(x, y, palFull[0]);
   }
-  if (gDead == 0) {  // vaisseau : fleche tournee vers le centre
+  if (gDead == 0) {  // vaisseau : 8 directions nettes (droit ou diagonale, tourne par quarts de tour) vers le centre
     float px = oX(oPa, 1), py = oY(oPa, 1);
-    float ux = ocx() - px, uy = ocy() - py, n = sqrtf(ux * ux + uy * uy);
-    ux /= n; uy /= n;
-    float vx = -uy, vy = ux;
-    int nx = px + 3 * ux, ny = py + 3 * uy;
-    int lx = px - 2 * ux + 3 * vx, ly = py - 2 * uy + 3 * vy, rx = px - 2 * ux - 3 * vx, ry = py - 2 * uy - 3 * vy;
-    uint16_t body = oPower ? palFull[4] : rgb(60, 140, 255);
-    gfx->drawLine(nx, ny, lx, ly, body);
-    gfx->drawLine(nx, ny, rx, ry, body);
-    gfx->drawLine(lx, ly, (int)px, (int)py, body);
-    gfx->drawLine(rx, ry, (int)px, (int)py, body);
-    gfx->drawPixel(px + ux, py + uy, palFull[0]);       // cockpit
-    gfx->drawPixel(px - 3 * ux, py - 3 * uy, palFull[7]);  // reacteur
-    gMark((int)px - 5, (int)py - 5, 11, 11);
+    int q = (int)lroundf((atan2f(ocy() - py, ocx() - px) + 1.5708f) / 0.7854f) & 7;  // 0 haut, 1 haut-droite...
+    const char *const *spr = O_SHIP[q & 1];
+    int rot = q >> 1, ix = (int)roundf(px), iy = (int)roundf(py);
+    bool flame = (gFrame / 3) & 1;
+    for (int dy = -5; dy <= 5; dy++)
+      for (int dx = -5; dx <= 5; dx++) {
+        int sx = dx, sy = dy;
+        for (int k = 0; k < rot; k++) { int t = sx; sx = sy; sy = -t; }  // quart de tour en arriere
+        char ch = spr[sy + 5][sx + 5];
+        if (ch == '.') continue;
+        if (ch == 'o' && flame) ch = 'y';
+        if (ch == 'b' && oPower) ch = 'g';  // double tir : ailes vertes
+        int k = gPalIdx(ch), X = ix + dx, Y = iy + dy;
+        if (k >= 0 && X >= 0 && X < W && Y >= 8 && Y < H) gfx->drawPixel(X, Y, palFull[k]);
+      }
+    gMark(ix - 5, iy - 5, 11, 11);
   }
   altBooms(palFull);
   altHud(palFull);

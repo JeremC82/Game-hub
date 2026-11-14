@@ -1047,6 +1047,18 @@ def sauterelle():
 
 
 # ================================================================ ORBITE
+def c_rows(name, n):  # sprites d'ORBITE lus dans games.ino
+    return re.findall(r'"([.wrybcgpov]{%d})"' % n, re.search(re.escape(name) + r'[^=]*=\s*\{(.*?)\};', SRC, re.S).group(1))
+
+
+_o = c_rows('O_SPR[3][2][7]', 7)
+O_SPR = [[_o[(t * 2 + k) * 7:(t * 2 + k + 1) * 7] for k in range(2)] for t in range(3)]
+_t = c_rows('O_SAT[2][7]', 7)
+O_SAT = [_t[:7], _t[7:]]
+_s = c_rows('O_SHIP[2][11]', 11)
+O_SHIP = [_s[:11], _s[11:]]
+
+
 def orbite():
     rnd = random.Random(11)
     cx, cy, rx, ry = W / 2, 8 + (H - 8) / 2, W / 2 - 6, (H - 8) / 2 - 4
@@ -1059,11 +1071,29 @@ def orbite():
         d = (a - b) % TAU
         return d - TAU if d > math.pi else d
     stars = [{'a': rnd.random() * TAU, 'r': rnd.random()} for _ in range(40)]
+    rings = 2 if H >= 128 else 1
+    N = 32 if rings == 2 else 20
+    per, wave = N // rings, N // 4
+    acc = [0]
+    for k in range(1, 65):
+        a = (k - 0.5) * TAU / 64
+        acc.append(acc[-1] + math.hypot(rx * math.sin(a), ry * math.cos(a)))
+
+    def slot_angle(i):  # places a egale distance le long de l'ellipse (comme oNewStage)
+        ring, slot = (i & 1, i // 2) if rings == 2 else (0, i)
+        target = (slot + 0.5 * ring + 0.25) / per * acc[64]
+        k = 1
+        while k < 64 and acc[k] < target:
+            k += 1
+        return (k - 1 + (target - acc[k - 1]) / max(0.001, acc[k] - acc[k - 1])) * TAU / 64
+
+    def ring_r(i):
+        return 0.62 if rings == 1 else 0.44 + (i & 1) * 0.12
     en = []
-    for i in range(32):
-        w, k = i // 8, i % 8
+    for i in range(N):
+        w, k = i // wave, i % wave
         en.append({'on': True, 'state': 0, 't': -(w * 110 + k * 9), 'a0': w * math.pi / 2 + 0.7, 'dir': -1 if w & 1 else 1,
-                   'type': (w + 1) % 3, 'carrier': i == 13, 'r': 0, 'a': 0, 'sa': 0, 'shot': False, 'i': i})
+                   'type': (w + 1) % 3, 'carrier': i == wave + wave // 2, 'r': 0, 'a': 0, 'sa': slot_angle(i), 'shot': False, 'i': i})
     shots, buls, booms, frames = [], [], [], []
     pa, rot, cool, dive, score, power, cap, stage_t = math.pi / 2, 0, 0, 150, 0, 0, None, 60
     SPR = (((0x0E, 0x1F, 0x15, 0x1F, 0x0A), (0x0E, 0x1F, 0x15, 0x1F, 0x11)),
@@ -1094,7 +1124,7 @@ def orbite():
                 for k in ((-0.07, 0.07) if power else (0,)):
                     if len(shots) < 8:
                         shots.append({'a': pa + k, 'r': 0.92})
-                cool = 7
+                cool = 16  # apercu : le pilote tire moins vite, pour qu'on voie l'anneau se former
             for s in shots:
                 s['r'] -= 0.02 + 0.035 * s['r']
             shots = [s for s in shots if s['r'] >= 0.06]
@@ -1107,13 +1137,14 @@ def orbite():
                     if e['t'] >= 0:
                         e['state'], e['t'] = 1, 0
                     continue
-                fr = 0.44 + (e['i'] & 1) * 0.11
+                fr = ring_r(e['i'])
                 if e['state'] == 1:
                     u = min(1, e['t'] / 100)
-                    e['r'] = fr * u + 0.5 * math.sin(math.pi * u)
-                    e['a'] = e['a0'] + e['dir'] * 4.4 * u
+                    e['r'] = fr * u + 0.45 * math.sin(math.pi * u)
+                    a_s, wgt = e['a0'] + e['dir'] * 4.4 * u, max(0, (u - 0.55) / 0.45)
+                    e['a'] = a_s + adiff(e['sa'] + rot, a_s) * wgt * wgt
                     if u >= 1:
-                        e['state'], e['sa'] = 2, e['a'] - rot
+                        e['state'] = 2
                 elif e['state'] == 2:
                     e['a'] = e['sa'] + rot
                     e['r'] = fr + 0.04 * math.sin(f * 0.05 + e['sa'])
@@ -1173,17 +1204,25 @@ def orbite():
                 continue
             x, y = int(X(e['a'], e['r'])), int(Y(e['a'], e['r']))
             c = ((255, 255, 255) if f & 8 else (150, 150, 150)) if e['carrier'] else EC[e['type']]
-            if e['r'] < 0.18:
+            fr = (f // 8) & 1
+            if e['r'] < 0.1:
                 s.px(x, y, c)
-            elif e['r'] < 0.4:
-                for dx, dy in ((0, 0), (-1, 0), (1, 0), (0, -1), (0, 1)):
+            elif e['r'] < 0.2:
+                for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
                     s.px(x + dx, y + dy, c)
-            else:
-                sp = SPR[e['type']][(f // 8) & 1]
+                s.px(x, y, PAL['w'])
+            elif e['r'] < 0.36:
+                sp = SPR[e['type']][fr]
                 for r in range(5):
                     for cc in range(5):
                         if sp[r] & (0x10 >> cc):
                             s.px(x - 2 + cc, y - 2 + r, c)
+            else:
+                rows = O_SAT[fr] if e['carrier'] else O_SPR[e['type']][fr]
+                for r, line in enumerate(rows):
+                    for cc, ch in enumerate(line):
+                        if ch != '.':
+                            s.px(x - 3 + cc, y - 3 + r, PAL[ch])
         for sh in shots:
             s.px(int(X(sh['a'], sh['r'])), int(Y(sh['a'], sh['r'])), PAL['y'])
             s.px(int(X(sh['a'], sh['r'] + 0.04)), int(Y(sh['a'], sh['r'] + 0.04)), PAL['w'])
@@ -1198,20 +1237,23 @@ def orbite():
             for dx, dy in ((0, -1), (-1, 0), (1, 0), (0, 1)):
                 s.px(x + dx, y + dy, c)
             s.px(x, y, PAL['w'])
-        d = ImageDraw.Draw(s.im)
         px, py = X(pa, 1), Y(pa, 1)
-        ux, uy = cx - px, cy - py
-        n = math.hypot(ux, uy)
-        ux, uy = ux / n, uy / n
-        vx, vy = -uy, ux
-        nose = (int(px + 3 * ux), int(py + 3 * uy))
-        lw = (int(px - 2 * ux + 3 * vx), int(py - 2 * uy + 3 * vy))
-        rw = (int(px - 2 * ux - 3 * vx), int(py - 2 * uy - 3 * vy))
-        body = PAL['c'] if power else (60, 140, 255)
-        d.line((nose, lw), fill=body); d.line((nose, rw), fill=body)
-        d.line((lw, (int(px), int(py))), fill=body); d.line((rw, (int(px), int(py))), fill=body)
-        s.px(int(px + ux), int(py + uy), PAL['w'])
-        s.px(int(px - 3 * ux), int(py - 3 * uy), PAL['o'])
+        q = round((math.atan2(cy - py, cx - px) + math.pi / 2) / (math.pi / 4)) & 7
+        spr, rot, ix, iy = O_SHIP[q & 1], q >> 1, round(px), round(py)
+        for dy in range(-5, 6):
+            for dx in range(-5, 6):
+                sx, sy = dx, dy
+                for _ in range(rot):
+                    sx, sy = sy, -sx
+                ch = spr[sy + 5][sx + 5]
+                if ch == '.':
+                    continue
+                if ch == 'o' and (f // 3) & 1:
+                    ch = 'y'
+                if ch == 'b' and power:
+                    ch = 'g'
+                if iy + dy >= 8:
+                    s.px(ix + dx, iy + dy, PAL[ch])
         for b in booms:
             boom(s, b)
         if stage_t:

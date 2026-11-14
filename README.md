@@ -37,6 +37,7 @@ Le jeu principal : un shoot'em up original, repris du mode Jeu du VU-mètre. Une
   | 2, 6, 10… | Crabes | formation qui balance plus vite et plus large, piqués **à deux** |
   | 3, 7, 11… | Cristaux | **un tir de plus** pour chaque ennemi, piqués **en zigzag** |
   | 4, 8, 12… | Orbes | la formation **descend et remonte**, et leurs tirs **visent ton vaisseau** |
+- **Les méduses de la rangée du haut**, les plus rares, demandent 2 tirs. Détruites, elles **éclatent en 4 petits vaisseaux** qui plongent aussitôt vers toi, et qui replongent du haut de l'écran tant qu'ils ne sont pas abattus.
 - **Formation :** 10 ennemis par rangée sur une dalle de 128 de large. Il reste de la place sur les côtés, alors l'essaim se balance bien de droite à gauche.
 - **Boss tous les 4 stages (4, 8, 12…) :** une fois la formation détruite, un grand vaisseau-mère arrive en haut de l'écran. Il va et vient et tire en éventail, et sa barre de vie s'affiche sous le score.
   - **2e phase :** sous la moitié de sa vie, il devient rouge et tire plus souvent, en éventail de 5.
@@ -139,10 +140,12 @@ Une sauterelle verte parcourt un **grand labyrinthe en relief** (plan original) 
 
 Ton vaisseau **tourne sur le bord de l'écran** et tire **vers le centre**. Les étoiles jaillissent du centre, ce qui donne de la profondeur.
 - **Commandes :** pousse le stick ou la croix dans une direction, et le vaisseau **glisse sur son orbite** jusque-là. ✕ (ou carré, triangle, R1, L1, R2) pour tirer en continu.
-- **Les ennemis :** ils sortent du centre **en spirale**, se rangent en anneau, puis **plongent vers toi** en tirant. Ils grossissent en approchant : un point au loin, une petite croix, puis le sprite.
+- **Les ennemis :** méduses, soucoupes et papillons, en couleurs et animés (tentacules qui ondulent, feux qui clignotent, ailes qui battent). Ils sortent du centre **en spirale**, prennent chacun leur place dans l'anneau, puis **plongent vers toi** en tirant. Ils grossissent en approchant : un point au loin, une petite croix, une silhouette, puis le sprite en couleurs.
+- **L'anneau :** sur une dalle (128x64), 20 ennemis sur un anneau ; en 128x128, 32 ennemis sur deux anneaux décalés. Les places sont réparties à égale distance, sans chevauchement.
+- **Ton vaisseau** pointe toujours vers le centre (8 directions), avec une flamme de réacteur qui scintille. Ses ailes deviennent vertes avec le double tir.
 - **Points :** 50, 80 ou 100 selon l'ennemi, **doublés s'il est en piqué**.
 - **Ennemi blanc :** il lâche une capsule. Rattrape-la sur ton orbite pour avoir le **double tir**, jusqu'à la prochaine vie perdue.
-- **Stages :** 4 vagues de 8 ennemis. Tout détruire fait passer au stage suivant, avec un **saut en hyperespace** (les étoiles accélèrent). Les ennemis piquent plus souvent, et tu gagnes une vie.
+- **Stages :** 4 vagues d'ennemis. Tout détruire fait passer au stage suivant, avec un **saut en hyperespace** (les étoiles accélèrent). Les ennemis piquent plus souvent, et tu gagnes une vie.
 
 ### RAQUETTES
 
@@ -295,8 +298,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V3.51_complet.bin](firmware/GameHub_V3.51_complet.bin) | 0x0 | `257ef16134a0f353573297fb56dfce68` |
-| [firmware/GameHub_V3.51.bin](firmware/GameHub_V3.51.bin) | 0x10000 | `037bbb9362b1a726782303af3dc35392` |
+| [firmware/GameHub_V3.52_complet.bin](firmware/GameHub_V3.52_complet.bin) | 0x0 | `211b91014d940a74e3736d9167de0297` |
+| [firmware/GameHub_V3.52.bin](firmware/GameHub_V3.52.bin) | 0x10000 | `3ff80853e8f7dfeda8f13f15fc3c96c3` |
 
 Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB SPIFFS)** dans Outils → Partition Scheme.
 
