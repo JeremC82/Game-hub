@@ -140,12 +140,10 @@ Une sauterelle verte parcourt un **grand labyrinthe en relief** (plan original) 
 
 Ton vaisseau **tourne sur le bord de l'écran** et tire **vers le centre**. Les étoiles jaillissent du centre, ce qui donne de la profondeur.
 - **Commandes :** pousse le stick ou la croix dans une direction, et le vaisseau **glisse sur son orbite** jusque-là. ✕ (ou carré, triangle, R1, L1, R2) pour tirer en continu.
-- **Les ennemis :** méduses, soucoupes et papillons, en couleurs et animés (tentacules qui ondulent, feux qui clignotent, ailes qui battent). Ils sortent du centre **en spirale**, prennent chacun leur place dans l'anneau, puis **plongent vers toi** en tirant. Ils grossissent en approchant : un point au loin, une petite croix, une silhouette, puis le sprite en couleurs.
-- **L'anneau :** sur une dalle (128x64), 20 ennemis sur un anneau ; en 128x128, 32 ennemis sur deux anneaux décalés. Les places sont réparties à égale distance, sans chevauchement.
-- **Ton vaisseau** est une petite aile delta qui pointe toujours vers le centre et **tourne en douceur sur 360°**, avec une flamme de réacteur qui scintille. Ses ailes deviennent vertes avec le double tir.
+- **Les ennemis :** ils sortent du centre **en spirale**, se rangent en anneau, puis **plongent vers toi** en tirant. Ils grossissent en approchant : un point au loin, une petite croix, puis le sprite.
 - **Points :** 50, 80 ou 100 selon l'ennemi, **doublés s'il est en piqué**.
 - **Ennemi blanc :** il lâche une capsule. Rattrape-la sur ton orbite pour avoir le **double tir**, jusqu'à la prochaine vie perdue.
-- **Stages :** 4 vagues d'ennemis. Tout détruire fait passer au stage suivant, avec un **saut en hyperespace** (les étoiles accélèrent). Les ennemis piquent plus souvent, et tu gagnes une vie.
+- **Stages :** 4 vagues de 8 ennemis. Tout détruire fait passer au stage suivant, avec un **saut en hyperespace** (les étoiles accélèrent). Les ennemis piquent plus souvent, et tu gagnes une vie.
 
 ### RAQUETTES
 
@@ -160,6 +158,8 @@ Une balle et deux raquettes : la tienne en bas, celle de l'ordinateur en haut.
 ## Menu
 
 Sans partie en cours, le jeu tourne tout seul en démo, sans son. **Sans manette connectée**, la démo affiche seulement une petite indication, « MANETTE : BOUTON PS », avec l'adresse Bluetooth de l'ESP32. Dès que la manette est connectée, le menu s'affiche **sur son propre écran**, sans la démo derrière. On y voit un fond d'étoiles, le titre GAME HUB et le record avec le nom de son détenteur :
+
+**Batterie de la manette :** en haut à droite du menu, un pourcentage et une petite pile (verte, orange, puis rouge qui clignote quand elle est faible). En charge, la pile est jaune, avec un éclair et une jauge qui se remplit en boucle.
 
 ![Menu, meilleurs scores avec les noms, saisie du nom](docs/rendu-menu.png)
 
@@ -298,8 +298,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V3.53_complet.bin](firmware/GameHub_V3.53_complet.bin) | 0x0 | `a3db6a79b26d30b55d9d212112518adb` |
-| [firmware/GameHub_V3.53.bin](firmware/GameHub_V3.53.bin) | 0x10000 | `48ba9d688dc71dd6320e76263d71585e` |
+| [firmware/GameHub_V3.54_complet.bin](firmware/GameHub_V3.54_complet.bin) | 0x0 | `21595dcaa6980001e8c84669d658acd6` |
+| [firmware/GameHub_V3.54.bin](firmware/GameHub_V3.54.bin) | 0x10000 | `342e2252fe0ad5566ba6e6554847b309` |
 
 Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB SPIFFS)** dans Outils → Partition Scheme.
 

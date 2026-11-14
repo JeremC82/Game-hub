@@ -268,6 +268,28 @@ def star_screen(seed):  # fond du menu : etoiles en noir et blanc
     return s
 
 
+def pad_battery(s, w, pct, chg=False, frame=0):
+    """Batterie de la manette en haut a droite du menu, comme drawPadBattery()."""
+    TF.setdefault('%', [5, 1, 2, 4, 5])
+    d = ImageDraw.Draw(s.im)
+    col = (40, 230, 80) if pct > 50 else (255, 160, 0) if pct > 20 else (255, 40, 40)
+    bx = w - 10
+    d.rectangle((bx, 0, bx + 7, 4), outline=(150, 150, 170))
+    d.line((bx + 8, 1, bx + 8, 3), fill=(150, 150, 170))
+    fill = frame % 7 if chg and pct < 100 else (pct * 6 + 50) // 100
+    if chg:
+        col = (255, 220, 0)
+    if fill > 0:
+        d.rectangle((bx + 1, 1, bx + fill, 3), fill=col)
+    t = '%d%%' % pct
+    tx = bx - 3 - (len(t) * 4 - 1)
+    s.tiny(tx, 0, t, (255, 220, 0) if chg else (200, 200, 210))
+    if chg:
+        ex, y = tx - 5, (255, 220, 0)
+        for p in ((ex + 2, 0), (ex + 1, 1), (ex, 2), (ex + 1, 2), (ex + 2, 2), (ex + 1, 3), (ex, 4)):
+            s.px(p[0], p[1], y)
+
+
 pages = []
 for page in ('menu', 'scores', 'nom'):
     s = star_screen(11)
@@ -279,7 +301,8 @@ for page in ('menu', 'scores', 'nom'):
         for i, t in enumerate(('> JOUER <RAID>', 'NIVEAU NORMAL', 'LUMINOSITE 60%', 'VOLUME 60%', 'SCORES', 'DEMO')):
             text_bg(s, y + i * 11, t, SEL if i == 0 else OFF)
         text_bg(s, y + 6 * 11 + 4, 'OPTIONS : JOUER', DIM)
-        title, sub = 'Menu', 'Gauche / droite sur JOUER : choix du jeu'
+        pad_battery(s, 128, 70)
+        title, sub = 'Menu', 'Gauche / droite sur JOUER : choix du jeu. En haut a droite : batterie de la manette'
     elif page == 'scores':  # tableau avec les noms (3 lettres)
         y = 64 - 36
         box(s, y - 5, y + 6 * 11 + 18)
@@ -288,6 +311,7 @@ for page in ('menu', 'scores', 'nom'):
         for i, t in enumerate(rows):
             text_bg(s, y + (i + 1) * 11 + 2, t, (230, 230, 230) if i == 0 else OFF)
         text_bg(s, y + 6 * 11 + 6, 'X : RETOUR', DIM)
+        pad_battery(s, 128, 40, True, 3)
         title, sub = 'Meilleurs scores', 'Rang, nom, score, niveau (F/N/D), stage'
     else:  # saisie du nom, facon borne d'arcade
         y = 64 - 40

@@ -29,7 +29,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "3.53"
+#define GAMES_VERSION "3.54"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -142,14 +142,14 @@ const uint8_t TF_R[5] = { 6, 5, 6, 5, 5 }, TF_E[5] = { 7, 4, 6, 4, 7 }, TF_S[5] 
               TF_B[5] = { 6, 5, 6, 5, 6 }, TF_F[5] = { 7, 4, 6, 4, 4 }, TF_M[5] = { 5, 7, 7, 5, 5 },
               TF_N[5] = { 6, 5, 5, 5, 5 }, TF_T[5] = { 7, 2, 2, 2, 2 }, TF_U[5] = { 5, 5, 5, 5, 7 },
               TF_P[5] = { 6, 5, 6, 4, 4 }, TF_COL[5] = { 0, 2, 0, 2, 0 }, TF_X[5] = { 5, 5, 2, 5, 5 },
-              TF_G[5] = { 7, 4, 5, 5, 7 };
+              TF_G[5] = { 7, 4, 5, 5, 7 }, TF_PCT[5] = { 5, 1, 2, 4, 5 };
 const uint8_t *tfGlyph(char c) {
   if (c >= '0' && c <= '9') return TF_DIG[c - '0'];
   switch (c) {
     case 'R': return TF_R; case 'E': return TF_E; case 'S': return TF_S; case 'C': return TF_C;
     case 'O': return TF_DIG[0]; case 'D': return TF_D; case 'A': return TF_A; case 'B': return TF_B;
     case 'F': return TF_F; case 'M': return TF_M; case 'N': return TF_N; case 'T': return TF_T;
-    case 'U': return TF_U; case 'P': return TF_P; case ':': return TF_COL; case 'X': return TF_X; case 'G': return TF_G;
+    case 'U': return TF_U; case 'P': return TF_P; case ':': return TF_COL; case 'X': return TF_X; case 'G': return TF_G; case '%': return TF_PCT;
   }
   return nullptr;
 }
@@ -2835,17 +2835,6 @@ OEn oEn[O_EN];
 OShot oShot[O_SHOTS], oBul[O_BUL], oStar[O_STARS], oCap;
 float oPa = 1.5708f, oRot = 0;  // angle du vaisseau (en bas), rotation de l'anneau
 int oCool = 0, oSpawnT = 0, oDiveT = 0, oPower = 0;
-// sprites d'ORBITE (originaux) : ennemis 7x7 en 2 images, satellite porteur de capsule, vaisseau 9x9 pointe vers le haut
-const char *const O_SPR[3][2][7] = {
-  { { "..ppp..", ".ppwpp.", "pppvppp", ".ppppp.", "v.v.v.v", ".v.v.v.", "v.....v" },     // meduse (tentacules qui ondulent)
-    { "..ppp..", ".ppwpp.", "pppvppp", ".ppppp.", ".v.v.v.", "v.v.v.v", ".v...v." } },
-  { { "..ccc..", ".cwwcc.", "bbbbbbb", "wbybybw", ".bbbbb.", "..c.c..", ".c...c." },     // soucoupe (feux qui clignotent)
-    { "..ccc..", ".cwwcc.", "bbbbbbb", "ybwbwby", ".bbbbb.", "..c.c..", "..c.c.." } },
-  { { "o.....o", "oy.r.yo", "oyyryyo", ".oywyo.", "oyyryyo", "oy...yo", "o.....o" },     // papillon (ailes qui battent)
-    { ".......", ".o.r.o.", "oyyryyo", "yoywyoy", "oyyryyo", ".o...o.", "......." } }
-};
-const char *const O_SAT[2][7] = { { "...w...", "..wcw..", "b.wrw.b", "bwwwwwb", "b.wrw.b", "..wcw..", "...w..." },  // satellite (capsule)
-                                  { "...w...", "..wrw..", "b.wcw.b", "bwwwwwb", "b.wcw.b", "..wrw..", "...w..." } };
 float ocx() { return W / 2.0f; }
 float ocy() { return 8 + (H - 8) / 2.0f; }
 float orx() { return W / 2.0f - 6; }
@@ -2858,36 +2847,18 @@ float oAngDiff(float a, float b) {  // ecart d'angle ramene entre -pi et pi
   if (d < -3.1416f) d += 6.2832f;
   return d;
 }
-int oN = 32, oRings = 2;  // ennemis par stage et nombre d'anneaux (une dalle : 20 sur 1 anneau, sinon 32 sur 2)
-float oFr(int i) { return oRings == 1 ? 0.62f : 0.44f + (i & 1) * 0.12f; }  // rayon de l'anneau de l'ennemi i
 void oNewStage() {
-  oRings = H >= 128 ? 2 : 1;
-  oN = oRings == 2 ? 32 : 20;
-  int per = oN / oRings, wave = oN / 4;
-  // places sur l'anneau reparties a egale distance le long de l'ellipse (sinon serrees sur les cotes d'un ecran large)
-  static float acc[65];
-  acc[0] = 0;
-  for (int s = 1; s <= 64; s++) {
-    float a = (s - 0.5f) * 6.2832f / 64;
-    acc[s] = acc[s - 1] + sqrtf(sq(orx() * sinf(a)) + sq(ory() * cosf(a)));
-  }
   for (int i = 0; i < O_EN; i++) {
     OEn &e = oEn[i];
-    e.on = i < oN;
-    if (!e.on) continue;
-    int w = i / wave, k = i % wave;
-    e.state = 0;                          // attend son tour
-    e.t = -(w * 110 + k * 9);             // 4 vagues, l'une apres l'autre
-    e.a0 = w * 1.5708f + gWave * 0.7f;    // chaque vague sort dans une direction differente
+    int w = i / 8, k = i % 8;
+    e.on = true;
+    e.state = 0;                         // attend son tour
+    e.t = -(w * 110 + k * 9);            // 4 vagues de 8, l'une apres l'autre
+    e.a0 = w * 1.5708f + gWave * 0.7f;   // chaque vague sort dans une direction differente
     e.dir = (w & 1) ? -1 : 1;
     e.type = (w + gWave) % 3;
-    e.carrier = (i == wave + wave / 2);
+    e.carrier = (i == 13);
     e.r = 0; e.a = e.a0;
-    int ring = oRings == 2 ? (i & 1) : 0, slot = oRings == 2 ? i / 2 : i;
-    float target = (slot + 0.5f * ring + 0.25f) / per * acc[64];
-    int s = 1;
-    while (s < 64 && acc[s] < target) s++;
-    e.sa = (s - 1 + (target - acc[s - 1]) / max(0.001f, acc[s] - acc[s - 1])) * 6.2832f / 64;  // angle de sa place
   }
   for (auto &b : oBul) b.on = false;
   for (auto &s : oShot) s.on = false;
@@ -2989,13 +2960,12 @@ void oStep() {
       if (e.t >= 0) { e.state = 1; e.t = 0; }
       continue;
     }
-    float fr = oFr(&e - oEn);
-    if (e.state == 1) {  // sortie en spirale : va presque jusqu'au bord puis glisse jusqu'a sa place
+    float fr = 0.44f + ((&e - oEn) & 1) * 0.11f;  // anneau sur 2 rangs
+    if (e.state == 1) {  // sortie en spirale : va presque jusqu'au bord puis revient se ranger
       float u = min(1.0f, e.t / 100.0f);
-      e.r = fr * u + 0.45f * sinf(3.1416f * u);
-      float as = e.a0 + e.dir * 4.4f * u, w = max(0.0f, (u - 0.55f) / 0.45f);
-      e.a = as + oAngDiff(e.sa + oRot, as) * w * w;
-      if (u >= 1.0f) e.state = 2;
+      e.r = fr * u + 0.5f * sinf(3.1416f * u);
+      e.a = e.a0 + e.dir * 4.4f * u;
+      if (u >= 1.0f) { e.state = 2; e.sa = e.a - oRot; }
     } else if (e.state == 2) {  // dans l'anneau : tourne doucement et respire
       e.a = e.sa + oRot;
       e.r = fr + 0.04f * sinf(gFrame * 0.05f + e.sa);
@@ -3071,10 +3041,10 @@ void oDraw() {
     uint8_t g = 40 + min(1.0f, s.r) * 200;
     gPix(x, y, (i & 3) == 0 ? rgb(g / 2, g / 2, g) : rgb(g, g, g));
   }
-  // ennemis : 1 point au loin, une petite croix, la silhouette 5x5, puis (des l'anneau) le sprite 7x7 en couleurs
+  // ennemis : 1 point au loin, une petite croix, puis le sprite 5x5 (2 images)
   static const uint8_t SPR[3][2][5] = {
     { { 0x0E, 0x1F, 0x15, 0x1F, 0x0A }, { 0x0E, 0x1F, 0x15, 0x1F, 0x11 } },  // meduse
-    { { 0x0E, 0x11, 0x15, 0x11, 0x0E }, { 0x0E, 0x1B, 0x11, 0x1B, 0x0E } },  // soucoupe
+    { { 0x0E, 0x11, 0x15, 0x11, 0x0E }, { 0x0E, 0x1B, 0x11, 0x1B, 0x0E } },  // disque
     { { 0x11, 0x1B, 0x0E, 0x1B, 0x11 }, { 0x0A, 0x1B, 0x0E, 0x1B, 0x0A } }   // papillon
   };
   static const uint8_t EC[3][3] = { { 255, 60, 200 }, { 0, 220, 255 }, { 255, 200, 0 } };
@@ -3082,17 +3052,15 @@ void oDraw() {
     if (!e.on || e.state == 0) continue;
     int x = oX(e.a, e.r), y = oY(e.a, e.r);
     uint16_t c = e.carrier ? ((gFrame & 8) ? palFull[0] : rgb(150, 150, 150)) : rgb(EC[e.type][0], EC[e.type][1], EC[e.type][2]);
-    int fr = (gFrame / 8) & 1;
-    if (e.r < 0.1f) gPix(x, y, c);
-    else if (e.r < 0.2f) { gPix(x, y, palFull[0]); gPix(x - 1, y, c); gPix(x + 1, y, c); gPix(x, y - 1, c); gPix(x, y + 1, c); }
-    else if (e.r < 0.36f) {
-      const uint8_t *sp = SPR[e.type][fr];
+    if (e.r < 0.18f) gPix(x, y, c);
+    else if (e.r < 0.4f) { gPix(x, y, c); gPix(x - 1, y, c); gPix(x + 1, y, c); gPix(x, y - 1, c); gPix(x, y + 1, c); }
+    else {
+      const uint8_t *sp = SPR[e.type][(gFrame / 8) & 1];
       for (int r = 0; r < 5; r++)
         for (int cc = 0; cc < 5; cc++)
           if (sp[r] & (0x10 >> cc)) { int px = x - 2 + cc, py = y - 2 + r; if (py >= 8 && px >= 0 && px < W && py < H) gfx->drawPixel(px, py, c); }
       gMark(x - 2, y - 2, 5, 5);
-    } else if (e.carrier) gSprite(O_SAT[fr], 7, 7, x - 3, y - 3, palFull, 0, 0);
-    else gSprite(O_SPR[e.type][fr], 7, 7, x - 3, y - 3, palFull, 0, 0);
+    }
   }
   for (auto &s : oShot) {  // tirs : petit trait jaune dans l'axe
     if (!s.on) continue;
@@ -3110,19 +3078,20 @@ void oDraw() {
     uint16_t c = (gFrame & 4) ? palFull[2] : palFull[5];
     gPix(x, y - 1, c); gPix(x - 1, y, c); gPix(x + 1, y, c); gPix(x, y + 1, c); gPix(x, y, palFull[0]);
   }
-  if (gDead == 0) {  // vaisseau : petite aile delta tracee a l'angle exact (tourne en douceur sur 360 degres)
+  if (gDead == 0) {  // vaisseau : fleche tournee vers le centre
     float px = oX(oPa, 1), py = oY(oPa, 1);
     float ux = ocx() - px, uy = ocy() - py, n = sqrtf(ux * ux + uy * uy);
     ux /= n; uy /= n;
     float vx = -uy, vy = ux;
-#define OSP(f, s) (int)roundf(px + (f) * ux + (s) * vx), (int)roundf(py + (f) * uy + (s) * vy)
-    bool flame = (gFrame / 3) & 1;
-    gfx->fillTriangle(OSP(3, 0), OSP(-2, 2.6f), OSP(-2, -2.6f), oPower ? palFull[5] : rgb(60, 140, 255));  // aile (verte : double tir)
-    gfx->drawLine(OSP(-1, 0), OSP(3, 0), palFull[4]);   // fuselage
-    gfx->drawPixel(OSP(1, 0), palFull[0]);              // cockpit
-    gfx->drawPixel(OSP(-2, 0), flame ? palFull[2] : palFull[7]);  // flamme qui scintille
-    if (flame) gfx->drawPixel(OSP(-3, 0), palFull[7]);
-#undef OSP
+    int nx = px + 3 * ux, ny = py + 3 * uy;
+    int lx = px - 2 * ux + 3 * vx, ly = py - 2 * uy + 3 * vy, rx = px - 2 * ux - 3 * vx, ry = py - 2 * uy - 3 * vy;
+    uint16_t body = oPower ? palFull[4] : rgb(60, 140, 255);
+    gfx->drawLine(nx, ny, lx, ly, body);
+    gfx->drawLine(nx, ny, rx, ry, body);
+    gfx->drawLine(lx, ly, (int)px, (int)py, body);
+    gfx->drawLine(rx, ry, (int)px, (int)py, body);
+    gfx->drawPixel(px + ux, py + uy, palFull[0]);       // cockpit
+    gfx->drawPixel(px - 3 * ux, py - 3 * uy, palFull[7]);  // reacteur
     gMark((int)px - 5, (int)py - 5, 11, 11);
   }
   altBooms(palFull);
@@ -3162,6 +3131,33 @@ void toDemo() {
 
 // Ecran du menu : fond d'etoiles qui defile, titre GAME HUB, record, puis le menu.
 // La demo ne tourne plus derriere (sprites, annonces et scores de la demo melanges au menu).
+// batterie de la manette, en haut a droite du menu : pourcentage + petite pile (verte, orange, rouge qui clignote) ;
+// en charge : la jauge se remplit en boucle en jaune, avec un eclair. Niveau envoye par la manette : 0 a 10 (11 = pleine, en charge).
+void drawPadBattery() {
+  if (!PS4.isConnected()) return;
+  int lvl = PS4.Battery();
+  bool chg = PS4.Charging();
+  int pct = min(100, lvl * 10);
+  uint16_t col = pct > 50 ? rgb(40, 230, 80) : pct > 20 ? rgb(255, 160, 0) : rgb(255, 40, 40);
+  int bx = W - 10, by = 0;
+  gfx->drawRect(bx, by, 8, 5, rgb(150, 150, 170));  // pile
+  gfx->drawFastVLine(bx + 8, by + 1, 3, rgb(150, 150, 170));
+  int fill = chg && pct < 100 ? (int)((gFrame / 6) % 7) : (pct * 6 + 50) / 100;
+  if (chg) col = rgb(255, 220, 0);
+  if (fill > 0 && (chg || pct > 20 || (gFrame & 16))) gfx->fillRect(bx + 1, by + 1, fill, 3, col);
+  char b[8];
+  snprintf(b, sizeof(b), "%d%%", pct);
+  int tw = tinyWidth(b), tx = bx - 3 - tw;
+  tinyText(*gfx, tx, by, b, chg ? rgb(255, 220, 0) : rgb(200, 200, 210));
+  if (chg) {  // eclair
+    int ex = tx - 5;
+    gfx->drawPixel(ex + 2, by, rgb(255, 220, 0)); gfx->drawPixel(ex + 1, by + 1, rgb(255, 220, 0));
+    gfx->drawFastHLine(ex, by + 2, 3, rgb(255, 220, 0)); gfx->drawPixel(ex + 1, by + 3, rgb(255, 220, 0));
+    gfx->drawPixel(ex, by + 4, rgb(255, 220, 0));
+    tx = ex;
+  }
+  gMark(tx, by, W - tx, 5);
+}
 void menuScreen() {
   gFrame++;
   for (int i = 0; i < gNStar; i++) {  // etoiles qui defilent doucement
@@ -3198,7 +3194,7 @@ void menuScreen() {
   }
   gfx->setTextSize(1);
   if (gNameEntry) drawNameEntry();
-  else drawMenu();
+  else { drawMenu(); drawPadBattery(); }
 }
 
 // saisie du nom (3 lettres, facon borne d'arcade) apres un score qui entre au tableau
