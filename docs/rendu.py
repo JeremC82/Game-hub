@@ -236,3 +236,43 @@ for t in range(4):
 path = os.path.join(DOC, 'rendu-vaisseaux.png')
 out.save(path)
 print(path)
+
+# menu et meilleurs scores (128x128, par-dessus la demo), comme drawMenu()
+def text_bg(s, y, t, col):
+    w = len(t) * 6 + 4
+    x = (s.w - w) // 2
+    ImageDraw.Draw(s.im).rectangle((x, y - 2, x + w - 1, y + 8), fill=(0, 0, 0))
+    s.text(y, t, col)
+
+
+SEL, OFF, DIM = (255, 220, 0), (0, 160, 200), (110, 110, 130)
+
+
+def box(s, y0, y1):  # cadre noir borde de bleu, comme gBox()
+    ImageDraw.Draw(s.im).rectangle((4, y0, 123, y1 - 1), fill=(0, 0, 0), outline=(40, 70, 170))
+pages = []
+for page in ('menu', 'scores'):
+    s = Screen(128, 128)
+    s.im = game_frame(128, 128, demo=False, stage=1, seed=11)
+    if page == 'menu':
+        y = 64 - 22
+        box(s, y - 6, y + 3 * 13 + 16)
+        for i, t in enumerate(('> JOUER', 'NIVEAU NORMAL', 'SCORES')):
+            text_bg(s, y + i * 13, t, SEL if i == 0 else OFF)
+        text_bg(s, y + 3 * 13 + 4, 'START : JOUER', DIM)
+    else:
+        y = 64 - 36
+        box(s, y - 5, y + 6 * 11 + 18)
+        text_bg(s, y, 'MEILLEURS SCORES', SEL)
+        rows = ['1  30800 N S6', '2  21450 D S4', '3  12750 N S3', '4   8500 F S2', '5   4200 N S1']
+        for i, t in enumerate(rows):
+            text_bg(s, y + (i + 1) * 11 + 2, t, (230, 230, 230) if i == 0 else OFF)
+        text_bg(s, y + 6 * 11 + 6, 'X : RETOUR', DIM)
+    pages.append(panels(s.im, 1, 2, 'Menu' if page == 'menu' else 'Meilleurs scores',
+                        'Croix haut / bas, X : valider, START : jouer' if page == 'menu' else 'Rang, score, niveau (F/N/D), stage atteint', pitch=4))
+out = Image.new('RGB', (pages[0].width * 2 + 20, pages[0].height), (12, 12, 16))
+out.paste(pages[0], (0, 0))
+out.paste(pages[1], (pages[0].width + 20, 0))
+path = os.path.join(DOC, 'rendu-menu.png')
+out.save(path)
+print(path)

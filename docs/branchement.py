@@ -89,13 +89,13 @@ class Sheet:
 
 
 # ================================================================ jeu : ESP32 -> dalles
-s = Sheet(2000, 1560, 'Game hub - branchement des dalles',
-          'ESP32 DevKit (38 broches) - meme brochage dalle que l\'horloge ClockV1 et le VU-metre')
-LEFT = [('BOOT (bouton carte)', 'boot'), ('5V / VIN', '5v'), ('GND', 'gnd')]
+s = Sheet(2000, 1560, 'Game hub - branchement des dalles et du son',
+          'ESP32 DevKit (38 broches) - meme brochage dalle que l\'horloge ClockV1 et le VU-metre - manette PS4 en Bluetooth (sans fil)')
+LEFT = [('5V / VIN', '5v'), ('GND', 'gnd'), ('GPIO22', 'bclk'), ('GPIO21', 'lrc'), ('GPIO33', 'din')]
 RIGHT = [('GPIO25', 'R1'), ('GPIO26', 'G1'), ('GPIO27', 'B1'), ('GPIO14', 'R2'), ('GPIO12', 'G2'), ('GPIO13', 'B2'),
          ('GPIO23', 'A'), ('GPIO19', 'B'), ('GPIO5', 'C'), ('GPIO17', 'D'), ('GPIO32', 'E'), ('GPIO16', 'CLK'),
          ('GPIO4', 'LAT'), ('GPIO15', 'OE'), ('GND', 'GND')]
-lp, rp = s.esp32(760, 140, 1080, 940, 'ESP32 DevKit (jeu)', LEFT, RIGHT, 250, 50, lstart=200)
+lp, rp = s.esp32(760, 140, 1080, 940, 'ESP32 DevKit (jeu)', LEFT, RIGHT, 150, 50, lstart=150)
 hx0, hy0 = 1440, 140
 s.box(hx0, hy0, hx0 + 260, hy0 + 590, 'HUB75 (entree)', (255, 252, 240))
 HUB = ['R1', 'G1', 'B1', 'GND', 'R2', 'G2', 'B2', 'E', 'A', 'B', 'C', 'D', 'CLK', 'LAT', 'OE', 'GND']
@@ -132,14 +132,35 @@ vx, vy = lp['5v']
 s.wire([(px0 + 640, py0 + 120), (720, py0 + 120), (720, vy), (vx, vy)], RED, 4)
 gx, gy = lp['gnd']
 s.wire([(px0 + 640, py0 + 160), (700, py0 + 160), (700, gy), (gx, gy)], INK, 4)
-bx, by = lp['boot']
-s.text(px0 + 30, py0 + 470, 'Bouton BOOT de la carte, appuye 5 s :', FB)
-s.text(px0 + 30, py0 + 500, 'oublie le wifi et redemarre (reseau Games-Setup).', FS, GREY)
-s.wire([(px0 + 420, py0 + 482), (740, py0 + 482), (740, by), (bx, by)], GREY, 2)
+# son : ampli I2S MAX98357A + haut-parleur (option)
+ax0, ay0, ax1, ay1 = 40, 600, 680, 940
+s.box(ax0, ay0, ax1, ay1, 'Son (option) : ampli I2S MAX98357A + haut-parleur 3 W', (240, 246, 255))
+AMP = [('VIN', '5v', RED, '5 V'), ('GND', 'gnd', INK, 'masse'), ('BCLK', 'bclk', ORANGE, 'GPIO 22'),
+       ('LRC', 'lrc', ORANGE, 'GPIO 21'), ('DIN', 'din', ORANGE, 'GPIO 33')]
+for i, (pin, key, col, note) in enumerate(AMP):
+    y = ay0 + 70 + i * 38
+    s.d.rectangle((ax1 - 30, y - 10, ax1 - 10, y + 10), outline=INK, width=2, fill=(255, 255, 255))
+    s.text(ax1 - 40, y, pin, FB, col, 'rm')
+    s.text(ax1 - 110, y, note, FS, GREY, 'rm')
+    if key in ('bclk', 'lrc', 'din'):
+        ex, ey = lp[key]
+        mid = 700 + ('bclk', 'lrc', 'din').index(key) * 14
+        s.wire([(ax1 - 10, y), (mid, y), (mid, ey), (ex, ey)], ORANGE, 3)
+        s.dot(ex, ey, ORANGE)
+s.text(ax0 + 30, ay0 + 70, 'VIN et GND : sur le 5 V', FS, RED)
+s.text(ax0 + 30, ay0 + 94, 'de l\'alimentation (comme l\'ESP32).', FS, GREY)
+# haut-parleur
+hx, hy = ax0 + 90, ay0 + 210
+s.d.rectangle((hx - 30, hy - 22, hx - 10, hy + 22), outline=INK, width=3, fill=(220, 220, 230))
+s.d.polygon([(hx - 10, hy - 22), (hx + 25, hy - 48), (hx + 25, hy + 48), (hx - 10, hy + 22)], outline=INK, fill=(200, 200, 215))
+s.text(hx + 40, hy - 10, 'Haut-parleur 4 ou 8 ohms, 3 W', FS)
+s.text(hx + 40, hy + 14, 'sur les bornes + / - du module', FS, GREY)
+s.text(ax0 + 30, ay0 + 290, 'GAIN et SD : non branches (9 dB, voix gauche + droite).', FS, GREY)
+s.text(ax0 + 30, ay0 + 314, 'Volume : commande v 0 a v 10 dans le moniteur serie.', FS, BLUE)
 
 # chainage : 3 configurations
 cy = 1010
-s.text(40, cy - 30, 'Chainage des dalles 128x64 (choix dans la page web, Reglages -> Dalles)', FB)
+s.text(40, cy - 30, 'Chainage des dalles 128x64 (reglage dans le moniteur serie : commande c NDFS)', FB)
 s.text(40, cy, 'Toutes les dalles sont posees dans le meme sens (fleches imprimees au dos dans la meme direction). '
                'Nappe : sortie OUT d\'une dalle -> entree IN de la suivante.', FS, GREY)
 PW, PH = 200, 100
@@ -175,70 +196,8 @@ s.text(x + PW + 60, y + 76, '5 V 15 A.', FS, RED)
 
 # options du menu Dalles
 oy = y + 40 + 4 * (VH + 14) + 20
-s.text(40, oy, 'Menu Dalles de la page web : 1 a 4 dalles, l\'une sous l\'autre, cote a cote ou carre 2x2 (4 dalles).', FB)
+s.text(40, oy, 'Commande c NDFS du moniteur serie : 1 a 4 dalles, l\'une sous l\'autre, cote a cote ou carre 2x2 (4 dalles).', FB)
 s.text(40, oy + 32, '- Ecran retourne (180) : la 1re dalle est en bas (ou a droite), ou tout l\'ensemble est monte a l\'envers.', FS)
 s.text(40, oy + 58, '- Une dalle sur deux retournee (serpentin) : les dalles 2 et 4 sont tournees de 180 pour garder des nappes courtes.', FS)
 s.save('branchement-dalles.png')
 
-# ================================================================ manette
-s = Sheet(1700, 1100, 'Game hub - branchement de la manette',
-          'ESP32 DevKit - radio ESP-NOW directe vers le jeu, sans box ni wifi a regler')
-LEFT = [('GPIO32', 'left'), ('GPIO33', 'right'), ('GPIO25', 'fire'), ('GPIO26', 'fire2'), ('GND', 'gnd')]
-RIGHT = [('3V3', '3v3'), ('GPIO34', 'joyx'), ('GND', 'jgnd'), ('', None), ('5V / VIN', '5v'), ('GND', 'pgnd')]
-lp, rp = s.esp32(640, 160, 960, 860, 'ESP32 DevKit (manette)', LEFT, RIGHT, 120, 100, lstart=110, rstart=110)
-s.text(800, 820, 'LED GPIO 2 (sur la carte) :', FS, INK, 'mm')
-s.text(800, 842, 'clignote = recherche, fixe = reliee', FS, GREY, 'mm')
-
-# boutons vers la masse
-bx0, by0 = 40, 160
-s.box(bx0, by0, bx0 + 500, by0 + 700, 'Boutons (vers la masse)', (240, 250, 242))
-names = {'left': ('GAUCHE', '<'), 'right': ('DROITE', '>'), 'fire': ('FEU', 'F'), 'fire2': ('FEU 2 (option)', 'F')}
-gnd_x = bx0 + 120
-for key, (label, sym) in names.items():
-    px, py = lp[key]
-    cx = bx0 + 250
-    # bouton poussoir : 2 pattes, une vers la GPIO, l'autre vers la masse
-    s.d.ellipse((cx - 26, py - 26, cx + 26, py + 26), outline=INK, width=3, fill=(255, 210, 210) if 'FEU' in label else (220, 225, 245))
-    s.text(cx, py, sym, FB, INK, 'mm')
-    s.text(cx, py + 32, label, FS, INK, 'mt')
-    s.wire([(cx + 26, py), (px, py)], ORANGE, 4)
-    s.dot(px, py, ORANGE)
-    s.wire([(cx - 26, py), (gnd_x, py)], INK, 3)
-    s.dot(gnd_x, py)
-gy_top, gy_bot = lp['left'][1], lp['gnd'][1]
-s.wire([(gnd_x, gy_top), (gnd_x, gy_bot)], INK, 3)
-s.wire([(gnd_x, gy_bot), lp['gnd']], INK, 3)
-s.text(bx0 + 30, by0 + 620, 'Pas de resistance : rappel interne de l\'ESP32.', FS, GREY)
-s.text(bx0 + 30, by0 + 645, 'Boutons d\'arcade ou poussoirs, 2 pattes.', FS, GREY)
-
-# joystick en option
-jx0, jy0 = 1080, 160
-s.box(jx0, jy0, jx0 + 580, jy0 + 440, 'Joystick analogique (option, KY-023)', (255, 252, 240))
-jpins = [('+5V (VCC)', '3v3', RED, '-> 3,3 V (pas 5 V !)'), ('VRx', 'joyx', ORANGE, '-> GPIO 34'), ('GND', 'jgnd', INK, '-> GND')]
-for i, (pin, key, col, note) in enumerate(jpins):
-    ex, ey = rp[key]
-    y = ey
-    s.d.rectangle((jx0 + 30, y - 10, jx0 + 50, y + 10), outline=INK, width=2, fill=(255, 255, 255))
-    s.text(jx0 + 60, y, pin, FB, col, 'lm')
-    s.text(jx0 + 220, y, note, FS, GREY, 'lm')
-    s.wire([(ex, ey), (jx0 + 30, y)], col, 4)
-    s.dot(jx0 + 30, y, col)
-s.text(jx0 + 30, jy0 + 345, 'SW (bouton du stick) -> GPIO 26 = 2e FEU.', FS)
-s.text(jx0 + 30, jy0 + 370, 'VRy n\'est pas utilise.', FS, GREY)
-s.text(jx0 + 30, jy0 + 400, 'Dans manette.ino : #define JOYSTICK 1', FB, BLUE)
-
-# alimentation
-ax0, ay0 = 1080, 640
-s.box(ax0, ay0, ax0 + 580, ay0 + 240, 'Alimentation', (252, 240, 240))
-for i, t in enumerate(('USB : chargeur ou batterie externe (le plus simple).', 'Ou batterie 18650 + module chargeur / 5 V',
-                       '   -> broche 5 V / VIN, masse -> GND.', 'Consommation ~100 mA.')):
-    s.text(ax0 + 30, ay0 + 70 + i * 36, t, FS, GREY if i == 3 else INK)
-vx, vy = rp['5v']
-s.wire([(vx, vy), (1040, vy), (1040, ay0 + 160), (ax0, ay0 + 160)], RED, 4)
-gx, gy = rp['pgnd']
-s.wire([(gx, gy), (1020, gy), (1020, ay0 + 196), (ax0, ay0 + 196)], INK, 4)
-
-s.text(40, 920, 'Mise en route : allumer le jeu, puis la manette. La LED clignote pendant la recherche (canaux 1 a 13),', FS)
-s.text(40, 946, 'puis reste allumee. Si le jeu change de canal (box reglee) ou s\'eteint, la manette le recherche toute seule.', FS)
-s.text(40, 980, 'Plusieurs manettes et la page web peuvent piloter le meme vaisseau.', FS, GREY)
-s.save('branchement-manette.png')

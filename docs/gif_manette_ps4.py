@@ -141,7 +141,7 @@ cmd = 'a ' + MAC
 for k in range(0, len(cmd) + 1, 2):
     im, d = frame(2, 'Tape-la dans le moniteur serie de l\'ESP32', 'Arduino IDE ou autre, 115200 bauds, puis Entree')
     d.rounded_rectangle((60, 120, 800, 420), 10, fill=(10, 12, 16), outline=(90, 90, 110), width=2)
-    lines = ['===== Game hub v1.03 - manette PS4 =====', 'Adresse Bluetooth de l\'ESP32 : 24:6f:28:aa:bb:cc',
+    lines = ['===== Game hub v2.01 =====', 'Adresse Bluetooth de l\'ESP32 : 24:6f:28:aa:bb:cc',
              '  a xx:xx:xx:xx:xx:xx : adresse de la console connue par la manette', '']
     for i, t in enumerate(lines):
         d.text((80, 140 + i * 26), t, fill=(150, 200, 150), font=font(16))

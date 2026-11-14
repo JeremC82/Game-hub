@@ -1,160 +1,170 @@
-# Game hub : shoot'em up sur dalles LED HUB75 (ESP32)
+# Game hub : jeux d'arcade sur dalles LED HUB75 (ESP32 + manette PS4)
 
-Le shoot'em up du mode Jeu du VU-mètre, jouable de trois façons :
-- depuis une **page web** (téléphone, tablette, PC) ;
-- avec une **manette ESP32**, un 2ᵉ ESP32 avec des boutons qui parle directement au jeu par radio ESP-NOW. Il n'y a besoin ni de box ni de page web ;
-- avec une **manette PS4** reliée en Bluetooth directement à l'ESP32 des dalles. C'est la version `Games_PS4`, sans wifi, encore **expérimentale**.
+Jeux d'arcade sur 1 à 4 dalles LED 128x64, avec un ESP32 classique et une **manette PS4 reliée en Bluetooth**.
 
-![Le jeu sur les 3 configurations de dalles](docs/rendu.png)
+- **Pas de wifi :** la manette se connecte directement à l'ESP32 des dalles.
+- **Partition unique de 3 Mo :** il reste de la place pour d'autres jeux.
+- **Son en option :** un petit ampli I2S et un haut-parleur.
 
-*Aperçu simulé (généré par `docs/rendu.py`, mêmes sprites que le jeu). Chaque configuration en grand : [128x128](docs/rendu-128x128.png), [256x64](docs/rendu-256x64.png), [128x256](docs/rendu-128x256.png).*
+Premier jeu : un **shoot'em up** original, repris du mode Jeu du VU-mètre. Il a un menu, des niveaux de difficulté, des stages, un vaisseau qui évolue, et des ennemis qui arrivent en vol.
 
-## Écrans
+![Le jeu sur les configurations de dalles](docs/rendu.png)
 
-Le menu **Réglages → Dalles** de la page web règle le montage. Le réglage est gardé en mémoire, et l'ESP32 redémarre quand on clique sur Appliquer.
+*Aperçu simulé, généré par `docs/rendu.py` avec les mêmes sprites que le jeu. Chaque configuration en grand : [128x128](docs/rendu-128x128.png), [256x64](docs/rendu-256x64.png), [128x256](docs/rendu-128x256.png).*
 
-- **Nombre :** 1 à 4 dalles 128x64.
-- **Disposition :** l'une sous l'autre, côte à côte, ou carré 2x2 (4 dalles). La page affiche la résolution obtenue.
-- **Écran retourné (180°) :** la 1ʳᵉ dalle, celle reliée à l'ESP32, est en bas ou à droite, ou bien tout l'ensemble est monté à l'envers.
-- **Une dalle sur deux retournée (serpentin) :** les dalles 2 et 4 sont tournées de 180° pour garder des nappes courtes.
+## Menu
 
-| Écran | Dalles | Montage (ordre de la chaîne) |
+Sans partie en cours, le jeu tourne tout seul en démo, sans son. Dès que la manette est connectée, un menu s'affiche par-dessus :
+
+![Menu et meilleurs scores](docs/rendu-menu.png)
+
+| Ligne | Action |
+|---|---|
+| **JOUER** | lance la partie |
+| **NIVEAU** | Facile / Normal / Difficile (gauche / droite ou ✕), choix gardé en mémoire |
+| **SCORES** | les 5 meilleurs scores : rang, score, niveau (F/N/D) et stage atteint |
+
+- **Navigation :** la croix haut / bas choisit la ligne, ✕ valide.
+- **START** (bouton Options) lance la partie depuis n'importe quelle ligne.
+- **En partie, START met en pause**, et un 2ᵉ appui reprend.
+- **Fin de partie :** « GAME OVER » s'affiche, avec « NOUVEAU RECORD ! » ou ton rang si tu entres dans le tableau. Le jeu revient ensuite au menu.
+
+| Niveau | Vies au départ | Ennemis |
 |---|---|---|
-| 128x128 | 2 | l'une sous l'autre, la 1ʳᵉ en haut |
-| 256x64 | 2 | côte à côte, la 1ʳᵉ à gauche |
-| 128x256 | 4 | l'une sous l'autre, écran vertical façon borne d'arcade, avec 7 rangées d'ennemis |
-| 256x128 | 4 | carré 2x2 : haut gauche → haut droite → bas gauche → bas droite |
-| 128x64, 128x192, 384x64, 512x64 | 1, 3 ou 4 | autres combinaisons possibles |
+| Facile | 5 | tirent 2 fois moins, piquent moins souvent, tirs plus lents |
+| Normal | 3 | — |
+| Difficile | 3 | tirent plus, piquent plus souvent, tirs plus rapides |
 
-Brochage identique à l'horloge ClockV1 et au VU-mètre.
+## Le jeu
 
-![Branchement des dalles](docs/branchement-dalles.png)
+- **Vies :** une icône par vie, en bas à gauche. Chaque stage terminé donne **une vie de plus** (9 au maximum).
+- **Stages :** quand tous les ennemis sont détruits, l'annonce « STAGE n » s'affiche avec un bonus de 500 points × le numéro du stage. La vague suivante est plus agressive.
+- **Arrivée en vol :** les ennemis arrivent en files, par groupes en miroir. Ils suivent des trajectoires courbes avec des boucles, puis rejoignent leur place. Abattus en vol, ils rapportent **double**.
 
-La profondeur de couleur est choisie au démarrage : la plus haute qui laisse assez de mémoire au wifi, entre 6 et 3 bits. Avec 4 dalles, on aura probablement 3 bits. Si même 3 bits ne passe pas, l'ESP32 revient tout seul à 2 dalles.
+  ![Arrivée des ennemis](docs/arrivee-ennemis.gif)
 
-## Jouer
+- **Le vaisseau évolue à chaque stage :**
 
-1. **Wifi :** au démarrage, l'ESP32 essaie dans l'ordre :
-   1. les réseaux de `games/secrets.h`, un fichier local jamais publié (il est dans .gitignore), même format que celui de l'horloge ;
-   2. le dernier réseau réglé ;
-   3. sinon, il crée le réseau **Games-Setup** pendant 3 min. Connecte-toi dessus et choisis ta box sur la page qui s'ouvre (sinon va sur 192.168.4.1). Pendant ce temps, le jeu et la manette ESP32 marchent déjà, et la dalle affiche `WIFI:Games-Setup`.
-2. Ouvre **http://games.local**, ou l'adresse IP affichée sur la dalle pendant la démo.
-3. Appuie sur **FEU** pour lancer une partie.
+  ![Évolution du vaisseau](docs/rendu-vaisseaux.png)
 
-Commandes :
-- **Tactile :** ◀ ▶ et **FEU**. Garder FEU appuyé tire en continu.
-- **Clavier :** ← → ou Q / D pour bouger, espace pour tirer.
-- **Manette :** une manette branchée au PC ou au téléphone est reconnue par le navigateur.
+  | Stage | Vaisseau |
+  |---|---|
+  | 1 | de base, un tir |
+  | 2 | **tir rapide** (ailes vertes) |
+  | 3 | **double canon**, deux tirs parallèles |
+  | 4 et + | **triple canon**, tirs en éventail |
 
-**Stages :** quand tous les ennemis sont détruits, l'annonce « STAGE n » s'affiche avec un bonus de 500 points × le numéro du stage. La vague suivante arrive alors, plus agressive. À chaque stage, ton vaisseau évolue :
+- **Abandon :** une partie sans aucun appui pendant 1 min repasse en démo.
 
-![Évolution du vaisseau](docs/rendu-vaisseaux.png)
-
-| Stage | Vaisseau |
-|---|---|
-| 1 | de base, un tir |
-| 2 | **tir rapide** (ailes vertes) |
-| 3 | **double canon**, deux tirs parallèles |
-| 4 et + | **triple canon**, tirs en éventail |
-
-Sans joueur, le jeu tourne tout seul en démo. Une partie abandonnée repasse en démo après 1 min sans appui. Le record (des joueurs seulement) est gardé en mémoire.
-
-Réglages de la page : luminosité et dalles.
-
-**Bouton BOOT appuyé 5 s :** oublie le wifi et redémarre sur Games-Setup.
-
-## Manette ESP32 (sans wifi ni box)
-
-Sketch : [manette/manette.ino](manette/manette.ino). Il marche sur n'importe quel ESP32 classique (DevKit), avec des boutons vers la masse :
-
-| Bouton | GPIO |
-|---|---|
-| Gauche | 32 |
-| Droite | 33 |
-| Feu | 25 |
-| Feu (2ᵉ bouton, ou bouton du joystick) | 26 |
-| LED de la carte | 2 : clignote = recherche du jeu, allumée = reliée |
-
-![Branchement de la manette](docs/branchement-manette.png)
-
-En option, un joystick analogique (module KY-023) : axe X sur GPIO 34, alimenté en 3,3 V. Mets `#define JOYSTICK 1` dans manette.ino.
-
-**Fonctionnement (ESP-NOW, la radio directe d'Espressif entre ESP32) :**
-- Le jeu émet une balise 2 fois par seconde sur son canal wifi : celui de la box s'il y est connecté, sinon celui du réseau Games-Setup.
-- La manette écoute les canaux 1 à 13 jusqu'à trouver cette balise. Elle envoie ensuite l'état de ses boutons à chaque appui et toutes les 100 ms, avec environ 1 ms de délai.
-- Si le jeu ne répond plus pendant 3 s (jeu éteint, ou canal changé parce que la box a été réglée), la manette recommence sa recherche toute seule.
-- Si la manette se tait plus de 0,5 s, le jeu relâche ses touches : le vaisseau ne reste pas bloqué.
-- Plusieurs manettes et la page web peuvent être utilisées en même temps : elles pilotent le même vaisseau.
-
-Pourquoi pas le Bluetooth : sa pile prend 50 à 100 Ko de RAM, ce qui ne tient pas avec la mémoire des dalles. ESP-NOW passe par la radio wifi déjà active et ne coûte presque rien.
-
-## Manette PS4 en Bluetooth (expérimental)
-
-Version à part du jeu : `Games_PS4_V<version>.bin`. Elle sort du même code, compilé avec `-DGAMES_PS4`. Cette version n'a pas de wifi, de page web ni de manette ESP-NOW : le Bluetooth et les dalles se partagent la mémoire.
-
-> En cours de test.
-> - **V1.03 :** l'ESP32 redémarrait à la connexion de la manette, faute de mémoire. L'erreur était `assert failed: host_recv_pkt_cb hci_hal_h4.c:553` : le Bluetooth n'arrivait plus à réserver ses tampons de réception.
-> - **V1.04 :**
->   - les dalles passent en **3 bits de couleur** pour laisser la mémoire au Bluetooth ;
->   - les anciens appairages sont effacés au démarrage ;
->   - rien n'est envoyé à la manette pendant la 1ʳᵉ seconde de connexion.
->
-> Le moniteur série (115200 bauds) affiche la mémoire libre à la connexion, puis toutes les 2 s. Avec 4 dalles, ce n'est pas sûr que la mémoire suffise.
+## Manette PS4
 
 ![Connexion de la manette PS4](docs/manette-ps4.gif)
-
-**Connexion, une seule fois.** Une manette PS4 ne se connecte qu'à l'adresse Bluetooth de « sa » console. L'ESP32 prend donc cette adresse :
-
-1. Branche la manette en USB sur le PC et lance **SixaxisPairTool**. Il affiche l'adresse de la console que la manette connaît (« Current Master »).
-2. Ouvre le moniteur série de l'ESP32 (115200 bauds) et tape `a` suivi de cette adresse, par exemple `a 1a:2b:3c:4d:5e:6f`, puis Entrée. L'ESP32 enregistre l'adresse et redémarre.
-3. Appuie sur le bouton **PS** de la manette. Elle se connecte et sa barre lumineuse s'allume.
-
-L'adresse reste en mémoire et la manette marche toujours sur la console. Autre méthode : écris dans la manette, avec SixaxisPairTool, l'adresse affichée par l'ESP32 sur la dalle. Mais il faudra alors réappairer la manette sur la console. La commande `a` seule, sans adresse, rend à l'ESP32 son adresse d'origine.
 
 | Manette | Action |
 |---|---|
 | stick gauche ou croix gauche / droite | bouger |
-| croix, rond, carré, triangle, R1, L1 ou R2 | tirer (et lancer une partie) |
-| croix haut / bas | luminosité (enregistrée) |
+| stick gauche ou croix haut / bas | avancer / reculer (dans le bas de l'écran, environ 45 %) |
+| croix, rond, carré, triangle, R1, L1 ou R2 | tirer |
+| START (Options) | jouer depuis le menu, pause en partie |
+| croix haut / bas, au menu | choisir la ligne |
+| Share + croix haut / bas | luminosité (enregistrée) |
 | Share + Options pendant 3 s | redémarrer l'ESP32 |
 
 - **Vibration :** la manette vibre quand ton vaisseau est touché.
-- **Barre lumineuse :** bleu sombre en démo, puis la couleur de l'évolution du vaisseau.
+- **Barre lumineuse :** bleu sombre au menu, puis la couleur de l'évolution du vaisseau.
 
-**Moniteur série :**
-- `?` affiche l'aide.
-- `c NDFS` règle les dalles :
-  - N : nombre de dalles, de 1 à 4 ;
-  - D : disposition, 0 l'une sous l'autre, 1 côte à côte, 2 carré ;
-  - F : écran retourné, 0 ou 1 ;
-  - S : serpentin, 0 ou 1.
+**Connexion, une seule fois.** Une manette PS4 ne se connecte qu'à l'adresse Bluetooth qu'elle a enregistrée. Il y a deux façons de faire.
 
-  Exemple : `c 2000`. Ce réglage est commun avec la version wifi.
+**Méthode 1 (la plus simple) : écrire l'adresse de l'ESP32 dans la manette.**
+1. Pendant la démo, la dalle affiche l'adresse Bluetooth de l'ESP32 sous « MANETTE: BOUTON PS ». Le moniteur série l'affiche aussi.
+2. Branche la manette en USB sur le PC et lance **SixaxisPairTool**. Tape l'adresse de l'ESP32 dans « Change Master », puis clique sur Update.
+3. Débranche la manette et appuie sur **PS**.
+
+Pour rejouer sur la PS4 ensuite, il suffit de rebrancher la manette en USB sur la console et d'appuyer sur PS.
+
+**Méthode 2 : l'ESP32 prend l'adresse de la console.** La manette continue alors de marcher sur la PS4 sans rien refaire.
+1. Avec SixaxisPairTool, lis l'adresse « Current Master » de la manette : c'est celle de la console.
+2. Dans le moniteur série de l'ESP32, tape `a 1a:2b:3c:4d:5e:6f` (avec cette adresse), puis Entrée. L'ESP32 redémarre.
+3. Appuie sur **PS**.
+
+La commande `a` seule rend à l'ESP32 son adresse d'origine.
+
+## Son (option)
+
+Module **ampli I2S MAX98357A**, par exemple [Adafruit MAX98357A, réf. 3006](https://www.adafruit.com/product/3006). On trouve aussi des modules compatibles en cherchant « MAX98357A I2S ». Il faut y ajouter un **haut-parleur de 3 W, 4 ou 8 Ω** (40 à 50 mm).
+
+| Module MAX98357A | ESP32 |
+|---|---|
+| VIN | 5 V (même alimentation que l'ESP32) |
+| GND | GND |
+| BCLK | GPIO 22 |
+| LRC | GPIO 21 |
+| DIN | GPIO 33 |
+| GAIN, SD | non branchés (gain 9 dB, voies gauche + droite mélangées) |
+| + / − | le haut-parleur |
+
+- **Bruitages synthétisés dans l'ESP32 :** tir, explosion, vaisseau touché, piqué d'un ennemi, jingles de stage, de nouvelle arme et de fin de partie, bips du menu.
+- **Volume :** `v 0` (muet) à `v 10` dans le moniteur série.
+- **Démo :** elle reste muette.
+- **Sans module branché :** le jeu marche normalement.
+- **Mémoire :** le son prend environ 4 Ko et utilise le 2ᵉ canal I2S, car les dalles utilisent l'autre.
+
+## Branchement
+
+![Branchement des dalles et du son](docs/branchement-dalles.png)
+
+| Écran | Dalles | Montage (ordre de la chaîne) | Commande |
+|---|---|---|---|
+| 128x128 | 2 | l'une sous l'autre, la 1ʳᵉ (reliée à l'ESP32) en haut | `c 2000` |
+| 256x64 | 2 | côte à côte, la 1ʳᵉ à gauche | `c 2100` |
+| 128x256 | 4 | l'une sous l'autre, écran vertical façon borne d'arcade, 7 rangées d'ennemis | `c 4000` |
+| 256x128 | 4 | carré 2x2 : haut gauche → haut droite → bas gauche → bas droite | `c 4200` |
+
+- **Écran retourné à 180°** (4ᵉ chiffre de la commande à 1, par exemple `c 2010`) : la 1ʳᵉ dalle est en bas ou à droite, ou tout l'ensemble est monté à l'envers.
+- **Une dalle sur deux retournée** (dernier chiffre à 1, par exemple `c 2001`) : câblage en serpentin, pour garder des nappes courtes.
+
+**Alimentation 5 V :** 8 A pour 2 dalles, 15 A pour 4. N'alimente pas les dalles par l'USB de l'ESP32.
+
+## Moniteur série (115200 bauds)
+
+| Commande | Effet |
+|---|---|
+| `?` | aide et état (adresse Bluetooth, dalles, couleurs, volume) |
+| `a xx:xx:xx:xx:xx:xx` | adresse Bluetooth que prend l'ESP32, celle de la console. `a` seule revient à l'adresse d'origine |
+| `c NDFS` | dalles. N : nombre (1 à 4). D : disposition (0 l'une sous l'autre, 1 côte à côte, 2 carré). F : écran retourné (0/1). S : serpentin (0/1) |
+| `p N` | couleurs des dalles sur N bits (3 à 6) |
+| `v N` | volume du son, de 0 à 10 |
+
+Les commandes `a`, `c` et `p` redémarrent l'ESP32. Les réglages sont gardés en mémoire.
+
+**Couleurs et mémoire :** le Bluetooth demande beaucoup de mémoire, surtout à la connexion de la manette. Les dalles sont donc en **3 bits** par défaut. Tu peux essayer `p 4` pour avoir plus de nuances. Si l'ESP32 plante 2 fois de suite, il revient tout seul à 3 bits. Le moniteur série affiche la mémoire libre à la connexion, puis toutes les 2 s.
 
 ## Firmware
 
-Binaires prêts à flasher sur un ESP32 classique, à l'adresse 0x10000 :
+Le programme utilise une **partition unique de 3 Mo** (« Huge APP », sans mise à jour par wifi). Il y a deux fichiers :
 
-| Fichier | Rôle | MD5 |
+| Fichier | Quand | Adresse |
 |---|---|---|
-| [firmware/Games_V1.03.bin](firmware/Games_V1.03.bin) | le jeu (wifi, page web, manette ESP-NOW), pour l'ESP32 des dalles | `1a1638eaf125761aca8b3de7a4099cd5` |
-| [firmware/Games_PS4_V1.04.bin](firmware/Games_PS4_V1.04.bin) | le jeu, version manette PS4 Bluetooth sans wifi (expérimental) | `eb28912c8b54f64137ce775ab40f1db3` |
-| [firmware/Manette_V1.00.bin](firmware/Manette_V1.00.bin) | la manette ESP-NOW | `598ccc714d7c450ee49a337ae10b483b` |
+| `GameHub_V<version>_complet.bin` | **1er flash**, ou en venant d'une ancienne version (table des partitions différente) | **0x0** |
+| `GameHub_V<version>.bin` | mises à jour suivantes | 0x10000 |
 
-Le jeu publié ne contient aucun réseau wifi. Au premier démarrage, règle le wifi avec le réseau **Games-Setup**. Pour intégrer tes propres réseaux, crée `games/secrets.h` et recompile.
+Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volume) sont conservés.
+
+| Binaire | Adresse | MD5 |
+|---|---|---|
+| [firmware/GameHub_V2.03_complet.bin](firmware/GameHub_V2.03_complet.bin) | 0x0 | `13c1957e460ce03857b630fe552ca659` |
+| [firmware/GameHub_V2.03.bin](firmware/GameHub_V2.03.bin) | 0x10000 | `d32e91995758472c123566274983d6e3` |
+
+Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB SPIFFS)** dans Outils → Partition Scheme.
 
 ## Compilation
 
 ```powershell
-./build.ps1           # le jeu et la manette -> Games_V<version>.bin et Manette_V<version>.bin
-./build.ps1 games     # le jeu seulement
-./build.ps1 games -Ps4  # le jeu en version manette PS4 -> Games_PS4_V<version>.bin
+./build.ps1    # arduino-cli, ESP32 classique, core 2.0.17, partition Huge APP
+               # -> GameHub_V<version>.bin et GameHub_V<version>_complet.bin
 ```
 
-Avec arduino-cli, pour un ESP32 classique sur le core 2.0.17.
+- **Bibliothèques :** ESP32-HUB75-MatrixPanel-I2S-DMA, Adafruit GFX et PS4Controller 1.1.0.
+- **Plans, aperçus et GIF :** `python docs/branchement.py`, `python docs/rendu.py`, `python docs/gif_manette_ps4.py`, `python docs/gif_arrivee.py` (Pillow).
 
-Plans, aperçus et GIF : `python docs/branchement.py`, `python docs/rendu.py`, `python docs/gif_manette_ps4.py` (Pillow).
-
-Le script utilise les bibliothèques de l'horloge : ESP32-HUB75-MatrixPanel-I2S-DMA, Adafruit GFX, ESPAsyncWebServer, AsyncTCP et WiFiManager. La version PS4 utilise en plus PS4Controller 1.1.0.
-
-> Pas encore testé sur le matériel.
+L'ancienne version avec wifi, page web et manette ESP-NOW reste disponible dans l'historique Git, jusqu'au commit `fb11367`.

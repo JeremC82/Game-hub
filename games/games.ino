@@ -1,55 +1,34 @@
 /**************************************************************************************************/
-/*  Games : shoot'em up d'arcade sur dalles LED HUB75 128x64, ESP32 classique                    */
+/*  Game hub : jeux d'arcade sur dalles LED HUB75 128x64, ESP32 classique, manette PS4 Bluetooth  */
 /*                                                                                                */
-/*  Le jeu vient du mode Jeu du VU-metre. On y joue depuis une page web (telephone, tablette ou  */
-/*  PC) : http://games.local ou l'adresse IP affichee sur la dalle.                               */
-/*    gauche / droite, FEU (tir automatique en restant appuye)                                    */
-/*    clavier : fleches ou Q / D, espace pour tirer ; manette de jeu reconnue par le navigateur   */
-/*  Ou avec la manette ESP32 (dossier manette/) : radio ESP-NOW directe, sans box ni page web.    */
-/*  Sans joueur, le jeu tourne tout seul (demo). FEU lance une partie. Le record est garde.      */
+/*  Pas de wifi : la manette PS4 se connecte en Bluetooth directement a l'ESP32 des dalles.       */
+/*  Partition unique de 3 Mo (Huge APP, pas de mise a jour par wifi) : place pour d'autres jeux.  */
 /*                                                                                                */
-/*  Ecran (menu Dalles de la page web, garde en memoire, redemarre) : 1 a 4 dalles 128x64        */
-/*  chainees, rangees l'une sous l'autre, cote a cote ou en carre 2x2 (4 dalles). Options :      */
-/*    ecran retourne (180 degres) : 1re dalle en bas / a droite, ou ensemble monte a l'envers    */
-/*    une dalle sur deux retournee : cablage en serpentin (nappes courtes)                       */
-/*  Ex. : 2 dalles l'une sous l'autre = 128x128, 4 l'une sous l'autre = 128x256 (vertical).       */
-/*  Meme brochage que l'horloge ClockV1 et le VU-metre.                                          */
+/*  Jeu : shoot'em up (repris du mode Jeu du VU-metre). Sans joueur, demo automatique ; un bouton */
+/*  de tir lance une partie. Stages, vaisseau qui evolue, arrivee des ennemis en vol.             */
+/*  Manette : stick / croix = bouger (aussi avancer / reculer), croix rond carre triangle R1 L1 R2 */
+/*            = tirer, START = menu / pause, Share + haut / bas = luminosite,                     */
+/*            Share + Options 3 s = redemarrer.                                                   */
 /*                                                                                                */
-/*  Wifi : essaie d'abord les reseaux de secrets.h (fichier local, jamais publie), puis le        */
-/*  dernier reseau regle. Sinon l'ESP32 cree le reseau                                            */
-/*  "Games-Setup" : s'y connecter et choisir sa box sur la page qui s'ouvre (192.168.4.1).         */
-/*  Bouton BOOT appuye 5 s : oublie le wifi et redemarre.                                        */
+/*  Ecran : 1 a 4 dalles 128x64 chainees, l'une sous l'autre, cote a cote ou en carre 2x2,        */
+/*  ecran retourne, une dalle sur deux retournee (serpentin). Meme brochage que l'horloge.        */
 /*                                                                                                */
-/*  Version manette PS4 (compilee avec -DGAMES_PS4, ./build.ps1 games -Ps4) : pas de wifi, la     */
-/*  manette PS4 se connecte en Bluetooth directement a cet ESP32. Reglages par le moniteur serie  */
-/*  (115200 bauds, taper ?) : adresse de la manette, dalles.                                      */
+/*  Reglages par le moniteur serie (115200 bauds, taper ?) : adresse Bluetooth de la manette,     */
+/*  dalles, nombre de bits de couleur, volume.                                                   */
+/*                                                                                                */
+/*  Son (option) : ampli I2S MAX98357A + haut-parleur 3 W. BCLK GPIO 22, LRC GPIO 21, DIN GPIO 33, */
+/*  VIN 5 V, GND. Bruitages synthetises (tir, explosions, pique, jingles), muets pendant la demo.  */
 /**************************************************************************************************/
 #include <Arduino.h>
 #include <Preferences.h>
 #include <ESP32-HUB75-MatrixPanel-I2S-DMA.h>
 #include <Adafruit_GFX.h>
-#ifdef GAMES_PS4  // version manette PS4 en Bluetooth, sans wifi
 #include <PS4Controller.h>
 #include <esp_gap_bt_api.h>
-#else
-#include <WiFi.h>
-#include <WiFiMulti.h>
-#include <esp_now.h>
-#include <esp_wifi.h>
-#include <ESPmDNS.h>
-#include <WebServer.h>  // avant ESPAsyncWebServer.h (utilise par WiFiManager, evite le conflit HTTP_GET)
-#include <ESPAsyncWebServer.h>
-#include <WiFiManager.h>
-#include "web_page.h"
-#if __has_include("secrets.h")
-#include "secrets.h"  // reseaux wifi connus (local, jamais publie)
-#else
-#define WIFI_SEED_COUNT 0
-const char *WIFI_SEED[1][2] = { { "", "" } };
-#endif
-#endif
+#include <driver/i2s.h>
+#include "game_types.h"
 
-#define GAMES_VERSION "1.04"
+#define GAMES_VERSION "2.03"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -66,7 +45,6 @@ const char *WIFI_SEED[1][2] = { { "", "" } };
 #define LAT_PIN 4
 #define OE_PIN 15
 #define CLK_PIN 16
-#define BOOT_PIN 0  // bouton BOOT : appui 5 s = oublier le wifi
 
 Preferences prefs;
 MatrixPanel_I2S_DMA *dma = nullptr;
@@ -105,7 +83,7 @@ class TiledPanels : public Adafruit_GFX {
   bool fl, sp;
 };
 Adafruit_GFX *gfx = nullptr;
-// configuration des dalles (menu Dalles de la page web)
+// configuration des dalles (moniteur serie, commande c)
 uint8_t nPanels = 2;   // 1 a 4 dalles 128x64
 uint8_t arrange = 0;   // 0 l'une sous l'autre, 1 cote a cote, 2 carre 2x2 (4 dalles)
 bool flipAll = false;  // ecran retourne (180 degres)
@@ -114,19 +92,27 @@ uint8_t panelCols() { return arrange == 2 && nPanels == 4 ? 2 : arrange == 1 ? n
 uint8_t panelRows() { return nPanels / panelCols(); }
 int W = 128, H = 128;
 uint8_t bright = 120;
+uint8_t colorBits = 0;  // profondeur de couleur obtenue pour les dalles
 uint16_t rgb(uint8_t r, uint8_t g, uint8_t b) { return dma->color565(r, g, b); }
 
-// ---------------------------------------------------------------- commandes (page web -> jeu)
-volatile uint8_t keys = 0;          // touches de la page web : 1 gauche, 2 droite, 4 feu
-volatile uint8_t keysNow = 0;       // touches de la manette ESP-NOW
-volatile uint32_t lastNowRx = 0;    // derniere trame de la manette (sans nouvelles : touches relachees)
-uint8_t keysPs4 = 0;                // touches de la manette PS4 (version GAMES_PS4)
+// ---------------------------------------------------------------- commandes (manette -> jeu)
+uint8_t keysPs4 = 0;                // touches de la manette PS4 : 1 gauche, 2 droite, 4 feu, 8 haut, 16 bas
+int gPYBase = 0;                    // hauteur de depart du vaisseau (en bas) ; il peut monter jusqu'a gPYMin
+int gPYMin = 0;
 volatile bool rumbleReq = false;    // vaisseau touche : la manette PS4 vibre
 volatile uint32_t lastInput = 0;    // dernier appui d'un joueur (millis)
 volatile bool startReq = false;     // FEU pendant la demo : nouvelle partie
-bool gDemo = true;                  // le jeu joue tout seul
+bool gDemo = true;                  // le jeu joue tout seul (menu par-dessus quand la manette est la)
+bool gPaused = false;               // START pendant une partie : pause
+uint8_t gDiff = 1;                  // difficulte : 0 facile, 1 normal, 2 difficile
+const char *const DIFF_NAME[3] = { "FACILE", "NORMAL", "DIFFICILE" };
+uint8_t menuSel = 0;                // ligne choisie : 0 jouer, 1 niveau, 2 scores
+bool menuScores = false;            // page des meilleurs scores affichee
+#define TOP_N 5
+HiScore gBest[TOP_N];                // meilleurs scores (gardes en memoire)
+uint8_t gLastRank = 0;              // place obtenue a la derniere partie (0 : hors tableau)
 #define IDLE_TO_DEMO_MS 60000UL     // partie abandonnee : retour a la demo apres 1 min sans appui
-char ipText[20] = "";
+char ipText[20] = "";  // adresse Bluetooth de l'ESP32, affichee pendant la demo
 
 // ---------------------------------------------------------------- petite police 3x5 (score)
 const uint8_t TF_DIG[10][5] = { { 7, 5, 5, 5, 7 }, { 2, 6, 2, 2, 7 }, { 7, 1, 7, 4, 7 }, { 7, 1, 7, 1, 7 }, { 5, 5, 7, 1, 1 },
@@ -152,6 +138,114 @@ void tinyText(Adafruit_GFX &g, int x, int y, const char *s, uint16_t col) {
   }
 }
 
+// ---------------------------------------------------------------- son : ampli I2S MAX98357A (option)
+// I2S0 (les dalles utilisent l'I2S1). Synthetiseur 4 voix (carre ou bruit, glissando, decroissance)
+// calcule dans une petite tache ; sans ampli branche, rien ne se passe.
+#define SND_BCLK 22
+#define SND_LRC 21
+#define SND_DIN 33
+#define SND_RATE 22050
+#define SND_VOICES 4
+Voice voices[SND_VOICES];
+portMUX_TYPE sndMux = portMUX_INITIALIZER_UNLOCKED;
+uint8_t volume = 6;  // 0 a 10 (moniteur serie : v N)
+const Note *melody = nullptr;  // jingle en cours (notes jouees l'une apres l'autre)
+uint8_t melodyLen = 0, melodyPos = 0;
+uint32_t melodyNext = 0;
+
+// lance un son : freq de depart, freq d'arrivee, duree, volume 0-1, bruit ou carre
+void sndPlay(float f0, float f1, uint16_t ms, float vol, bool noise) {
+  if (!gDemo) sndRaw(f0, f1, ms, vol, noise);  // demo muette
+}
+void sfxMenu() { sndRaw(1200, 1200, 35, 0.15f, false); }
+void sndRaw(float f0, float f1, uint16_t ms, float vol, bool noise) {
+  if (volume == 0) return;
+  uint32_t n = (uint32_t)SND_RATE * ms / 1000;
+  portENTER_CRITICAL(&sndMux);
+  int best = 0;
+  for (int i = 1; i < SND_VOICES; i++)
+    if (voices[i].left < voices[best].left) best = i;  // voix libre, ou la plus proche de finir
+  voices[best] = { 0, f0 / SND_RATE, (f1 - f0) / SND_RATE / n, vol, vol / n, n, noise };
+  portEXIT_CRITICAL(&sndMux);
+}
+void sndMelody(const Note *m, uint8_t len) {
+  if (gDemo || volume == 0) return;
+  melody = m; melodyLen = len; melodyPos = 0; melodyNext = 0;
+}
+void sndUpdate() {  // notes des jingles (appele a chaque tour de boucle)
+  if (!melody || millis() < melodyNext) return;
+  if (melodyPos >= melodyLen) { melody = nullptr; return; }
+  const Note &n = melody[melodyPos++];
+  if (n.hz) sndPlay(n.hz, n.hz, n.ms * 9 / 10, 0.22f, false);
+  melodyNext = millis() + n.ms;
+}
+const Note JINGLE_STAGE[] = { { 523, 90 }, { 659, 90 }, { 784, 90 }, { 1047, 220 } };
+const Note JINGLE_OVER[] = { { 523, 200 }, { 392, 200 }, { 330, 200 }, { 262, 450 } };
+const Note JINGLE_ARME[] = { { 784, 70 }, { 988, 70 }, { 1175, 70 }, { 1568, 200 } };
+void sfxShot() { sndPlay(1400, 500, 70, 0.16f, false); }
+void sfxBoom() { sndPlay(900, 120, 260, 0.35f, true); }
+void sfxHit() { sndPlay(700, 60, 700, 0.5f, true); sndPlay(220, 40, 600, 0.3f, false); }
+void sfxDive() { sndPlay(1100, 350, 450, 0.10f, false); }
+
+void audioTask(void *) {
+  static int16_t buf[256 * 2];  // stereo : la meme valeur a gauche et a droite
+  uint32_t rnd = 12345;
+  for (;;) {
+    float g = volume * volume / 100.0f * 9000;  // volume progressif
+    portENTER_CRITICAL(&sndMux);
+    for (int i = 0; i < 256; i++) {
+      float acc = 0;
+      for (auto &v : voices) {
+        if (!v.left) continue;
+        float smp;
+        if (v.noise) {
+          v.ph += v.f;
+          if (v.ph >= 1) { v.ph -= 1; rnd = rnd * 1103515245 + 12345; }
+          smp = (rnd >> 16 & 1) ? 1 : -1;
+        } else {
+          v.ph += v.f;
+          if (v.ph >= 1) v.ph -= 1;
+          smp = v.ph < 0.5f ? 1 : -1;
+        }
+        acc += smp * v.vol;
+        v.f += v.df;
+        v.vol -= v.dv * 0.6f;  // decroissance douce
+        v.left--;
+      }
+      int32_t o = constrain((int32_t)(acc * g), -32000, 32000);
+      buf[i * 2] = buf[i * 2 + 1] = o;
+    }
+    portEXIT_CRITICAL(&sndMux);
+    size_t done;
+    i2s_write(I2S_NUM_0, buf, sizeof(buf), &done, portMAX_DELAY);
+  }
+}
+void audioBegin() {
+  volume = constrain(prefs.getUChar("vol", 6), 0, 10);
+  i2s_config_t cfg = {};
+  cfg.mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX);
+  cfg.sample_rate = SND_RATE;
+  cfg.bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT;
+  cfg.channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT;
+  cfg.communication_format = I2S_COMM_FORMAT_STAND_I2S;
+  cfg.dma_buf_count = 4;
+  cfg.dma_buf_len = 256;
+  cfg.tx_desc_auto_clear = true;  // silence si la tache prend du retard
+  i2s_pin_config_t pins = {};
+  pins.mck_io_num = I2S_PIN_NO_CHANGE;
+  pins.bck_io_num = SND_BCLK;
+  pins.ws_io_num = SND_LRC;
+  pins.data_out_num = SND_DIN;
+  pins.data_in_num = I2S_PIN_NO_CHANGE;
+  if (i2s_driver_install(I2S_NUM_0, &cfg, 0, NULL) != ESP_OK || i2s_set_pin(I2S_NUM_0, &pins) != ESP_OK) {
+    Serial.println("Son : I2S indisponible");
+    return;
+  }
+  xTaskCreatePinnedToCore(audioTask, "son", 3072, NULL, 2, NULL, 1);
+  Serial.printf("Son : ampli I2S (BCLK %d, LRC %d, DIN %d), volume %u/10, memoire libre %u\n", SND_BCLK, SND_LRC, SND_DIN, volume,
+                ESP.getFreeHeap());
+}
+
 // ---------------------------------------------------------------- jeu : shoot'em up d'arcade (repris du VU-metre)
 // Sprites originaux multicolores (9x7), formation qui oscille, ennemis qui piquent en courbe,
 // ecran d'arcade : SCORE et RECORD en haut, vies et vague en bas (128x128).
@@ -162,10 +256,11 @@ void tinyText(Adafruit_GFX &g, int x, int y, const char *s, uint16_t col) {
 #define G_BOMBS 10
 #define G_BOOMS 10
 #define G_STARS 128
-#define G_RECTS 460
+#define G_RECTS 800
 #define G_MAXROWS 7
 const int GW = 9, GH = 7;  // taille des ennemis
-struct GEnemy { float x, y, vx, vy; int16_t t; int8_t row, col, type, hp, dir; uint8_t state; bool alive; };  // state : 0 rang, 1 pique, 2 retour
+struct GEnemy { float x, y, vx, vy; int16_t t; int8_t row, col, type, hp, dir; uint8_t state, path; bool alive; };
+// state : 0 rang, 1 pique, 2 retour a sa place, 3 arrivee en vol (trajectoire courbe, en file)
 struct GDot { float x, y; bool on; float vx; };  // vx : tirs en eventail
 struct GBoom { int16_t x, y; uint8_t t; };
 struct GStar { int16_t x; float y, v; uint8_t hue; };
@@ -198,7 +293,8 @@ const char *const SPR_SHIP[4][8] = {
   { "c...c...c", "c..ccc..c", "cc.cwc.cc", "rbbcwcbbr", "rbbcccbbr", "bbcbcbcbb", "b.oy.yo.b", "..o...o.." }
 };
 const char *const TIER_NAME[4] = { "", "TIR RAPIDE", "DOUBLE CANON", "TRIPLE CANON" };
-int gStageT = 0;          // images restantes de l'annonce "STAGE n"
+int gStageT = 0;
+bool gLifeUp = false;     // vie gagnee a la fin du stage (affichee avec l'annonce)          // images restantes de l'annonce "STAGE n"
 uint32_t gBonus = 0;      // bonus de fin de stage affiche avec l'annonce
 int gTier() { return min(gWave, 4) - 1; }
 const char *const SPR_LIFE[4] = { "..c..", ".ccc.", "bcwcb", "b...b" };
@@ -212,8 +308,10 @@ int gPalIdx(char ch) {
     if (G_PAL_CH[i] == ch) return i;
   return -1;
 }
+bool gOverflow = false;  // trop de zones dessinees : tout l'ecran sera efface a l'image suivante
 void gMark(int x, int y, int w, int h) {
   if (gNOld < G_RECTS) gOld[gNOld++] = { (int16_t)x, (int16_t)y, (uint8_t)w, (uint8_t)h };
+  else gOverflow = true;
 }
 void gPix(int x, int y, uint16_t c) {
   if (x >= 0 && x < W && y >= 0 && y < H) gfx->drawPixel(x, y, c);
@@ -237,6 +335,33 @@ void gBoomAt(int x, int y) {
   for (int i = 0; i < G_BOOMS; i++)
     if (gBoom[i].t == 0) { gBoom[i] = { (int16_t)x, (int16_t)y, 1 }; return; }
 }
+// Trajectoires d'arrivee (en % de l'ecran), parcourues en file par chaque groupe puis retour a sa place.
+// 0 : plongee depuis le haut avec une boucle sur le cote ; 1 : entree par le cote, boucle au centre.
+// Chaque trajectoire existe aussi en miroir (groupes qui arrivent par paires, de chaque cote).
+#define G_PATH_PTS 9
+#define G_PATH_SEG 10  // images par segment
+const int8_t G_PATH[2][G_PATH_PTS][2] = {
+  { { 42, -12 }, { 45, 12 }, { 52, 34 }, { 66, 52 }, { 84, 58 }, { 92, 44 }, { 82, 30 }, { 66, 36 }, { 58, 50 } },
+  { { -10, 78 }, { 14, 74 }, { 32, 64 }, { 44, 48 }, { 44, 32 }, { 34, 24 }, { 24, 32 }, { 26, 46 }, { 40, 52 } }
+};
+// position sur la trajectoire a l'instant t (Catmull-Rom) ; false une fois la trajectoire finie
+bool gPathPos(uint8_t kind, bool mirror, int t, float &x, float &y) {
+  int seg = t / G_PATH_SEG;
+  if (seg >= G_PATH_PTS - 1) return false;
+  float u = (t % G_PATH_SEG) / (float)G_PATH_SEG, u2 = u * u, u3 = u2 * u;
+  const int8_t(*P)[2] = G_PATH[kind];
+  int i0 = max(seg - 1, 0), i1 = seg, i2 = seg + 1, i3 = min(seg + 2, G_PATH_PTS - 1);
+  float c[2];
+  for (int k = 0; k < 2; k++)
+    c[k] = 0.5f * (2 * P[i1][k] + (-P[i0][k] + P[i2][k]) * u + (2 * P[i0][k] - 5 * P[i1][k] + 4 * P[i2][k] - P[i3][k]) * u2 +
+                   (-P[i0][k] + 3 * P[i1][k] - 3 * P[i2][k] + P[i3][k]) * u3);
+  float hs = min((float)H, W * 1.2f);  // ecran tres haut : boucles pas trop etirees
+  x = c[0] * W / 100.0f - GW / 2;
+  if (mirror) x = W - GW - x;
+  y = c[1] * hs / 100.0f;
+  return true;
+}
+
 void gNewWave() {
   gCols = constrain((W - 6) / 11, 4, 20);
   gNE = 0;
@@ -247,15 +372,29 @@ void gNewWave() {
       e = {};
       e.row = r; e.col = c; e.type = gRowType[r]; e.alive = true;
       e.hp = e.type == 0 ? 2 : 1;
-      e.x = gSlotX(c); e.y = -10 - 8 * (gRows - r);  // arrivent du haut
-      e.state = 2;
+      e.x = -50; e.y = -50;  // hors ecran jusqu'a son tour
+      e.state = 3;
     }
+  // arrivee en vol : groupes en file, par paires miroir (gauche / droite), une paire toutes les 60 images
+  int gs = max(8, (gNE + 5) / 6);
+  for (int i = 0; i < gNE; i++) {
+    int g = i / gs, pair = g / 2;
+    GEnemy &e = gEn[i];
+    e.dir = (g & 1) ? 1 : 0;   // miroir
+    e.path = pair & 1;         // trajectoire 0 ou 1, en alternance
+    e.t = -(pair * 60 + (i % gs) * 6);  // depart decale : la file s'etire sur la trajectoire
+  }
   gWave++;
-  gStageT = 100;  // annonce pendant 2,5 s : les ennemis arrivent sans tirer ni piquer
+  gStageT = 100;  // annonce pendant 2,5 s : les ennemis commencent leur arrivee sans tirer
+  if (gWave >= 2 && gWave <= 4) sndMelody(JINGLE_ARME, 4);  // nouvelle arme
+  else sndMelody(JINGLE_STAGE, 4);
 }
 void gReset() {
-  gLives = 3; gScore = 0; gWave = 0; gDead = 0; gCool = 0; gBonus = 0;
+  gLives = (!gDemo && gDiff == 0) ? 5 : 3;  // facile : 5 vies
+  gPaused = false;
+  gScore = 0; gWave = 0; gDead = 0; gCool = 0; gBonus = 0; gLifeUp = false;
   gPx = W / 2 - 4;
+  if (gPYBase) gPY = gPYBase;
   for (auto &s : gShot) s.on = false;
   for (auto &b : gBomb) b.on = false;
   for (auto &b : gBoom) b.t = 0;
@@ -271,7 +410,9 @@ void gameSetup() {
   for (int r = 0; r < gRows; r++) gRowType[r] = huge ? T7[r] : tall ? T5[r] : T3[r];
   gTop = 13;
   gPY = tall ? H - 15 : H - 8;  // sur 128x128 : la ligne du bas montre vies et vague
-  gHi = prefs.getUInt("hiscore", 0);
+  gPYBase = gPY;
+  gPYMin = max(gTop + gRows * 9 + 12, H * 55 / 100);  // zone du vaisseau : les 45 % du bas, sous la formation
+  topLoad();
   if (gLives <= 0 && gDead == 0) gReset();
   gNStar = min(G_STARS, W * H / 220);
   for (int i = 0; i < gNStar; i++) gStar[i] = { (int16_t)random(W), (float)random(12, H), 0.2f + random(100) / 120.0f, (uint8_t)random(9) };
@@ -291,14 +432,42 @@ bool gFire() {
       if (!s.on) { s = { x, (float)gPY - 3, true, vx }; break; }
   }
   gCool = COOL[t];
+  sfxShot();
   return true;
 }
+int gEffDiff() { return gDemo ? 1 : gDiff; }  // la demo joue en normal
+
+// meilleurs scores : chargement (ancien record repris) et ajout en fin de partie
+void topLoad() {
+  memset(gBest, 0, sizeof(gBest));
+  if (prefs.getBytes("top", gBest, sizeof(gBest)) != sizeof(gBest)) {
+    memset(gBest, 0, sizeof(gBest));
+    gBest[0] = { prefs.getUInt("hiscore", 0), 0, 1 };
+  }
+  gHi = gBest[0].score;
+}
+void topAdd() {
+  gLastRank = 0;
+  if (!gScore) return;
+  int pos = TOP_N;
+  while (pos > 0 && gScore > gBest[pos - 1].score) pos--;
+  if (pos >= TOP_N) return;
+  for (int i = TOP_N - 1; i > pos; i--) gBest[i] = gBest[i - 1];
+  gBest[pos] = { gScore, (uint8_t)min(gWave, 255), gDiff };
+  prefs.putBytes("top", gBest, sizeof(gBest));
+  gLastRank = pos + 1;
+  gHi = gBest[0].score;
+}
 void gHitPlayer() {
+  int deadY = gPY;
   if (!gDemo) rumbleReq = true;  // vibration seulement pendant une partie
-  gBoomAt(gPx + 4, gPY + 3);
+  sfxHit();
+  if (gLives == 1) sndMelody(JINGLE_OVER, 4);  // derniere vie perdue
+  gBoomAt(gPx + 4, deadY + 3);
+  gPY = gPYBase;  // le vaisseau suivant repart d'en bas
   gLives--;
   gDead = gLives > 0 ? 50 : 120;  // pause avant le vaisseau suivant (plus longue apres GAME OVER)
-  if (!gDemo && gLives <= 0 && gScore >= gHi && gScore) prefs.putUInt("hiscore", gHi);  // nouveau record (joueurs seulement)
+  if (!gDemo && gLives <= 0) topAdd();  // fin de partie : meilleurs scores (joueurs seulement)
 }
 void gameStep() {
   gFrame++;
@@ -310,15 +479,18 @@ void gameStep() {
   }
   // formation et piques
   gSway = sinf(gFrame * 0.03f) * max(1, min(6, (W - gCols * 11) / 2 - 1));
-  int alive = 0;
-  for (int i = 0; i < gNE; i++) alive += gEn[i].alive;
+  int alive = 0, entering = 0;
+  for (int i = 0; i < gNE; i++) { alive += gEn[i].alive; entering += gEn[i].alive && gEn[i].state == 3; }
   int diveEvery = max(16, 60 - gWave * 7);
-  if (gDead == 0 && gStageT == 0 && gFrame % diveEvery == 0 && alive) {
+  if (gEffDiff() == 0) diveEvery = diveEvery * 3 / 2;               // facile : piques plus rares
+  else if (gEffDiff() == 2) diveEvery = max(12, diveEvery * 2 / 3);  // difficile : plus frequents
+  if (gDead == 0 && gStageT == 0 && !entering && gFrame % diveEvery == 0 && alive) {  // pas de pique pendant l'arrivee
     int k = random(gNE);
     for (int t = 0; t < gNE; t++, k = (k + 1) % gNE)
       if (gEn[k].alive && gEn[k].state == 0) {
         GEnemy &e = gEn[k];
         e.state = 1; e.vx = 0; e.vy = -0.6f; e.t = 0;
+        sfxDive();
         e.dir = e.x < W / 2 ? -1 : 1;  // part en boucle vers l'exterieur
         break;
       }
@@ -337,13 +509,20 @@ void gameStep() {
       e.vy = min(e.vy + 0.03f, 1.3f + 0.1f * gWave);
       e.x += e.vx + curve; e.y += e.vy;
       if (e.y > H) { e.y = -8; e.state = 2; }
+    } else if (e.state == 3) {  // arrivee en vol sur sa trajectoire
+      if (++e.t < 0) continue;  // pas encore son tour (reste hors ecran)
+      float px, py;
+      if (gPathPos(e.path, e.dir, e.t, px, py)) { e.x = px; e.y = py; }
+      else e.state = 2;  // trajectoire finie : rejoint sa place
     } else {  // retour a sa place
       float dx = sx - e.x, dy = sy - e.y;
-      e.x += constrain(dx * 0.08f, -1.5f, 1.5f);
-      e.y += constrain(dy * 0.08f, -1.5f, 1.5f);
+      e.x += constrain(dx * 0.1f, -2.2f, 2.2f);
+      e.y += constrain(dy * 0.1f, -2.2f, 2.2f);
       if (fabsf(dx) < 0.6f && fabsf(dy) < 0.6f) e.state = 0;
     }
-    int chance = e.state == 1 ? 18 : 2 + gWave;  // tirs ennemis
+    int chance = e.state == 1 ? 18 : e.state == 3 ? 5 : 2 + gWave;  // tirs ennemis
+    if (gEffDiff() == 0) chance = max(1, chance / 2);
+    else if (gEffDiff() == 2) chance = chance * 8 / 5;
     if (gDead == 0 && gStageT == 0 && e.y > 0 && e.y < H * 0.6f && random(1000) < chance)
       for (auto &b : gBomb)
         if (!b.on) { b = { e.x + 4, e.y + GH, true }; break; }
@@ -357,20 +536,33 @@ void gameStep() {
   if (gDead == 0 && !gDemo) {
     gPlayerControl();
   } else if (gDead == 0) {
+    // decisions gardees un moment (esquive 15 images, cible 25 images) : sinon le vaisseau hesite et tremble
+    static int8_t dodgeDir = 0;
+    static uint8_t dodgeT = 0, aimT = 0;
+    static int aim = -1;
     float target = gPx;
-    bool dodge = false;
-    for (auto &b : gBomb)
-      if (b.on && b.y > gPY - 24 && fabsf(b.x - shipC) < 6) { target = b.x < shipC ? gPx + 7 : gPx - 7; dodge = true; break; }
-    if (!dodge) {
-      float best = 1e9;
-      for (int i = 0; i < gNE; i++) {
-        GEnemy &e = gEn[i];
-        if (!e.alive || e.y < 0) continue;
-        float d = fabsf(e.x - gPx) - (e.state == 1 ? 40 : 0) - (e.type == 0 ? 8 : 0);  // priorite : piques, meduses
-        if (d < best) { best = d; target = e.x; }
+    if (dodgeT) dodgeT--;
+    else
+      for (auto &b : gBomb)
+        if (b.on && b.y > gPY - 24 && fabsf(b.x - shipC) < 6) { dodgeDir = b.x < shipC ? 1 : -1; dodgeT = 15; break; }
+    if (dodgeT) {
+      target = gPx + dodgeDir * 7;
+    } else {
+      if (aimT) aimT--;
+      if (aim < 0 || aim >= gNE || !gEn[aim].alive || gEn[aim].y < 0 || !aimT) {
+        float best = 1e9;
+        aim = -1;
+        for (int i = 0; i < gNE; i++) {
+          GEnemy &e = gEn[i];
+          if (!e.alive || e.y < 0) continue;
+          float d = fabsf(e.x - gPx) - (e.state == 1 ? 40 : 0) - (e.type == 0 ? 8 : 0);  // priorite : piques, meduses
+          if (d < best) { best = d; aim = i; }
+        }
+        aimT = 25;
       }
+      if (aim >= 0) target = gEn[aim].x;
     }
-    gPx += constrain(target - gPx, -1.3f, 1.3f);
+    if (fabsf(target - gPx) >= 1) gPx += constrain(target - gPx, -1.5f, 1.5f);  // pas de micro-mouvement
     gPx = constrain(gPx, 0.0f, (float)(W - GW));
     if (gCool > 0) gCool--;
     if (gCool == 0)  // tir quand un ennemi est au-dessus
@@ -395,16 +587,17 @@ void gameStep() {
         if (--e.hp > 0) break;  // meduse : il faut 2 tirs
         e.alive = false;
         static const uint16_t PTS[3][2] = { { 150, 400 }, { 80, 160 }, { 50, 100 } };
-        gScore += PTS[e.type][e.state == 1];
+        gScore += PTS[e.type][e.state == 1 || e.state == 3];  // abattu en vol : points doubles
         if (!gDemo && gScore > gHi) gHi = gScore;
         gBoomAt(e.x + 4, e.y + 3);
+        sfxBoom();
         break;
       }
     }
   }
   for (auto &b : gBomb) {  // tirs ennemis
     if (!b.on) continue;
-    b.y += 1.3f + 0.1f * gWave;
+    b.y += 1.3f + 0.1f * gWave + (gEffDiff() - 1) * 0.3f;  // tirs plus lents en facile, plus rapides en difficile
     if (b.y >= H) { b.on = false; continue; }
     if (gDead == 0 && b.x >= gPx && b.x <= gPx + 8 && b.y + 2 >= gPY + 2 && b.y <= gPY + 7) { b.on = false; gHitPlayer(); }
   }
@@ -415,6 +608,8 @@ void gameStep() {
   if (!any) {  // stage termine : bonus, puis stage suivant
     gBonus = 500UL * gWave;
     gScore += gBonus;
+    gLifeUp = gLives < 9;
+    if (gLifeUp) gLives++;  // stage gagne : une vie en plus
     if (!gDemo && gScore > gHi) gHi = gScore;
     for (auto &b : gBomb) b.on = false;
     gNewWave();
@@ -422,6 +617,11 @@ void gameStep() {
   if (gStageT > 0) gStageT--;
 }
 void gameDraw() {
+  if (gOverflow) {  // des zones n'ont pas ete notees : on efface tout (plus de restes, ex. icones de vies)
+    gOverflow = false;
+    gNOld = 0;
+    gfx->fillScreen(0);
+  }
   for (int i = 0; i < gNOld; i++) {  // efface l'image precedente
     GRect &r = gOld[i];
     int x0 = max(0, (int)r.x), y0 = max(0, (int)r.y), x1 = min(W, r.x + r.w), y1 = min(H, r.y + r.h);
@@ -443,7 +643,7 @@ void gameDraw() {
   for (int i = 0; i < gNE; i++) {
     GEnemy &e = gEn[i];
     if (!e.alive) continue;
-    int fr = e.state == 1 ? (gFrame / 5) & 1 : ((gFrame / 16) + e.col) & 1;  // animation
+    int fr = e.state == 1 || e.state == 3 ? (gFrame / 5) & 1 : ((gFrame / 16) + e.col) & 1;  // animation (ailes rapides en vol)
     gSprite(SPR_E[e.type][fr], GW, GH, (int)e.x, (int)e.y, gPal, 'p', e.hp == 1 && e.type == 0 ? 'o' : 'p');
   }
   for (auto &s : gShot)
@@ -471,7 +671,7 @@ void gameDraw() {
   tinyText(*gfx, rx, 6, sc, white);
   gMark(rx, 6, tinyWidth(sc), 5);
   if (H >= 128) {  // ligne du bas : vies a gauche, vague a droite
-    for (int i = 0; i < gLives - 1 && i < 6; i++) gSprite(SPR_LIFE, 5, 4, 1 + i * 7, H - 5, palFull, 0, 0);
+    for (int i = 0; i < gLives && i < 9; i++) gSprite(SPR_LIFE, 5, 4, 1 + i * 7, H - 5, palFull, 0, 0);  // une icone par vie
     for (int i = 0; i < gWave && i < 10; i++) {
       int x = W - 4 - i * 4;
       gPix(x, H - 5, palFull[2]); gPix(x + 1, H - 5, palFull[2]);
@@ -480,17 +680,19 @@ void gameDraw() {
       gPix(x, H - 2, palFull[3]);
     }
   } else if (W >= 96) {  // ecran bas : vies en haut a droite
-    for (int i = 0; i < gLives - 1 && i < 4; i++) gSprite(SPR_LIFE, 5, 4, W - 6 - i * 7, 1, palFull, 0, 0);
+    for (int i = 0; i < gLives && i < 5; i++) gSprite(SPR_LIFE, 5, 4, W - 6 - i * 7, 1, palFull, 0, 0);  // une icone par vie
   }
 }
 
 // joueur : deplacement aux touches, tir tant que FEU est appuye (3 tirs a l'ecran au plus)
 void gPlayerControl() {
-  uint8_t k = keys | keysPs4 | (millis() - lastNowRx < 500 ? keysNow : 0);
-  float sp = W > 128 ? 2.4f : 1.7f;
+  uint8_t k = keysPs4;
+  float sp = W > 128 ? 3 : 2;  // pas entier : deplacement regulier a l'ecran
   if ((k & 1) && !(k & 2)) gPx -= sp;
   if ((k & 2) && !(k & 1)) gPx += sp;
   gPx = constrain(gPx, 0.0f, (float)(W - GW));
+  if ((k & 8) && !(k & 16)) gPY = max(gPYMin, gPY - 2);     // avancer
+  if ((k & 16) && !(k & 8)) gPY = min(gPYBase, gPY + 2);    // reculer
   if (gCool > 0) gCool--;
   if ((k & 4) && gCool == 0) gFire();
 }
@@ -503,32 +705,75 @@ void gText(int y, const char *s, uint16_t c) {
   gfx->print(s);
   gMark(x, y, strlen(s) * 6, 8);
 }
+void gTextBg(int y, const char *s, uint16_t c) {  // texte sur un fond noir (lisible par-dessus la demo)
+  int w = strlen(s) * 6 + 4, x = (W - w) / 2;
+  gfx->fillRect(x, y - 2, w, 11, 0);
+  gMark(x, y - 2, w, 11);
+  gText(y, s, c);
+}
+void gBox(int y0, int y1) {  // cadre noir borde de bleu derriere le menu
+  int w = min(W - 4, 120), x = (W - w) / 2;
+  gfx->fillRect(x, y0, w, y1 - y0, 0);
+  gfx->drawRect(x, y0, w, y1 - y0, rgb(40, 70, 170));
+  gMark(x, y0, w, y1 - y0);
+}
+void drawMenu() {
+  char b[24];
+  uint16_t sel = rgb(255, 220, 0), off = rgb(0, 160, 200), dim = rgb(110, 110, 130);
+  bool tall = H >= 128;
+  if (menuScores) {  // page des meilleurs scores
+    int y = tall ? H / 2 - 36 : 11, n = tall ? TOP_N : 4, step = tall ? 11 : 9;
+    gBox(y - 5, tall ? y + (n + 1) * step + 18 : y + n * step + 13);
+    gText(y, "MEILLEURS SCORES", sel);
+    for (int i = 0; i < n; i++) {
+      if (gBest[i].score) snprintf(b, sizeof(b), "%d %6lu %c S%u", i + 1, (unsigned long)gBest[i].score, DIFF_NAME[gBest[i].diff % 3][0], gBest[i].stage);
+      else snprintf(b, sizeof(b), "%d      -     ", i + 1);
+      gText(y + (i + 1) * step + 2, b, i == 0 ? rgb(230, 230, 230) : off);
+    }
+    if (tall) gText(y + (n + 1) * step + 6, "X : RETOUR", dim);
+    return;
+  }
+  int y = tall ? H / 2 - 22 : 14, step = tall ? 13 : 11;
+  gBox(y - 6, tall ? y + 3 * step + 16 : y + 2 * step + 12);
+  const char *items[3] = { "JOUER", nullptr, "SCORES" };
+  for (int i = 0; i < 3; i++) {
+    const char *t = items[i];
+    if (i == 1) { snprintf(b, sizeof(b), "NIVEAU %s%s%s", i == menuSel ? "<" : "", DIFF_NAME[gDiff], i == menuSel ? ">" : ""); t = b; }
+    char line[26];
+    snprintf(line, sizeof(line), "%s%s", i == menuSel ? "> " : "", t);
+    gText(y + i * step, line, i == menuSel ? sel : off);
+  }
+  if (tall) gText(y + 3 * step + 4, "START : JOUER", dim);
+}
 void gOverlay() {
   gfx->setFont(NULL);
   gfx->setTextSize(1);
-  if (gLives <= 0 && gDead > 0 && !gDemo) gText(H / 2 - 4, "GAME OVER", rgb(255, 40, 40));
+  if (gLives <= 0 && gDead > 0 && !gDemo) {
+    gText(H / 2 - 4, "GAME OVER", rgb(255, 40, 40));
+    if (gLastRank == 1) gText(H / 2 + 8, "NOUVEAU RECORD !", rgb(255, 220, 0));
+    else if (gLastRank) { char b[12]; snprintf(b, sizeof(b), "RANG %u", gLastRank); gText(H / 2 + 8, b, rgb(0, 220, 255)); }
+  }
+  if (gPaused) gTextBg(H / 2 - 4, "PAUSE", rgb(255, 220, 0));
   if (gStageT > 0 && gLives > 0) {  // annonce du stage, bonus et nouvelle arme
     char b[20];
     int y = H >= 128 ? H / 2 - 22 : H / 2 - 10;
     snprintf(b, sizeof(b), "STAGE %d", gWave);
     if (gStageT > 12 || (gStageT & 2)) gText(y, b, rgb(255, 220, 0));
     if (gBonus) { snprintf(b, sizeof(b), "BONUS %lu", (unsigned long)gBonus); gText(y + 11, b, rgb(230, 230, 230)); }
-    if (gWave <= 4 && TIER_NAME[gTier()][0]) gText(y + 22, TIER_NAME[gTier()], rgb(40, 230, 80));
+    int yy = y + 22;
+    if (gWave <= 4 && TIER_NAME[gTier()][0]) { gText(yy, TIER_NAME[gTier()], rgb(40, 230, 80)); yy += 11; }
+    if (gLifeUp) gText(yy, "VIE +1", rgb(0, 220, 255));
   }
   if (!gDemo) return;
+  if (PS4.isConnected()) { drawMenu(); return; }  // manette la : menu par-dessus la demo
   if ((gFrame / 40) & 1) gText(H / 2 + 6, "DEMO", rgb(255, 220, 0));
-#ifdef GAMES_PS4
-  else gText(H / 2 + 6, PS4.isConnected() ? "APPUIE SUR X" : "MANETTE: BOUTON PS", rgb(0, 220, 255));
+  else gText(H / 2 + 6, "MANETTE: BOUTON PS", rgb(0, 220, 255));
   if (!PS4.isConnected() && ipText[0]) gText(H / 2 + 18, ipText, rgb(110, 110, 130));  // adresse attendue par la manette
-  return;
-#else
-  else gText(H / 2 + 6, "APPUIE SUR FEU", rgb(0, 220, 255));
-#endif
-  if (ipText[0]) gText(H / 2 + 18, ipText, rgb(110, 110, 130));
 }
 
 void startGame() {
   gDemo = false;
+  menuScores = false;
   gfx->fillScreen(0);
   gNOld = 0;
   gReset();
@@ -548,167 +793,17 @@ void gameUpdate() {
     startReq = false;
     if (gDemo || (gLives <= 0)) startGame();
   }
+  if (gPaused) {  // pause : l'image reste figee
+    gameDraw();
+    gOverlay();
+    return;
+  }
   if (!gDemo && now - lastInput > IDLE_TO_DEMO_MS) toDemo();
   gameStep();
   gameDraw();
   gOverlay();
 }
 
-#ifndef GAMES_PS4
-// ---------------------------------------------------------------- manette ESP-NOW (2e ESP32, sans box)
-// Le jeu emet une balise 2 fois par seconde sur son canal ; la manette la cherche sur les canaux 1 a 13,
-// puis envoie ses touches (a chaque changement et toutes les 100 ms). Paquets identiques dans manette.ino.
-#define GH_MAGIC 0x42554847UL  // "GHUB"
-enum : uint8_t { GH_BEACON = 1, GH_KEYS = 2 };
-struct __attribute__((packed)) GhPacket {
-  uint32_t magic;
-  uint8_t type;
-  uint8_t keys;
-};
-const uint8_t BROADCAST[6] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
-bool nowOn = false;
-
-void onNowRecv(const uint8_t *mac, const uint8_t *data, int len) {
-  if (len != sizeof(GhPacket)) return;
-  const GhPacket *p = (const GhPacket *)data;
-  if (p->magic != GH_MAGIC || p->type != GH_KEYS) return;
-  uint8_t nk = p->keys & 7;
-  bool fresh = millis() - lastNowRx < 500;
-  if ((nk & 4) && !(fresh && (keysNow & 4))) startReq = true;  // FEU : lance une partie
-  if (nk) lastInput = millis();
-  keysNow = nk;
-  lastNowRx = millis();
-}
-void nowBegin() {
-  if (esp_now_init() != ESP_OK) { Serial.println("ESP-NOW indisponible"); return; }
-  esp_now_register_recv_cb(onNowRecv);
-  esp_now_peer_info_t peer = {};
-  memcpy(peer.peer_addr, BROADCAST, 6);
-  peer.channel = 0;  // canal actuel (celui de la box, ou du point d'acces de reglage)
-  peer.ifidx = WIFI_IF_STA;
-  esp_now_add_peer(&peer);
-  nowOn = true;
-  uint8_t ch;
-  wifi_second_chan_t sc;
-  esp_wifi_get_channel(&ch, &sc);
-  Serial.printf("Manette ESP-NOW : balise sur le canal %u\n", ch);
-}
-void nowBeacon() {
-  static uint32_t last = 0;
-  if (!nowOn || millis() - last < 500) return;
-  last = millis();
-  GhPacket p = { GH_MAGIC, GH_BEACON, 0 };
-  esp_now_send(BROADCAST, (const uint8_t *)&p, sizeof(p));
-}
-
-// ---------------------------------------------------------------- serveur web (page + WebSocket)
-AsyncWebServer server(80);
-AsyncWebSocket ws("/ws");
-uint32_t restartAt = 0;  // redemarrage demande (changement d'ecran)
-bool serverOn = false;
-WiFiManager wm;
-bool portalOn = false;  // portail de reglage wifi ouvert (non bloquant)
-
-void onWs(AsyncWebSocket *s, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
-  if (type == WS_EVT_DISCONNECT) {
-    if (s->count() == 0) keys = 0;  // plus personne : on relache tout
-    return;
-  }
-  if (type != WS_EVT_DATA) return;
-  AwsFrameInfo *info = (AwsFrameInfo *)arg;
-  if (!info->final || info->index != 0 || info->opcode != WS_TEXT || len < 2 || len > 8) return;
-  char b[9];
-  memcpy(b, data, len);
-  b[len] = 0;
-  int v = atoi(b + 1);
-  if (b[0] == 'k') {  // touches : k<masque>
-    uint8_t nk = v & 7;
-    if ((nk & 4) && !(keys & 4)) startReq = true;  // FEU : lance une partie (demo ou fin de partie)
-    keys = nk;
-    lastInput = millis();
-  } else if (b[0] == 'c' && len == 5) {  // dalles : c<nombre 1-4><disposition 0-2><retourne 0/1><serpentin 0/1>, redemarre
-    uint8_t n = b[1] - '0', a = b[2] - '0';
-    if (n >= 1 && n <= 4 && a <= 2) {
-      prefs.putUChar("nb", n);
-      prefs.putUChar("arr", a);
-      prefs.putBool("flip", b[3] == '1');
-      prefs.putBool("serp", b[4] == '1');
-      restartAt = millis() + 500;
-    }
-  } else if (b[0] == 'v' || b[0] == 'V') {  // luminosite (V = enregistrer)
-    bright = constrain(v, 5, 255);
-    dma->setBrightness8(bright);
-    if (b[0] == 'V') prefs.putUChar("bright", bright);
-  }
-}
-
-// etat du jeu envoye aux pages ouvertes :
-// {"m":0 demo/1 partie/2 perdu,"s":score,"h":record,"l":vies,"w":vague,"b":luminosite,"c":"dalles (comme la commande c)"}
-void sendStatus() {
-  static uint32_t last = 0;
-  static char prev[96] = "";
-  if (!serverOn || millis() - last < 150) return;
-  last = millis();
-  ws.cleanupClients();
-  if (!ws.count()) return;
-  char js[96];
-  int m = gDemo ? 0 : gLives <= 0 ? 2 : 1;
-  snprintf(js, sizeof(js), "{\"m\":%d,\"s\":%lu,\"h\":%lu,\"l\":%d,\"w\":%d,\"b\":%u,\"c\":\"%u%u%u%u\"}", m, (unsigned long)gScore, (unsigned long)gHi,
-           max(0, gLives), gWave, bright, nPanels, arrange, flipAll, serpent);
-  static uint32_t lastFull = 0;
-  if (strcmp(js, prev) == 0 && millis() - lastFull < 2000) return;  // rien de neuf (rappel toutes les 2 s)
-  lastFull = millis();
-  strcpy(prev, js);
-  ws.textAll(js);
-}
-
-void startServer() {
-  ws.onEvent(onWs);
-  server.addHandler(&ws);
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *r) {
-    AsyncWebServerResponse *res = r->beginResponse_P(200, "text/html", WEB_PAGE);
-    res->addHeader("Cache-Control", "no-cache");
-    r->send(res);
-  });
-  server.onNotFound([](AsyncWebServerRequest *r) { r->redirect("/"); });
-  server.begin();
-  MDNS.begin("games");
-  MDNS.addService("http", "tcp", 80);
-  serverOn = true;
-  snprintf(ipText, sizeof(ipText), "%s", WiFi.localIP().toString().c_str());
-  Serial.printf("Page de jeu : http://games.local ou http://%s\n", ipText);
-}
-
-// ---------------------------------------------------------------- ecran de connexion wifi
-void wifiScreen(const char *l1, const char *l2, const char *l3) {
-  gfx->fillScreen(0);
-  gfx->setFont(NULL);
-  gfx->setTextSize(1);
-  gfx->setTextColor(rgb(255, 220, 0));
-  gfx->setCursor(2, H / 2 - 24);
-  gfx->print(l1);
-  gfx->setTextColor(rgb(0, 220, 255));
-  gfx->setCursor(2, H / 2 - 8);
-  gfx->print(l2);
-  gfx->setTextColor(rgb(150, 150, 170));
-  gfx->setCursor(2, H / 2 + 8);
-  gfx->print(l3);
-}
-
-void handleBootButton() {
-  static uint32_t down = 0;
-  if (digitalRead(BOOT_PIN) == LOW) {
-    if (!down) down = millis();
-    else if (millis() - down > 5000) {
-      wifiScreen("WIFI OUBLIE", "redemarrage...", "");
-      wm.resetSettings();
-      delay(500);
-      ESP.restart();
-    }
-  } else down = 0;
-}
-
-#else  // ================================================================ version manette PS4 (Bluetooth)
 uint32_t restartAt = 0;
 uint32_t brightSaveAt = 0;  // luminosite changee : enregistree 2 s plus tard
 
@@ -755,15 +850,38 @@ void ps4Poll() {
     Serial.printf("  PS4 ok %lu s, batterie %u/15, memoire libre %u (min %u, bloc %u)\n", (millis() - since) / 1000, PS4.Battery(),
                   ESP.getFreeHeap(), ESP.getMinFreeHeap(), ESP.getMaxAllocHeap());
   }
+  static bool stable = false;
+  if (!stable && millis() - since > 15000) {  // connexion stable : les couleurs choisies tiennent
+    stable = true;
+    if (prefs.getUChar("crash", 0)) prefs.putUChar("crash", 0);
+  }
   if (millis() - since < 1000) return;  // laisse la connexion s'etablir avant d'envoyer quoi que ce soit a la manette
   uint8_t k = 0;
-  if (PS4.Left() || PS4.UpLeft() || PS4.DownLeft() || PS4.LStickX() < -40) k |= 1;
-  if (PS4.Right() || PS4.UpRight() || PS4.DownRight() || PS4.LStickX() > 40) k |= 2;
+  // stick avec hysteresis : pousse au-dela de 50, relache en dessous de 30 (pas d'aller-retour a la limite)
+  int sx = PS4.LStickX();
+  bool stL = sx < ((keysPs4 & 1) ? -30 : -50), stR = sx > ((keysPs4 & 2) ? 30 : 50);
+  if (PS4.Left() || PS4.UpLeft() || PS4.DownLeft() || stL) k |= 1;
+  if (PS4.Right() || PS4.UpRight() || PS4.DownRight() || stR) k |= 2;
+  // haut / bas (avancer / reculer) ; Share + croix haut / bas reste pour la luminosite
+  int sy = PS4.LStickY();
+  bool stU = sy > ((keysPs4 & 8) ? 30 : 50), stD = sy < ((keysPs4 & 16) ? -30 : -50);
+  if (!PS4.Share()) {
+    if (PS4.Up() || PS4.UpLeft() || PS4.UpRight() || stU) k |= 8;
+    if (PS4.Down() || PS4.DownLeft() || PS4.DownRight() || stD) k |= 16;
+  }
   if (PS4.Cross() || PS4.Circle() || PS4.Square() || PS4.Triangle() || PS4.R1() || PS4.L1() || PS4.R2Value() > 60) k |= 4;
-  if ((k & 4) && !(keysPs4 & 4)) startReq = true;
   if (k) lastInput = millis();
-  keysPs4 = k;
-  if ((PS4.Up() || PS4.Down()) && millis() - lastBr > 150) {  // croix haut / bas : luminosite
+  keysPs4 = gPaused ? 0 : k;
+  // boutons du menu et START (Options) : on agit a l'appui
+  static uint8_t prevB = 0;
+  uint8_t bt = PS4.Up() | PS4.Down() << 1 | PS4.Left() << 2 | PS4.Right() << 3 | PS4.Cross() << 4 | PS4.Circle() << 5 |
+               (PS4.Options() && !PS4.Share()) << 6;
+  uint8_t edge = bt & ~prevB;
+  prevB = bt;
+  if (edge) lastInput = millis();
+  if (gDemo) menuInput(edge);
+  else if (edge & 64 && gLives > 0) { gPaused = !gPaused; sfxMenu(); }  // START : pause / reprise
+  if (PS4.Share() && (PS4.Up() || PS4.Down()) && millis() - lastBr > 150) {  // Share + croix haut / bas : luminosite
     lastBr = millis();
     bright = constrain(bright + (PS4.Up() ? 15 : -15), 5, 255);
     dma->setBrightness8(bright);
@@ -794,16 +912,41 @@ void ps4Poll() {
   if (send) PS4.sendToController();
 }
 
-// reglages par le moniteur serie (pas de page web dans cette version)
+// menu (demo + manette) : haut / bas = ligne, gauche / droite = niveau, X = valider, START = jouer
+void menuInput(uint8_t edge) {
+  if (!edge) return;
+  if (menuScores) {  // page des scores : X, rond ou START pour revenir
+    if (edge & (16 | 32 | 64)) { menuScores = false; sfxMenu(); }
+    return;
+  }
+  if (edge & 64) { startReq = true; return; }
+  if (edge & 1) { menuSel = (menuSel + 2) % 3; sfxMenu(); }
+  if (edge & 2) { menuSel = (menuSel + 1) % 3; sfxMenu(); }
+  if (menuSel == 1 && (edge & (4 | 8 | 16))) {
+    gDiff = (gDiff + ((edge & 4) ? 2 : 1)) % 3;
+    prefs.putUChar("diff", gDiff);
+    sfxMenu();
+  }
+  if (edge & 16) {
+    if (menuSel == 0) startReq = true;
+    else if (menuSel == 2) { menuScores = true; sfxMenu(); }
+  }
+}
+
+// reglages par le moniteur serie
 void serialMenu() {
   Serial.println();
-  Serial.println("===== Game hub v" GAMES_VERSION " - manette PS4 =====");
+  Serial.println("===== Game hub v" GAMES_VERSION " =====");
   Serial.printf("Adresse Bluetooth de l'ESP32 : %s\n", ipText);
-  Serial.printf("Dalles : %u, disposition %u, retourne %u, serpentin %u -> ecran %dx%d\n", nPanels, arrange, flipAll, serpent, W, H);
+  Serial.printf("Dalles : %u, disposition %u, retourne %u, serpentin %u -> ecran %dx%d, couleurs %u bits\n", nPanels, arrange, flipAll,
+                serpent, W, H, colorBits);
   Serial.println("  a xx:xx:xx:xx:xx:xx : adresse de la console connue par la manette (redemarre)");
   Serial.println("  a                   : revenir a l'adresse d'origine de l'ESP32 (redemarre)");
   Serial.println("  c NDFS : dalles. N nombre 1-4, D 0 l'une sous l'autre / 1 cote a cote / 2 carre,");
   Serial.println("           F ecran retourne 0/1, S une dalle sur deux retournee 0/1. Ex. : c 2000");
+  Serial.println("  p N : couleurs des dalles sur N bits (3 a 6, redemarre). 3 = le plus sur pour le Bluetooth,");
+  Serial.println("        4 = plus de nuances. 2 plantages de suite : retour automatique a 3.");
+  Serial.printf("  v N : volume du son, 0 (muet) a 10. Actuel : %u\n", volume);
   Serial.println("  ? : ce menu");
 }
 void handleSerial() {
@@ -837,22 +980,34 @@ void handleSerial() {
         Serial.println("Dalles enregistrees, redemarrage");
         restartAt = millis() + 300;
       } else Serial.println("Format : c NDFS (ex. c 2000)");
+    } else if (cmd == 'v') {
+      int v = atoi(arg);
+      if (*arg && v >= 0 && v <= 10) {
+        volume = v;
+        prefs.putUChar("vol", v);
+        Serial.printf("Volume %d/10\n", v);
+        bool demo = gDemo;
+        gDemo = false;
+        sfxBoom();  // pour entendre le niveau
+        gDemo = demo;
+      } else Serial.println("Format : v 0 a v 10");
+    } else if (cmd == 'p') {
+      int b = atoi(arg);
+      if (b >= 3 && b <= 6) {
+        prefs.putUChar("bits", b);
+        prefs.putUChar("crash", 0);
+        Serial.printf("Couleurs %d bits, redemarrage\n", b);
+        restartAt = millis() + 300;
+      } else Serial.println("Format : p 3 a p 6 (ex. p 4)");
     } else if (cmd == '?') serialMenu();
     else if (cmd) Serial.println("Commande inconnue, tapez ?");
   }
 }
-#endif
 
 // ---------------------------------------------------------------- demarrage
 void setup() {
   Serial.begin(115200);
-#ifdef GAMES_PS4
-  Serial.println("Games v" GAMES_VERSION " (manette PS4, sans wifi)");
-#else
-  Serial.println("Games v" GAMES_VERSION);
-  btStop();
-#endif
-  pinMode(BOOT_PIN, INPUT_PULLUP);
+  Serial.println("Game hub v" GAMES_VERSION " (manette PS4)");
   prefs.begin("games", false);
   bright = prefs.getUChar("bright", 120);
   nPanels = constrain(prefs.getUChar("nb", 2), 1, 4);
@@ -861,19 +1016,30 @@ void setup() {
   serpent = prefs.getBool("serp", false);
 
   HUB75_I2S_CFG::i2s_pins pins = { R1_PIN, G1_PIN, B1_PIN, R2_PIN, G2_PIN, B2_PIN, A_PIN, B_PIN, C_PIN, D_PIN, E_PIN, LAT_PIN, OE_PIN, CLK_PIN };
-  // profondeur de couleur la plus haute qui laisse assez de memoire au wifi et au serveur web
-#ifdef GAMES_PS4
-  const int maxDepth = 3, needHeap = 0;  // 3 bits : le Bluetooth manque de memoire a la connexion de la manette (assert hci_hal_h4.c:553)
-#else
-  const int maxDepth = 6, needHeap = 110000;
-#endif
+  // profondeur de couleur choisie, en laissant assez de memoire au Bluetooth
+  // Couleurs choisies au moniteur serie (p 3 a p 6), 3 bits par defaut : au-dela, le Bluetooth peut manquer de
+  // memoire a la connexion de la manette (assert hci_hal_h4.c:553). 2 plantages de suite : retour a 3 bits.
+  uint8_t wantBits = constrain(prefs.getUChar("bits", 3), 3, 6);
+  esp_reset_reason_t why = esp_reset_reason();
+  if (why == ESP_RST_PANIC || why == ESP_RST_INT_WDT || why == ESP_RST_TASK_WDT) {
+    uint8_t crashes = prefs.getUChar("crash", 0) + 1;
+    if (crashes >= 2 && wantBits > 3) {
+      wantBits = 3;
+      prefs.putUChar("bits", 3);
+      crashes = 0;
+      Serial.println("2 plantages de suite : retour a 3 bits de couleur");
+    }
+    prefs.putUChar("crash", crashes);
+  }
+  const int maxDepth = wantBits, needHeap = 0;
   for (int depth = maxDepth; depth >= 3; depth--) {
     HUB75_I2S_CFG cfg(128, 64, nPanels, pins);
     cfg.setPixelColorDepthBits(depth);
     cfg.clkphase = false;
     dma = new MatrixPanel_I2S_DMA(cfg);
     if (dma->begin()) {
-      if (ESP.getFreeHeap() >= needHeap || depth == 3) {  // assez pour le wifi ou le Bluetooth
+      if (ESP.getFreeHeap() >= needHeap || depth == 3) {
+        colorBits = depth;
         Serial.printf("Ecran %dx%d (%d dalles), couleurs %d bits, memoire libre %u\n", 128 * panelCols(), 64 * panelRows(), nPanels, depth,
                       ESP.getFreeHeap());
         break;
@@ -894,33 +1060,10 @@ void setup() {
   dma->setBrightness8(bright);
   gfx->fillScreen(0);
 
-#ifdef GAMES_PS4
+  gDiff = prefs.getUChar("diff", 1) % 3;
   ps4Begin();
+  audioBegin();
   serialMenu();
-#else
-  // wifi : reseau connu, sinon portail "Games-Setup" pendant 3 min (puis demo seule, sans page web)
-  wifiScreen("CONNEXION WIFI", "", "");
-  WiFi.mode(WIFI_STA);
-  bool ok = false;
-  if (WIFI_SEED_COUNT) {  // reseaux connus de secrets.h : le plus fort a portee
-    WiFiMulti multi;
-    for (int i = 0; i < WIFI_SEED_COUNT; i++) multi.addAP(WIFI_SEED[i][0], WIFI_SEED[i][1]);
-    ok = multi.run(15000) == WL_CONNECTED;
-  }
-  // sinon dernier reseau regle, puis portail "Games-Setup" pendant 3 min, sans bloquer le jeu ni la manette
-  wm.setConnectTimeout(20);
-  wm.setConfigPortalTimeout(180);
-  wm.setConfigPortalBlocking(false);
-  wm.setAPCallback([](WiFiManager *) { strcpy(ipText, "WIFI:Games-Setup"); });
-  if (ok || wm.autoConnect("Games-Setup")) {
-    WiFi.setSleep(false);  // reponse plus rapide aux touches
-    startServer();
-  } else {
-    portalOn = true;
-    Serial.println("Wifi a regler : reseau Games-Setup (192.168.4.1)");
-  }
-  nowBegin();
-#endif
 
   gameSetup();
   gDemo = true;
@@ -928,29 +1071,10 @@ void setup() {
 
 void loop() {
   if (restartAt && millis() > restartAt) ESP.restart();
-#ifdef GAMES_PS4
   ps4Poll();
+  sndUpdate();
   handleSerial();
   if (brightSaveAt && millis() > brightSaveAt) { brightSaveAt = 0; prefs.putUChar("bright", bright); }
   gameUpdate();
-#else
-  handleBootButton();
-  if (portalOn) {
-    wm.process();
-    if (WiFi.status() == WL_CONNECTED) {  // reseau choisi : on ferme le portail, la page de jeu demarre
-      portalOn = false;
-      wm.stopConfigPortal();
-      WiFi.mode(WIFI_STA);
-      WiFi.setSleep(false);
-      startServer();
-    } else if (!wm.getConfigPortalActive()) {  // 3 min ecoulees : jeu et manette seuls
-      portalOn = false;
-      ipText[0] = 0;
-    }
-  }
-  gameUpdate();
-  sendStatus();
-  nowBeacon();
-#endif
   vTaskDelay(1);
 }

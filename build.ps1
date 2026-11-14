@@ -1,25 +1,23 @@
-# Compile Game-hub (ESP32 classique) avec les memes bibliotheques que l'horloge
-#   ./build.ps1              -> le jeu (games) et la manette (manette)
-#   ./build.ps1 games        -> le jeu seulement
-#   ./build.ps1 games -Ps4   -> le jeu en version manette PS4 Bluetooth, sans wifi (Games_PS4_V<version>.bin)
-param([string[]]$Sketches = @("games", "manette"), [switch]$Ps4, [string]$Fqbn = "esp32:esp32:esp32")
+# Compile Game hub (ESP32 classique, manette PS4 Bluetooth, sans wifi) avec les bibliotheques de l'horloge.
+# Partition unique de 3 Mo (Huge APP). Produit :
+#   GameHub_V<version>.bin         -> mise a jour, a flasher a 0x10000
+#   GameHub_V<version>_complet.bin -> 1er flash (demarrage + table des partitions + programme), a 0x0
+param([string]$Fqbn = "esp32:esp32:esp32:PartitionScheme=huge_app,DebugLevel=error")
 $proj = $PSScriptRoot
 $cli = "$env:LOCALAPPDATA\Programs\Arduino IDE\resources\app\lib\backend\resources\arduino-cli.exe"
 $yaml = "C:\Users\Jeremy\Documents\projet vscode\clockV1\build\arduino-cli.yaml"
-$names = @{ games = @("Games", "GAMES_VERSION"); manette = @("Manette", "MANETTE_VERSION") }
-foreach ($sk in $Sketches) {
-  $out = "$proj\build\$sk"
-  $extra = @()
-  $prefix = $names[$sk][0]
-  if ($Ps4 -and $sk -eq "games") {
-    $out = "$proj\build\games_ps4"
-    $extra = @("--build-property", "compiler.cpp.extra_flags=-DGAMES_PS4")
-    $prefix = "Games_PS4"
-  }
-  & $cli --config-file $yaml compile --fqbn $Fqbn --warnings default @extra --output-dir $out "$proj\$sk" 2>&1 | Tee-Object "$proj\build\compile_$sk.log" | Select-String -Pattern "$sk\.ino:\d+:\d+: (warning|error)|error:|Le croquis|Error during|trop grand|too big"
-  if ($LASTEXITCODE -ne 0) { "ECHEC compilation $sk"; exit 1 }
-  $ver = (Select-String -Path "$proj\$sk\$sk.ino" -Pattern ('#define ' + $names[$sk][1] + ' "([^"]+)"')).Matches[0].Groups[1].Value
-  $bin = "$proj\$($prefix)_V$ver.bin"
-  Copy-Item "$out\$sk.ino.bin" $bin -Force
-  "{0} : {1} octets" -f (Split-Path $bin -Leaf), (Get-Item $bin).Length
-}
+$core = "$env:LOCALAPPDATA\Arduino15\packages\esp32\hardware\esp32\2.0.17"
+$esptool = "$env:LOCALAPPDATA\Arduino15\packages\esp32\tools\esptool_py\4.6\esptool.exe"
+$out = "$proj\build\games"
+& $cli --config-file $yaml compile --fqbn $Fqbn --warnings default --output-dir $out "$proj\games" 2>&1 | Tee-Object "$proj\build\compile.log" | Select-String -Pattern "games\.ino:\d+:\d+: (warning|error)|error:|Le croquis|Les variables|Error during"
+if ($LASTEXITCODE -ne 0) { "ECHEC compilation"; exit 1 }
+$ver = (Select-String -Path "$proj\games\games.ino" -Pattern '#define GAMES_VERSION "([^"]+)"').Matches[0].Groups[1].Value
+$bin = "$proj\GameHub_V$ver.bin"
+$full = "$proj\GameHub_V${ver}_complet.bin"
+Copy-Item "$out\games.ino.bin" $bin -Force
+& $esptool --chip esp32 merge_bin -o $full --flash_mode dio --flash_freq 80m --flash_size 4MB `
+  0x1000 "$out\games.ino.bootloader.bin" 0x8000 "$out\games.ino.partitions.bin" `
+  0xe000 "$core\tools\partitions\boot_app0.bin" 0x10000 $bin | Out-Null
+if ($LASTEXITCODE -ne 0) { "ECHEC fusion du bin complet"; exit 1 }
+"{0} : {1} octets (a 0x10000)" -f (Split-Path $bin -Leaf), (Get-Item $bin).Length
+"{0} : {1} octets (1er flash, a 0x0)" -f (Split-Path $full -Leaf), (Get-Item $full).Length
