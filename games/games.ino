@@ -30,6 +30,7 @@
 #include <Adafruit_GFX.h>
 #ifdef GAMES_PS4  // version manette PS4 en Bluetooth, sans wifi
 #include <PS4Controller.h>
+#include <esp_gap_bt_api.h>
 #else
 #include <WiFi.h>
 #include <WiFiMulti.h>
@@ -48,7 +49,7 @@ const char *WIFI_SEED[1][2] = { { "", "" } };
 #endif
 #endif
 
-#define GAMES_VERSION "1.03"
+#define GAMES_VERSION "1.04"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -293,7 +294,7 @@ bool gFire() {
   return true;
 }
 void gHitPlayer() {
-  rumbleReq = true;
+  if (!gDemo) rumbleReq = true;  // vibration seulement pendant une partie
   gBoomAt(gPx + 4, gPY + 3);
   gLives--;
   gDead = gLives > 0 ? 50 : 120;  // pause avant le vaisseau suivant (plus longue apres GAME OVER)
@@ -716,6 +717,15 @@ uint32_t brightSaveAt = 0;  // luminosite changee : enregistree 2 s plus tard
 void ps4Begin() {
   String mac = prefs.getString("ps4mac", "");
   bool ok = mac.length() == 17 ? PS4.begin(mac.c_str()) : PS4.begin();
+  // anciens appairages gardes par l'ESP32 : cause connue de deconnexion juste apres la connexion
+  int nb = esp_bt_gap_get_bond_device_num();
+  if (nb > 0) {
+    esp_bd_addr_t list[8];
+    int n = min(nb, 8);
+    esp_bt_gap_get_bond_device_list(&n, list);
+    for (int i = 0; i < n; i++) esp_bt_gap_remove_bond_device(list[i]);
+    Serial.printf("%d ancien(s) appairage(s) efface(s)\n", n);
+  }
   snprintf(ipText, sizeof(ipText), "%s", PS4.getAddress().c_str());
   Serial.printf("Manette PS4 : Bluetooth %s, adresse %s, memoire libre %u\n", ok ? "pret" : "ECHEC", ipText, ESP.getFreeHeap());
 }
@@ -724,13 +734,28 @@ void ps4Begin() {
 void ps4Poll() {
   static bool was = false;
   static int lastTier = -2;
-  static uint32_t rumbleOff = 0, lastBr = 0, combo = 0;
+  static uint32_t rumbleOff = 0, lastBr = 0, combo = 0, lastLog = 0, since = 0;
   if (!PS4.isConnected()) {
     keysPs4 = 0;
-    if (was) { was = false; Serial.println("Manette PS4 deconnectee"); }
+    if (was) {
+      was = false;
+      Serial.printf("Manette PS4 deconnectee apres %lu s, memoire libre %u (plus petit bloc %u)\n", (millis() - since) / 1000,
+                    ESP.getFreeHeap(), ESP.getMaxAllocHeap());
+    }
     return;
   }
-  if (!was) { was = true; lastTier = -2; Serial.printf("Manette PS4 connectee, batterie %u/15\n", PS4.Battery()); }
+  if (!was) {
+    was = true;
+    lastTier = -2;
+    since = millis();
+    Serial.printf("Manette PS4 connectee, memoire libre %u (plus petit bloc %u)\n", ESP.getFreeHeap(), ESP.getMaxAllocHeap());
+  }
+  if (millis() - lastLog > 2000) {  // diagnostic : etat toutes les 2 s
+    lastLog = millis();
+    Serial.printf("  PS4 ok %lu s, batterie %u/15, memoire libre %u (min %u, bloc %u)\n", (millis() - since) / 1000, PS4.Battery(),
+                  ESP.getFreeHeap(), ESP.getMinFreeHeap(), ESP.getMaxAllocHeap());
+  }
+  if (millis() - since < 1000) return;  // laisse la connexion s'etablir avant d'envoyer quoi que ce soit a la manette
   uint8_t k = 0;
   if (PS4.Left() || PS4.UpLeft() || PS4.DownLeft() || PS4.LStickX() < -40) k |= 1;
   if (PS4.Right() || PS4.UpRight() || PS4.DownRight() || PS4.LStickX() > 40) k |= 2;
@@ -837,13 +862,18 @@ void setup() {
 
   HUB75_I2S_CFG::i2s_pins pins = { R1_PIN, G1_PIN, B1_PIN, R2_PIN, G2_PIN, B2_PIN, A_PIN, B_PIN, C_PIN, D_PIN, E_PIN, LAT_PIN, OE_PIN, CLK_PIN };
   // profondeur de couleur la plus haute qui laisse assez de memoire au wifi et au serveur web
-  for (int depth = 6; depth >= 3; depth--) {
+#ifdef GAMES_PS4
+  const int maxDepth = 3, needHeap = 0;  // 3 bits : le Bluetooth manque de memoire a la connexion de la manette (assert hci_hal_h4.c:553)
+#else
+  const int maxDepth = 6, needHeap = 110000;
+#endif
+  for (int depth = maxDepth; depth >= 3; depth--) {
     HUB75_I2S_CFG cfg(128, 64, nPanels, pins);
     cfg.setPixelColorDepthBits(depth);
     cfg.clkphase = false;
     dma = new MatrixPanel_I2S_DMA(cfg);
     if (dma->begin()) {
-      if (ESP.getFreeHeap() >= 110000 || depth == 3) {  // assez pour le wifi ou le Bluetooth
+      if (ESP.getFreeHeap() >= needHeap || depth == 3) {  // assez pour le wifi ou le Bluetooth
         Serial.printf("Ecran %dx%d (%d dalles), couleurs %d bits, memoire libre %u\n", 128 * panelCols(), 64 * panelRows(), nPanels, depth,
                       ESP.getFreeHeap());
         break;

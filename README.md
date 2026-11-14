@@ -92,7 +92,14 @@ Pourquoi pas le Bluetooth : sa pile prend 50 à 100 Ko de RAM, ce qui ne tient p
 
 Version à part du jeu : `Games_PS4_V<version>.bin`. Elle sort du même code, compilé avec `-DGAMES_PS4`. Cette version n'a pas de wifi, de page web ni de manette ESP-NOW : le Bluetooth et les dalles se partagent la mémoire.
 
-> Pas encore testé sur le matériel. Au démarrage, le moniteur série (115200 bauds) affiche la mémoire libre après les dalles et après le Bluetooth (`Manette PS4 : Bluetooth pret ...`). Avec 2 dalles, ça devrait passer. Avec 4, ce n'est pas sûr.
+> En cours de test.
+> - **V1.03 :** l'ESP32 redémarrait à la connexion de la manette, faute de mémoire. L'erreur était `assert failed: host_recv_pkt_cb hci_hal_h4.c:553` : le Bluetooth n'arrivait plus à réserver ses tampons de réception.
+> - **V1.04 :**
+>   - les dalles passent en **3 bits de couleur** pour laisser la mémoire au Bluetooth ;
+>   - les anciens appairages sont effacés au démarrage ;
+>   - rien n'est envoyé à la manette pendant la 1ʳᵉ seconde de connexion.
+>
+> Le moniteur série (115200 bauds) affiche la mémoire libre à la connexion, puis toutes les 2 s. Avec 4 dalles, ce n'est pas sûr que la mémoire suffise.
 
 ![Connexion de la manette PS4](docs/manette-ps4.gif)
 
@@ -131,7 +138,7 @@ Binaires prêts à flasher sur un ESP32 classique, à l'adresse 0x10000 :
 | Fichier | Rôle | MD5 |
 |---|---|---|
 | [firmware/Games_V1.03.bin](firmware/Games_V1.03.bin) | le jeu (wifi, page web, manette ESP-NOW), pour l'ESP32 des dalles | `1a1638eaf125761aca8b3de7a4099cd5` |
-| [firmware/Games_PS4_V1.03.bin](firmware/Games_PS4_V1.03.bin) | le jeu, version manette PS4 Bluetooth sans wifi (expérimental) | `820fd2c1c0ac652fa528103688cc507a` |
+| [firmware/Games_PS4_V1.04.bin](firmware/Games_PS4_V1.04.bin) | le jeu, version manette PS4 Bluetooth sans wifi (expérimental) | `eb28912c8b54f64137ce775ab40f1db3` |
 | [firmware/Manette_V1.00.bin](firmware/Manette_V1.00.bin) | la manette ESP-NOW | `598ccc714d7c450ee49a337ae10b483b` |
 
 Le jeu publié ne contient aucun réseau wifi. Au premier démarrage, règle le wifi avec le réseau **Games-Setup**. Pour intégrer tes propres réseaux, crée `games/secrets.h` et recompile.
