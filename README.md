@@ -23,12 +23,19 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. **Sans manette
 | **JOUER** | lance la partie |
 | **NIVEAU** | Facile / Normal / Difficile (gauche / droite ou ✕), choix gardé en mémoire |
 | **LUMINOSITE** | 0 à 100 % par pas de 10 % (gauche / droite ou ✕), visible tout de suite et gardée en mémoire. À 0 %, les dalles restent très faiblement allumées pour qu'on voie encore le menu. |
+| **VOLUME** | volume du son, 0 à 100 % par pas de 10 % (gauche / droite ou ✕). Un bip fait entendre le niveau. 0 % = muet. C'est le rapport cyclique du PWM : le potentiomètre de l'ampli règle le maximum. |
 | **SCORES** | les 5 meilleurs scores : rang, **nom**, score, niveau (F/N/D) et stage atteint |
 | **DEMO** | cache le menu : le jeu tourne tout seul, avec « DEMO » qui clignote |
+
+| Réglage du volume | Réglage de la luminosité |
+|---|---|
+| ![Réglage du volume](docs/reglage-volume.gif) | ![Réglage de la luminosité](docs/reglage-luminosite.gif) |
 
 - **Navigation :** la croix haut / bas choisit la ligne, ✕ valide.
 - **OPTIONS** (le « START » de la manette PS4) lance la partie depuis n'importe quelle ligne.
 - **Mode démo :** au bout de **30 s sans toucher la manette**, le menu se cache et la démo tourne seule. Le premier appui sur un bouton, ou un mouvement du stick, fait revenir le menu, sans autre effet.
+
+  ![Mode démo](docs/mode-demo.gif)
 - **En partie, OPTIONS met en pause** : OPTIONS reprend la partie, **○ (rond) revient au menu**. Si ton score entre dans les 5 meilleurs, il est enregistré.
 - **Fin de partie :** « GAME OVER » s'affiche. Le jeu revient ensuite au menu, puis passe en mode démo après 30 s.
 - **Saisie du nom :** si ton score entre dans les 5 meilleurs, un écran affiche « NOUVEAU RECORD ! » (ou « BRAVO ! RANG n ») puis **3 grandes lettres** à choisir, comme sur une borne d'arcade.
@@ -128,7 +135,7 @@ Le son passe par **une seule broche, GPIO 22** (depuis la V2.23). L'ESP32 y sort
 
 - **Bruitages :** tir, explosion, vaisseau touché, piqué d'un ennemi, jingles de stage, de nouvelle arme et de fin de partie, bips du menu et de la saisie du nom. La démo reste muette.
 - **Une seule voix :** un son important (vaisseau touché, explosion) passe avant un son mineur (tir, bip).
-- **Volume :** `v 0` (muet) à `v 10` dans le moniteur série, en plus du potentiomètre de l'ampli.
+- **Volume :** ligne VOLUME du menu (0 à 100 %), ou `v 0` à `v 10` dans le moniteur série, en plus du potentiomètre de l'ampli.
 - **Sans ampli branché :** le jeu marche normalement.
 
 ## Ancien son I2S (retiré)
@@ -179,8 +186,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V2.24_complet.bin](firmware/GameHub_V2.24_complet.bin) | 0x0 | `6846a0917fe29e2caa83dbc1e605c7d9` |
-| [firmware/GameHub_V2.24.bin](firmware/GameHub_V2.24.bin) | 0x10000 | `df5f766e1ac08ecb9b98eb74d07305e5` |
+| [firmware/GameHub_V2.25_complet.bin](firmware/GameHub_V2.25_complet.bin) | 0x0 | `d8c3188dae0180b82c1aa84a858db6df` |
+| [firmware/GameHub_V2.25.bin](firmware/GameHub_V2.25.bin) | 0x10000 | `242f75cacf1bd5098435975034e43db6` |
 
 Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB SPIFFS)** dans Outils → Partition Scheme.
 
@@ -197,6 +204,6 @@ Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB S
   - La copie corrigée cherche l'en-tête du paquet avant de le lire.
   - Elle demande aussi à la manette un rapport toutes les 4 ms. Avec 0, elle n'en envoyait qu'environ un toutes les 2 s, et les appuis brefs étaient perdus.
   - Le jeu interdit enfin le mode veille Bluetooth (sniff) et force le lien de la manette en mode actif dès le premier rapport. Le moniteur série affiche le nombre de paquets reçus par seconde.
-- **Plans, aperçus et GIF :** `python docs/branchement.py`, `python docs/rendu.py`, `python docs/gif_manette_ps4.py`, `python docs/gif_arrivee.py` (Pillow).
+- **Plans, aperçus et GIF :** `python docs/branchement.py`, `python docs/rendu.py`, `python docs/gif_manette_ps4.py`, `python docs/gif_arrivee.py`, `python docs/gif_menus.py`, `python docs/branchement_son.py` (Pillow).
 
 L'ancienne version avec wifi, page web et manette ESP-NOW reste disponible dans l'historique Git, jusqu'au commit `fb11367`.

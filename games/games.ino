@@ -29,7 +29,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "2.24"
+#define GAMES_VERSION "2.25"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -107,8 +107,8 @@ bool gDemo = true;                  // le jeu joue tout seul (menu par-dessus qu
 bool gPaused = false;               // START pendant une partie : pause
 uint8_t gDiff = 1;                  // difficulte : 0 facile, 1 normal, 2 difficile
 const char *const DIFF_NAME[3] = { "FACILE", "NORMAL", "DIFFICILE" };
-uint8_t menuSel = 0;                // ligne choisie : 0 jouer, 1 niveau, 2 luminosite, 3 scores, 4 demo
-#define MENU_N 5
+uint8_t menuSel = 0;                // ligne choisie : 0 jouer, 1 niveau, 2 luminosite, 3 volume, 4 scores, 5 demo
+#define MENU_N 6
 int brightPct() { return (bright * 100 + 127) / 255 / 10 * 10; }  // luminosite en %, arrondie a 10 %
 void setBrightPct(int p) {  // 0 % : tres faible mais jamais noir (le menu reste visible)
   p = constrain(p, 0, 100);
@@ -817,13 +817,14 @@ void drawMenu() {
     if (tall) gText(y + (n + 1) * step + 6, "X : RETOUR", dim);
     return;
   }
-  int y = tall ? H / 2 - 22 : 12, step = tall ? 13 : 9;
+  int y = tall ? H / 2 - 22 : 12, step = tall ? 11 : 8;
   gBox(y - 6, tall ? y + MENU_N * step + 16 : y + (MENU_N - 1) * step + 12);
-  const char *items[MENU_N] = { "JOUER", nullptr, nullptr, "SCORES", "DEMO" };
+  const char *items[MENU_N] = { "JOUER", nullptr, nullptr, nullptr, "SCORES", "DEMO" };
   for (int i = 0; i < MENU_N; i++) {
     const char *t = items[i];
     if (i == 1) { snprintf(b, sizeof(b), "NIVEAU %s%s%s", i == menuSel ? "<" : "", DIFF_NAME[gDiff], i == menuSel ? ">" : ""); t = b; }
     if (i == 2) { snprintf(b, sizeof(b), "LUMINOSITE %s%d%%%s", i == menuSel ? "<" : "", brightPct(), i == menuSel ? ">" : ""); t = b; }
+    if (i == 3) { snprintf(b, sizeof(b), "VOLUME %s%d%%%s", i == menuSel ? "<" : "", volume * 10, i == menuSel ? ">" : ""); t = b; }
     char line[26];
     snprintf(line, sizeof(line), "%s%s", i == menuSel ? "> " : "", t);
     gText(y + i * step, line, i == menuSel ? sel : off);
@@ -1205,6 +1206,15 @@ void menuInput(uint8_t edge) {
     setBrightPct(p);
     sfxMenu();
   }
+  if (menuSel == 3 && (edge & (4 | 8 | 16))) {  // volume du son (rapport cyclique du PWM) : 0 a 100 %, pas de 10 %
+    int v = volume;
+    if (edge & 4) v--;
+    else if (edge & 8) v++;
+    else v = v >= 10 ? 0 : v + 1;
+    volume = constrain(v, 0, 10);
+    prefs.putUChar("vol", volume);
+    sfxMenu();  // bip au nouveau volume (rien a 0 %)
+  }
   if (menuSel == 1 && (edge & (4 | 8 | 16))) {
     gDiff = (gDiff + ((edge & 4) ? 2 : 1)) % 3;
     prefs.putUChar("diff", gDiff);
@@ -1212,8 +1222,8 @@ void menuInput(uint8_t edge) {
   }
   if (edge & 16) {
     if (menuSel == 0) startReq = true;
-    else if (menuSel == 3) { menuScores = true; sfxMenu(); }
-    else if (menuSel == 4) { gAttract = true; menuSel = 0; sfxMenu(); }  // ligne DEMO
+    else if (menuSel == 4) { menuScores = true; sfxMenu(); }
+    else if (menuSel == 5) { gAttract = true; menuSel = 0; sfxMenu(); }  // ligne DEMO
   }
 }
 

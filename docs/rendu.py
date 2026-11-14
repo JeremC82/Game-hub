@@ -274,10 +274,10 @@ for page in ('menu', 'scores', 'nom'):
         text_big(s, (128 - 96) // 2, 8, 'GAME HUB', SEL)
         s.text(26, 'RECORD 30800 JER', (255, 40, 40))
         y = 64 - 22
-        box(s, y - 6, y + 5 * 13 + 16)
-        for i, t in enumerate(('> JOUER', 'NIVEAU NORMAL', 'LUMINOSITE 60%', 'SCORES', 'DEMO')):
-            text_bg(s, y + i * 13, t, SEL if i == 0 else OFF)
-        text_bg(s, y + 5 * 13 + 4, 'OPTIONS : JOUER', DIM)
+        box(s, y - 6, y + 6 * 11 + 16)
+        for i, t in enumerate(('> JOUER', 'NIVEAU NORMAL', 'LUMINOSITE 60%', 'VOLUME 60%', 'SCORES', 'DEMO')):
+            text_bg(s, y + i * 11, t, SEL if i == 0 else OFF)
+        text_bg(s, y + 6 * 11 + 4, 'OPTIONS : JOUER', DIM)
         title, sub = 'Menu', 'Croix haut / bas, X : valider, OPTIONS : jouer'
     elif page == 'scores':  # tableau avec les noms (3 lettres)
         y = 64 - 36
