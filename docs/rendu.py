@@ -256,10 +256,10 @@ for page in ('menu', 'scores'):
     s.im = game_frame(128, 128, demo=False, stage=1, seed=11)
     if page == 'menu':
         y = 64 - 22
-        box(s, y - 6, y + 3 * 13 + 16)
-        for i, t in enumerate(('> JOUER', 'NIVEAU NORMAL', 'SCORES')):
+        box(s, y - 6, y + 4 * 13 + 16)
+        for i, t in enumerate(('> JOUER', 'NIVEAU NORMAL', 'SCORES', 'DEMO')):
             text_bg(s, y + i * 13, t, SEL if i == 0 else OFF)
-        text_bg(s, y + 3 * 13 + 4, 'START : JOUER', DIM)
+        text_bg(s, y + 4 * 13 + 4, 'START : JOUER', DIM)
     else:
         y = 64 - 36
         box(s, y - 5, y + 6 * 11 + 18)

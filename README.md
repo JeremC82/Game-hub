@@ -23,11 +23,13 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. Dès que la ma
 | **JOUER** | lance la partie |
 | **NIVEAU** | Facile / Normal / Difficile (gauche / droite ou ✕), choix gardé en mémoire |
 | **SCORES** | les 5 meilleurs scores : rang, score, niveau (F/N/D) et stage atteint |
+| **DEMO** | cache le menu : le jeu tourne tout seul, avec « DEMO » qui clignote |
 
 - **Navigation :** la croix haut / bas choisit la ligne, ✕ valide.
 - **START** (bouton Options) lance la partie depuis n'importe quelle ligne.
+- **Mode démo :** au bout de **30 s sans toucher la manette**, le menu se cache et la démo tourne seule. Le premier appui sur un bouton, ou un mouvement du stick, fait revenir le menu, sans autre effet.
 - **En partie, START met en pause**, et un 2ᵉ appui reprend.
-- **Fin de partie :** « GAME OVER » s'affiche, avec « NOUVEAU RECORD ! » ou ton rang si tu entres dans le tableau. Le jeu revient ensuite au menu.
+- **Fin de partie :** « GAME OVER » s'affiche, avec « NOUVEAU RECORD ! » ou ton rang si tu entres dans le tableau. Le jeu revient ensuite au menu, puis passe en mode démo après 30 s.
 
 | Niveau | Vies au départ | Ennemis |
 |---|---|---|
@@ -152,8 +154,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V2.03_complet.bin](firmware/GameHub_V2.03_complet.bin) | 0x0 | `13c1957e460ce03857b630fe552ca659` |
-| [firmware/GameHub_V2.03.bin](firmware/GameHub_V2.03.bin) | 0x10000 | `d32e91995758472c123566274983d6e3` |
+| [firmware/GameHub_V2.04_complet.bin](firmware/GameHub_V2.04_complet.bin) | 0x0 | `ad495a4b9aca014fcc9ed5cbecced6a8` |
+| [firmware/GameHub_V2.04.bin](firmware/GameHub_V2.04.bin) | 0x10000 | `5cf0d702a591e28ee497beb7c274c904` |
 
 Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB SPIFFS)** dans Outils → Partition Scheme.
 

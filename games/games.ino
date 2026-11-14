@@ -28,7 +28,7 @@
 #include <driver/i2s.h>
 #include "game_types.h"
 
-#define GAMES_VERSION "2.03"
+#define GAMES_VERSION "2.04"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -106,7 +106,9 @@ bool gDemo = true;                  // le jeu joue tout seul (menu par-dessus qu
 bool gPaused = false;               // START pendant une partie : pause
 uint8_t gDiff = 1;                  // difficulte : 0 facile, 1 normal, 2 difficile
 const char *const DIFF_NAME[3] = { "FACILE", "NORMAL", "DIFFICILE" };
-uint8_t menuSel = 0;                // ligne choisie : 0 jouer, 1 niveau, 2 scores
+uint8_t menuSel = 0;                // ligne choisie : 0 jouer, 1 niveau, 2 scores, 3 demo
+bool gAttract = false;              // mode demo : menu cache (ligne DEMO, ou 30 s sans toucher la manette)
+#define MENU_IDLE_MS 30000UL        // menu sans activite : passage en mode demo
 bool menuScores = false;            // page des meilleurs scores affichee
 #define TOP_N 5
 HiScore gBest[TOP_N];                // meilleurs scores (gardes en memoire)
@@ -734,16 +736,16 @@ void drawMenu() {
     return;
   }
   int y = tall ? H / 2 - 22 : 14, step = tall ? 13 : 11;
-  gBox(y - 6, tall ? y + 3 * step + 16 : y + 2 * step + 12);
-  const char *items[3] = { "JOUER", nullptr, "SCORES" };
-  for (int i = 0; i < 3; i++) {
+  gBox(y - 6, tall ? y + 4 * step + 16 : y + 3 * step + 12);
+  const char *items[4] = { "JOUER", nullptr, "SCORES", "DEMO" };
+  for (int i = 0; i < 4; i++) {
     const char *t = items[i];
     if (i == 1) { snprintf(b, sizeof(b), "NIVEAU %s%s%s", i == menuSel ? "<" : "", DIFF_NAME[gDiff], i == menuSel ? ">" : ""); t = b; }
     char line[26];
     snprintf(line, sizeof(line), "%s%s", i == menuSel ? "> " : "", t);
     gText(y + i * step, line, i == menuSel ? sel : off);
   }
-  if (tall) gText(y + 3 * step + 4, "START : JOUER", dim);
+  if (tall) gText(y + 4 * step + 4, "START : JOUER", dim);
 }
 void gOverlay() {
   gfx->setFont(NULL);
@@ -765,7 +767,12 @@ void gOverlay() {
     if (gLifeUp) gText(yy, "VIE +1", rgb(0, 220, 255));
   }
   if (!gDemo) return;
-  if (PS4.isConnected()) { drawMenu(); return; }  // manette la : menu par-dessus la demo
+  if (PS4.isConnected() && !gAttract) { drawMenu(); return; }  // manette la : menu par-dessus la demo
+  if (PS4.isConnected()) {  // mode demo : le menu revient au premier appui
+    if ((gFrame / 40) & 1) gText(H / 2 + 6, "DEMO", rgb(255, 220, 0));
+    else gText(H / 2 + 6, "START : MENU", rgb(0, 220, 255));
+    return;
+  }
   if ((gFrame / 40) & 1) gText(H / 2 + 6, "DEMO", rgb(255, 220, 0));
   else gText(H / 2 + 6, "MANETTE: BOUTON PS", rgb(0, 220, 255));
   if (!PS4.isConnected() && ipText[0]) gText(H / 2 + 18, ipText, rgb(110, 110, 130));  // adresse attendue par la manette
@@ -780,6 +787,8 @@ void startGame() {
 }
 void toDemo() {
   gDemo = true;
+  gAttract = false;  // fin de partie : le menu d'abord, la demo seule apres 30 s
+  lastInput = millis();
   gfx->fillScreen(0);
   gNOld = 0;
   gReset();
@@ -799,6 +808,7 @@ void gameUpdate() {
     return;
   }
   if (!gDemo && now - lastInput > IDLE_TO_DEMO_MS) toDemo();
+  if (gDemo && !gAttract && now - lastInput > MENU_IDLE_MS) { gAttract = true; menuScores = false; }  // menu sans activite
   gameStep();
   gameDraw();
   gOverlay();
@@ -879,7 +889,9 @@ void ps4Poll() {
   uint8_t edge = bt & ~prevB;
   prevB = bt;
   if (edge) lastInput = millis();
-  if (gDemo) menuInput(edge);
+  if (gDemo && gAttract) {  // mode demo : n'importe quel bouton ou le stick fait revenir le menu (sans autre effet)
+    if (edge || k) { gAttract = false; lastInput = millis(); sfxMenu(); prevB = 0xFF; }
+  } else if (gDemo) menuInput(edge);
   else if (edge & 64 && gLives > 0) { gPaused = !gPaused; sfxMenu(); }  // START : pause / reprise
   if (PS4.Share() && (PS4.Up() || PS4.Down()) && millis() - lastBr > 150) {  // Share + croix haut / bas : luminosite
     lastBr = millis();
@@ -920,8 +932,8 @@ void menuInput(uint8_t edge) {
     return;
   }
   if (edge & 64) { startReq = true; return; }
-  if (edge & 1) { menuSel = (menuSel + 2) % 3; sfxMenu(); }
-  if (edge & 2) { menuSel = (menuSel + 1) % 3; sfxMenu(); }
+  if (edge & 1) { menuSel = (menuSel + 3) % 4; sfxMenu(); }
+  if (edge & 2) { menuSel = (menuSel + 1) % 4; sfxMenu(); }
   if (menuSel == 1 && (edge & (4 | 8 | 16))) {
     gDiff = (gDiff + ((edge & 4) ? 2 : 1)) % 3;
     prefs.putUChar("diff", gDiff);
@@ -930,6 +942,7 @@ void menuInput(uint8_t edge) {
   if (edge & 16) {
     if (menuSel == 0) startReq = true;
     else if (menuSel == 2) { menuScores = true; sfxMenu(); }
+    else if (menuSel == 3) { gAttract = true; menuSel = 0; sfxMenu(); }  // ligne DEMO
   }
 }
 
