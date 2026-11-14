@@ -112,6 +112,20 @@ Pour rejouer sur la PS4 ensuite, il suffit de rebrancher la manette en USB sur l
 
 La commande `a` seule rend à l'ESP32 son adresse d'origine.
 
+## Son par une broche PWM (prévu)
+
+![Branchement du son](docs/branchement-son.png)
+
+Le son par l'ampli I2S gêne la manette PS4 (voir plus bas). Le son prévu passe donc par **une seule broche, GPIO 22**. L'ESP32 y sort des notes carrées, façon consoles 8 bits, sans I2S et presque sans travail pour le processeur. Le signal est filtré, puis envoyé à un ampli analogique.
+
+- **Filtre :** 1 kΩ en série, 10 nF vers la masse, puis 10 µF en série vers l'entrée de l'ampli. Relie l'entrée L à l'entrée R : le son est mono.
+- **Amplis NS4110B ou PAM8610 :** ils demandent **7 à 15 V**, pas le 5 V des dalles. Alimente-les avec un bloc 12 V à part, ou avec un élévateur 5 V → 12 V (MT3608, XL6009).
+- **Plus simple :** un **PAM8403** (2 x 3 W) fonctionne directement en 5 V.
+- **Masse commune** obligatoire entre l'ampli et l'ESP32.
+- **Volume :** avec le potentiomètre de l'ampli. Commence au minimum.
+
+> Le schéma est prêt. Le code de ce son n'est **pas encore fait**.
+
 ## Son (option)
 
 > **Son coupé depuis la V2.21** (`#define SON_ACTIF 0` dans games.ino). Avec le canal audio actif, la manette PS4 perd la plupart de ses paquets, et les commandes deviennent lentes. Le code du son reste en place. Pour le réactiver, mets `SON_ACTIF 1` et recompile.
