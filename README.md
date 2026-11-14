@@ -6,76 +6,21 @@ Jeux d'arcade sur 1 à 4 dalles LED 128x64, avec un ESP32 classique et une **man
 - **Partition unique de 3 Mo :** il reste de la place pour d'autres jeux.
 - **Son en option :** une broche PWM vers un petit ampli et un haut-parleur.
 
-**3 jeux originaux**, à choisir dans le menu :
-- **ESSAIM** : le shoot'em up repris du mode Jeu du VU-mètre ;
-- **RAID** : un shoot vertical avec un boss à la fin de chaque stage ;
-- **COURSE** : un petit bonhomme qui court et saute.
+**4 jeux originaux**, à choisir dans le menu (gauche / droite sur la ligne JOUER). Au démarrage, c'est toujours **ESSAIM** qui est proposé.
 
-Ils ont en commun les niveaux de difficulté, les stages, les vies, les meilleurs scores et la démo automatique.
+Les 4 jeux ont en commun les niveaux de difficulté, les stages, les vies, les meilleurs scores avec les noms et la démo automatique.
+
+
+# ESSAIM
+
+Le jeu principal : un shoot'em up original, repris du mode Jeu du VU-mètre. Une formation d'ennemis arrive en vol, change de monde à chaque stage, et ton vaisseau évolue.
+
+![Mode démo d'ESSAIM](docs/mode-demo.gif)
 
 ![Le jeu sur les configurations de dalles](docs/rendu.png)
 
 *Aperçu simulé, généré par `docs/rendu.py` avec les mêmes sprites que le jeu. Chaque configuration en grand : [128x128](docs/rendu-128x128.png), [256x64](docs/rendu-256x64.png), [128x256](docs/rendu-128x256.png).*
 
-## Menu
-
-Sans partie en cours, le jeu tourne tout seul en démo, sans son. **Sans manette connectée**, la démo affiche « DEMO » et une petite indication, « MANETTE : BOUTON PS », avec l'adresse Bluetooth de l'ESP32. Dès que la manette est connectée, le menu s'affiche **sur son propre écran**, sans la démo derrière. On y voit un fond d'étoiles, le titre GAME HUB et le record avec le nom de son détenteur :
-
-![Menu, meilleurs scores avec les noms, saisie du nom](docs/rendu-menu.png)
-
-| Ligne | Action |
-|---|---|
-| **JOUER** | **gauche / droite : choix du jeu** (ESSAIM, RAID, COURSE). ✕ ou OPTIONS lance la partie. Le choix est gardé en mémoire. |
-| **NIVEAU** | Facile / Normal / Difficile (gauche / droite ou ✕), choix gardé en mémoire |
-| **LUMINOSITE** | 0 à 100 % par pas de 10 % (gauche / droite ou ✕), visible tout de suite et gardée en mémoire. À 0 %, les dalles restent très faiblement allumées pour qu'on voie encore le menu. |
-| **VOLUME** | volume du son, 0 à 100 % par pas de 10 % (gauche / droite ou ✕). Un bip fait entendre le niveau. 0 % = muet. C'est le rapport cyclique du PWM : le potentiomètre de l'ampli règle le maximum. |
-| **SCORES** | les 5 meilleurs scores **du jeu choisi** : rang, **nom**, score, niveau (F/N/D) et stage atteint. Chaque jeu a son propre tableau. |
-| **DEMO** | lance **la démo du jeu choisi** : il tourne tout seul avec un pilote automatique, et « DEMO » clignote |
-
-| Réglage du volume | Réglage de la luminosité |
-|---|---|
-| ![Réglage du volume](docs/reglage-volume.gif) | ![Réglage de la luminosité](docs/reglage-luminosite.gif) |
-
-- **Navigation :** la croix haut / bas choisit la ligne, ✕ valide.
-- **OPTIONS** (le « START » de la manette PS4) lance la partie depuis n'importe quelle ligne.
-- **Mode démo :** au bout de **30 s sans toucher la manette**, le menu se cache et la démo tourne seule. Le premier appui sur un bouton, ou un mouvement du stick, fait revenir le menu, sans autre effet.
-
-  ![Mode démo](docs/mode-demo.gif)
-- **En partie, OPTIONS met en pause** : OPTIONS reprend la partie, **○ (rond) revient au menu**. Si ton score entre dans les 5 meilleurs, il est enregistré.
-- **Fin de partie :** « GAME OVER » s'affiche. Le jeu revient ensuite au menu, puis passe en mode démo après 30 s.
-- **Saisie du nom :** si ton score entre dans les 5 meilleurs, un écran affiche « NOUVEAU RECORD ! » (ou « BRAVO ! RANG n ») puis **3 grandes lettres** à choisir, comme sur une borne d'arcade.
-  - Croix haut / bas : change la lettre (A à Z, chiffres, espace, tiret).
-  - Gauche / droite, ou ✕ : passe à la lettre précédente ou suivante.
-  - ○ : revient à la lettre précédente.
-  - OPTIONS : valide. ✕ sur la dernière lettre valide aussi.
-  - Le dernier nom saisi est proposé la fois suivante.
-  - Après validation, le tableau des scores s'affiche avec ton nom. Sans appui pendant 60 s, le nom est validé tel quel.
-
-| Niveau | Vies au départ | Ennemis |
-|---|---|---|
-| Facile | 5 | tirent 2 fois moins, piquent moins souvent, tirs plus lents |
-| Normal | 3 | — |
-| Difficile | 3 | tirent plus, piquent plus souvent, tirs plus rapides |
-
-## RAID
-
-![RAID](docs/jeu-raid.gif)
-
-Un shoot vertical : tu te déplaces partout dans le bas de l'écran, et des vagues d'ennemis descendent en formation.
-- **Commandes :** croix ou stick pour bouger, ✕ pour tirer (en continu si tu restes appuyé).
-- **Capsules « P » :** certaines vagues en lâchent une, qui améliore ton arme (3 niveaux). Perdre une vie fait baisser l'arme d'un niveau.
-- **Boss :** après 7 vagues, un gros boss apparaît, avec sa barre de vie en haut de l'écran. Il tire en éventail et vise ton vaisseau. Le détruire termine le stage : gros bonus et une vie en plus.
-
-## COURSE
-
-![COURSE](docs/jeu-course.gif)
-
-Un petit bonhomme original (casquette rouge, t-shirt bleu) court tout seul vers la droite.
-- **Commandes :** ✕ ou haut pour sauter. Garde le bouton appuyé pour sauter plus haut.
-- **Le parcours :** saute par-dessus les **trous** et les **piques**, et de **plateforme en plateforme**. Ramasse les **cristaux** (50 points).
-- **Points et stages :** la distance parcourue rapporte des points. Tous les 1500 pixels, c'est un nouveau stage : la course va plus vite et tu gagnes une vie.
-
-## ESSAIM (le shoot'em up)
 
 - **Écran :** score et record en haut ; **vies en haut à droite** (une icône et le nombre, par exemple `X3`) . Le vaisseau est tout en bas de l'écran. Le stage s'affiche dans l'annonce, au début de chaque stage.
 - **Vies :** Chaque stage terminé donne **une vie de plus** (9 au maximum).
@@ -109,6 +54,90 @@ Un petit bonhomme original (casquette rouge, t-shirt bleu) court tout seul vers 
 
 - **Abandon :** une partie sans aucun appui pendant 1 min repasse en démo.
 
+# Les autres jeux
+
+### RAID
+
+![RAID](docs/jeu-raid.gif)
+
+Un shoot vertical : tu te déplaces partout dans le bas de l'écran, et les vagues d'ennemis descendent.
+- **Commandes :** croix ou stick pour bouger, ✕ pour tirer (en continu si tu restes appuyé), **○ pour une bombe**.
+- **Ennemis :**
+  - des lignes et des diagonales ;
+  - des éventails ;
+  - des **kamikazes**, qui foncent sur ton vaisseau ;
+  - des **tourelles**, qui s'arrêtent en haut et tirent en éventail.
+
+  Touchés, ils clignotent en blanc.
+- **Capsules :**
+  - **P** améliore l'arme, sur 3 niveaux, jusqu'à 5 tirs en éventail. Perdre une vie fait baisser l'arme d'un niveau.
+  - **S** donne un bouclier, qui encaisse un tir.
+  - **B** ajoute une bombe. Les bombes restantes s'affichent en bas à gauche.
+- **Bombe (○) :** elle détruit les ennemis à l'écran, efface leurs tirs et blesse le boss.
+- **Boss :** après 8 vagues, un boss apparaît, avec sa barre de vie en haut. Il y a 3 boss différents, qui alternent selon le stage : une coque à canons, un crabe à pinces et un noyau à bras tournants.
+  - Sous la moitié de sa vie, le boss passe en **2ᵉ phase** : plus rapide, avec des tirs en spirale.
+  - Le détruire termine le stage : gros bonus et une vie en plus.
+
+### COURSE
+
+![COURSE](docs/jeu-course.gif)
+
+Un petit bonhomme original (casquette rouge, t-shirt bleu) court tout seul vers la droite, devant des montagnes qui défilent au loin.
+- **Commandes :** ✕ ou haut pour sauter. Garde le bouton appuyé pour sauter plus haut.
+- **Pièces dorées :** en arcs au-dessus des trous et en rangées. Chacune vaut 10 points, et **30 pièces donnent une vie** (compteur en haut à droite).
+- **Blocs :** les rangées de blocs de pierre servent de plateformes. Un **coup de tête par-dessous** sur un bloc à bordure dorée fait jaillir une pièce (100 points).
+- **Rochers qui roulent :** saute par-dessus, ou **écrase-les en retombant dessus** (200 points, avec un rebond).
+- **Trous et piques :** les toucher fait perdre une vie. Les cristaux, plus rares, valent 200 points.
+- **Stages :** tous les 1500 pixels, la course accélère et tu gagnes une vie.
+
+### RAQUETTES
+
+![RAQUETTES](docs/jeu-raquettes.gif)
+
+Une balle et deux raquettes : la tienne en bas, celle de l'ordinateur en haut.
+- **Commandes :** gauche / droite pour déplacer ta raquette.
+- **La balle :** son angle dépend de l'endroit où elle touche la raquette, et elle accélère à chaque échange. Elle rebondit sur les bords.
+- **Points :** un point gagné rapporte 100 × le stage. Un point perdu coûte une vie.
+- **Stages :** 5 points gagnés font passer au stage suivant. L'ordinateur devient plus rapide, les raquettes un peu plus petites, et tu gagnes une vie.
+
+## Menu
+
+Sans partie en cours, le jeu tourne tout seul en démo, sans son. **Sans manette connectée**, la démo affiche « DEMO » et une petite indication, « MANETTE : BOUTON PS », avec l'adresse Bluetooth de l'ESP32. Dès que la manette est connectée, le menu s'affiche **sur son propre écran**, sans la démo derrière. On y voit un fond d'étoiles, le titre GAME HUB et le record avec le nom de son détenteur :
+
+![Menu, meilleurs scores avec les noms, saisie du nom](docs/rendu-menu.png)
+
+| Ligne | Action |
+|---|---|
+| **JOUER** | **gauche / droite : choix du jeu** (ESSAIM, RAID, COURSE, RAQUETTES). Au démarrage : ESSAIM. ✕ ou OPTIONS lance la partie. |
+| **NIVEAU** | Facile / Normal / Difficile (gauche / droite ou ✕), choix gardé en mémoire |
+| **LUMINOSITE** | 0 à 100 % par pas de 10 % (gauche / droite ou ✕), visible tout de suite et gardée en mémoire. À 0 %, les dalles restent très faiblement allumées pour qu'on voie encore le menu. |
+| **VOLUME** | volume du son, 0 à 100 % par pas de 10 % (gauche / droite ou ✕). Un bip fait entendre le niveau. 0 % = muet. C'est le rapport cyclique du PWM : le potentiomètre de l'ampli règle le maximum. |
+| **SCORES** | les 5 meilleurs scores **du jeu choisi** : rang, **nom**, score, niveau (F/N/D) et stage atteint. Chaque jeu a son propre tableau. |
+| **DEMO** | lance **la démo du jeu choisi** : il tourne tout seul avec un pilote automatique, et « DEMO » clignote |
+
+| Réglage du volume | Réglage de la luminosité |
+|---|---|
+| ![Réglage du volume](docs/reglage-volume.gif) | ![Réglage de la luminosité](docs/reglage-luminosite.gif) |
+
+- **Navigation :** la croix haut / bas choisit la ligne, ✕ valide.
+- **OPTIONS** (le « START » de la manette PS4) lance la partie depuis n'importe quelle ligne.
+- **Mode démo :** au bout de **30 s sans toucher la manette**, le menu se cache et la démo tourne seule. Le premier appui sur un bouton, ou un mouvement du stick, fait revenir le menu, sans autre effet.
+- **En partie, OPTIONS met en pause** : OPTIONS reprend la partie, **○ (rond) revient au menu**. Si ton score entre dans les 5 meilleurs, il est enregistré.
+- **Fin de partie :** « GAME OVER » s'affiche. Le jeu revient ensuite au menu, puis passe en mode démo après 30 s.
+- **Saisie du nom :** si ton score entre dans les 5 meilleurs, un écran affiche « NOUVEAU RECORD ! » (ou « BRAVO ! RANG n ») puis **3 grandes lettres** à choisir, comme sur une borne d'arcade.
+  - Croix haut / bas : change la lettre (A à Z, chiffres, espace, tiret).
+  - Gauche / droite, ou ✕ : passe à la lettre précédente ou suivante.
+  - ○ : revient à la lettre précédente.
+  - OPTIONS : valide. ✕ sur la dernière lettre valide aussi.
+  - Le dernier nom saisi est proposé la fois suivante.
+  - Après validation, le tableau des scores s'affiche avec ton nom. Sans appui pendant 60 s, le nom est validé tel quel.
+
+| Niveau | Vies au départ | Ennemis |
+|---|---|---|
+| Facile | 5 | tirent 2 fois moins, piquent moins souvent, tirs plus lents |
+| Normal | 3 | — |
+| Difficile | 3 | tirent plus, piquent plus souvent, tirs plus rapides |
+
 ## Manette PS4
 
 ![Connexion de la manette PS4](docs/manette-ps4.gif)
@@ -117,7 +146,8 @@ Un petit bonhomme original (casquette rouge, t-shirt bleu) court tout seul vers 
 |---|---|
 | stick gauche ou croix gauche / droite | bouger |
 | stick gauche ou croix haut / bas | avancer / reculer (dans le bas de l'écran, environ 45 %) |
-| croix, rond, carré, triangle, R1, L1 ou R2 | tirer |
+| croix, carré, triangle, R1, L1 ou R2 | tirer (ESSAIM, RAID), sauter (COURSE) |
+| ○ (rond) | bombe dans RAID ; dans les menus : retour |
 | OPTIONS | jouer depuis le menu, pause en partie |
 | ○ (rond), pendant la pause | quitter la partie et revenir au menu |
 | croix haut / bas, au menu | choisir la ligne |
@@ -209,8 +239,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V3.00_complet.bin](firmware/GameHub_V3.00_complet.bin) | 0x0 | `4e03015a77cd250584285c637bc1a7dc` |
-| [firmware/GameHub_V3.00.bin](firmware/GameHub_V3.00.bin) | 0x10000 | `72e420ee251d08e65cacf76553d33fa6` |
+| [firmware/GameHub_V3.10_complet.bin](firmware/GameHub_V3.10_complet.bin) | 0x0 | `6048935896b87ed95166a6cc82634d0b` |
+| [firmware/GameHub_V3.10.bin](firmware/GameHub_V3.10.bin) | 0x10000 | `893b95f20d8c8e73db0ff8d3fe4fac9f` |
 
 Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB SPIFFS)** dans Outils → Partition Scheme.
 
