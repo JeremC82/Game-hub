@@ -150,6 +150,7 @@ Module **ampli I2S MAX98357A**, par exemple [Adafruit MAX98357A, réf. 3006](htt
 | `c NDFS` | dalles. N : nombre (1 à 4). D : disposition (0 l'une sous l'autre, 1 côte à côte, 2 carré). F : écran retourné (0/1). S : serpentin (0/1) |
 | `p N` | couleurs des dalles sur N bits (3 à 6) |
 | `v N` | volume du son, de 0 à 10 |
+| `e 0` / `e 1` / `e x` | test des pertes Bluetooth : LED éteintes / rallumées / transfert vers les dalles arrêté (jusqu'au redémarrage) |
 
 Les commandes `a`, `c` et `p` redémarrent l'ESP32. Les réglages sont gardés en mémoire.
 
@@ -168,8 +169,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V2.12_complet.bin](firmware/GameHub_V2.12_complet.bin) | 0x0 | `3fad0066bb4a45c9150f5265ff09615d` |
-| [firmware/GameHub_V2.12.bin](firmware/GameHub_V2.12.bin) | 0x10000 | `dbe5f0c888e69fc1745383268586e87a` |
+| [firmware/GameHub_V2.14_complet.bin](firmware/GameHub_V2.14_complet.bin) | 0x0 | `31cb2693987e81f1e7abef9cc574a38d` |
+| [firmware/GameHub_V2.14.bin](firmware/GameHub_V2.14.bin) | 0x10000 | `746bebae90e011fcad52f6f3d367052a` |
 
 Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB SPIFFS)** dans Outils → Partition Scheme.
 

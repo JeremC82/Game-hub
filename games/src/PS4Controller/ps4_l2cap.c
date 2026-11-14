@@ -305,6 +305,7 @@ volatile uint8_t ps4DbgType = 0;
 volatile uint8_t ps4DbgRaw[12];  // octets 13 a 24 du paquet recale
 volatile int ps4DbgLen = 0;
 volatile uint32_t ps4DbgCount = 0;  // paquets recus (le jeu affiche le nombre par seconde)
+volatile uint32_t ps4DbgSent = 0;   // rapports envoyes par la manette, d'apres son compteur (pour les pertes)
 static void ps4_l2cap_data_ind_cback(uint16_t l2cap_cid, BT_HDR *p_buf) {
   uint8_t *d = p_buf->data;
   int n = p_buf->offset + p_buf->length;
@@ -328,6 +329,12 @@ static void ps4_l2cap_data_ind_cback(uint16_t l2cap_cid, BT_HDR *p_buf) {
     }
     for (int i = 0; i < 12; i++) ps4DbgRaw[i] = tmp[13 + i];  // sticks, boutons, gachettes (diagnostic)
     ps4DbgLen = n - pos;
+    {  // le 7e octet apres les sticks porte un compteur 6 bits : l'ecart donne les rapports envoyes
+      static int prevCnt = -1;
+      int c = tmp[19] >> 2;
+      ps4DbgSent += prevCnt < 0 ? 1 : ((c - prevCnt) & 63 ? (c - prevCnt) & 63 : 64);
+      prevCnt = c;
+    }
     parsePacket(tmp);
   }
 

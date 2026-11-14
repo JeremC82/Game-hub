@@ -29,7 +29,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "2.12"
+#define GAMES_VERSION "2.14"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -922,6 +922,7 @@ extern "C" volatile uint8_t ps4DbgType;
 extern "C" volatile uint8_t ps4DbgRaw[12];
 extern "C" volatile int ps4DbgLen;
 extern "C" volatile uint32_t ps4DbgCount;
+extern "C" volatile uint32_t ps4DbgSent;
 void ps4Poll() {
   static bool dbgShown = false;
   if (!dbgShown && ps4DbgPos != -2) {  // diagnostic : debut du 1er paquet de la manette
@@ -948,13 +949,15 @@ void ps4Poll() {
     since = millis();
     Serial.printf("Manette PS4 connectee, memoire libre %u (plus petit bloc %u)\n", ESP.getFreeHeap(), ESP.getMaxAllocHeap());
   }
-  if (millis() - lastLog > 2000) {  // diagnostic : etat toutes les 2 s
+  if (millis() - lastLog > 5000) {  // etat de la manette toutes les 5 s
     lastLog = millis();
-    static uint32_t lastCount = 0;
-    uint32_t cnt = ps4DbgCount;
-    Serial.printf("  PS4 ok %lu s, %lu paquets/s, batterie %u/15, memoire libre %u (min %u, bloc %u)\n", (millis() - since) / 1000,
-                  (unsigned long)((cnt - lastCount) / 2), PS4.Battery(), ESP.getFreeHeap(), ESP.getMinFreeHeap(), ESP.getMaxAllocHeap());
+    static uint32_t lastCount = 0, lastSent = 0;
+    uint32_t cnt = ps4DbgCount, sent = ps4DbgSent, rx = cnt - lastCount, tx = sent - lastSent;
+    Serial.printf("  PS4 ok %lu s, %lu paquets/s recus sur ~%lu envoyes (%lu%% perdus), batterie %u/15, memoire libre %u (min %u)\n",
+                  (millis() - since) / 1000, (unsigned long)(rx / 5), (unsigned long)(tx / 5), (unsigned long)(tx > rx ? (tx - rx) * 100 / tx : 0),
+                  PS4.Battery(), ESP.getFreeHeap(), ESP.getMinFreeHeap());
     lastCount = cnt;
+    lastSent = sent;
   }
   static bool stable = false;
   if (!stable && millis() - since > 15000) {  // connexion stable : les couleurs choisies tiennent
@@ -984,22 +987,6 @@ void ps4Poll() {
                (PS4.Options() && !PS4.Share()) << 6;
   uint8_t edge = bt & ~prevB;
   prevB = bt;
-  {  // diagnostic : octets bruts des boutons (5e a 7e octet apres les sticks) a chaque changement
-    static uint8_t prevRaw[3] = { 0, 0, 0 };
-    uint8_t b5 = ps4DbgRaw[4], b6 = ps4DbgRaw[5], b7 = ps4DbgRaw[6] & 0x03;  // b7 : PS et pave (le reste est un compteur)
-    if (b5 != prevRaw[0] || b6 != prevRaw[1] || b7 != prevRaw[2]) {
-      prevRaw[0] = b5; prevRaw[1] = b6; prevRaw[2] = b7;
-      Serial.printf("Brut : rapport 0x%02X long %d | sticks %02X %02X %02X %02X | boutons %02X %02X %02X | L2 %02X R2 %02X\n", ps4DbgType,
-                    ps4DbgLen, ps4DbgRaw[0], ps4DbgRaw[1], ps4DbgRaw[2], ps4DbgRaw[3], b5, b6, ps4DbgRaw[6], ps4DbgRaw[7], ps4DbgRaw[8]);
-    }
-  }
-  if (edge) {  // journal des appuis dans le moniteur serie (verifier que la manette est bien lue)
-    static const char *const NAMES[7] = { "HAUT", "BAS", "GAUCHE", "DROITE", "X", "ROND", "OPTIONS" };
-    Serial.print("Bouton :");
-    for (int i = 0; i < 7; i++)
-      if (edge & (1 << i)) Serial.printf(" %s", NAMES[i]);
-    Serial.printf("  (%s)\n", gDemo ? (gAttract ? "demo" : menuScores ? "scores" : "menu") : gPaused ? "pause" : "partie");
-  }
   if (edge) lastInput = millis();
   if (gDemo && gAttract) {  // mode demo : n'importe quel bouton ou le stick fait revenir le menu (sans autre effet)
     if (edge || k) { gAttract = false; lastInput = millis(); sfxMenu(); prevB = 0xFF; }
@@ -1078,6 +1065,7 @@ void serialMenu() {
   Serial.println("  p N : couleurs des dalles sur N bits (3 a 6, redemarre). 3 = le plus sur pour le Bluetooth,");
   Serial.println("        4 = plus de nuances. 2 plantages de suite : retour automatique a 3.");
   Serial.printf("  v N : volume du son, 0 (muet) a 10. Actuel : %u\n", volume);
+  Serial.println("  e 0 / e 1 : test, LED eteintes / rallumees ; e x : transfert vers les dalles arrete (jusqu'au redemarrage)");
   Serial.println("  ? : ce menu");
 }
 void handleSerial() {
@@ -1111,6 +1099,11 @@ void handleSerial() {
         Serial.println("Dalles enregistrees, redemarrage");
         restartAt = millis() + 300;
       } else Serial.println("Format : c NDFS (ex. c 2000)");
+    } else if (cmd == 'e') {  // test des pertes Bluetooth : parasites des LED ou charge du transfert d'image ?
+      if (*arg == '0') { dma->setBrightness8(0); Serial.println("Test : LED eteintes (transfert d'image actif)"); }
+      else if (*arg == '1') { dma->setBrightness8(bright); Serial.println("Test : LED rallumees"); }
+      else if (*arg == 'x') { dma->stopDMAoutput(); Serial.println("Test : transfert vers les dalles arrete (redemarrer pour revenir)"); }
+      else Serial.println("Format : e 0, e 1 ou e x");
     } else if (cmd == 'v') {
       int v = atoi(arg);
       if (*arg && v >= 0 && v <= 10) {
