@@ -29,7 +29,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "2.17"
+#define GAMES_VERSION "2.18"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -150,7 +150,7 @@ void tinyText(Adafruit_GFX &g, int x, int y, const char *s, uint16_t col) {
 // ---------------------------------------------------------------- son : ampli I2S MAX98357A (option)
 // I2S0 (les dalles utilisent l'I2S1). Synthetiseur 4 voix (carre ou bruit, glissando, decroissance)
 // calcule dans une petite tache ; sans ampli branche, rien ne se passe.
-#define SON_ACTIF 0  // 0 : son coupe (test : la manette PS4 perd-elle encore des rapports sans la tache son ?)
+#define SON_ACTIF 1  // 0 : son coupe (V2.17 : sans son, la manette PS4 ne perdait plus de rapports)
 #define SND_BCLK 22
 #define SND_LRC 21
 #define SND_DIN 33
