@@ -19,9 +19,18 @@
 /*  dernier reseau regle. Sinon l'ESP32 cree le reseau                                            */
 /*  "Games-Setup" : s'y connecter et choisir sa box sur la page qui s'ouvre (192.168.4.1).         */
 /*  Bouton BOOT appuye 5 s : oublie le wifi et redemarre.                                        */
+/*                                                                                                */
+/*  Version manette PS4 (compilee avec -DGAMES_PS4, ./build.ps1 games -Ps4) : pas de wifi, la     */
+/*  manette PS4 se connecte en Bluetooth directement a cet ESP32. Reglages par le moniteur serie  */
+/*  (115200 bauds, taper ?) : adresse de la manette, dalles.                                      */
 /**************************************************************************************************/
 #include <Arduino.h>
 #include <Preferences.h>
+#include <ESP32-HUB75-MatrixPanel-I2S-DMA.h>
+#include <Adafruit_GFX.h>
+#ifdef GAMES_PS4  // version manette PS4 en Bluetooth, sans wifi
+#include <PS4Controller.h>
+#else
 #include <WiFi.h>
 #include <WiFiMulti.h>
 #include <esp_now.h>
@@ -30,8 +39,6 @@
 #include <WebServer.h>  // avant ESPAsyncWebServer.h (utilise par WiFiManager, evite le conflit HTTP_GET)
 #include <ESPAsyncWebServer.h>
 #include <WiFiManager.h>
-#include <ESP32-HUB75-MatrixPanel-I2S-DMA.h>
-#include <Adafruit_GFX.h>
 #include "web_page.h"
 #if __has_include("secrets.h")
 #include "secrets.h"  // reseaux wifi connus (local, jamais publie)
@@ -39,8 +46,9 @@
 #define WIFI_SEED_COUNT 0
 const char *WIFI_SEED[1][2] = { { "", "" } };
 #endif
+#endif
 
-#define GAMES_VERSION "1.02"
+#define GAMES_VERSION "1.03"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -111,6 +119,8 @@ uint16_t rgb(uint8_t r, uint8_t g, uint8_t b) { return dma->color565(r, g, b); }
 volatile uint8_t keys = 0;          // touches de la page web : 1 gauche, 2 droite, 4 feu
 volatile uint8_t keysNow = 0;       // touches de la manette ESP-NOW
 volatile uint32_t lastNowRx = 0;    // derniere trame de la manette (sans nouvelles : touches relachees)
+uint8_t keysPs4 = 0;                // touches de la manette PS4 (version GAMES_PS4)
+volatile bool rumbleReq = false;    // vaisseau touche : la manette PS4 vibre
 volatile uint32_t lastInput = 0;    // dernier appui d'un joueur (millis)
 volatile bool startReq = false;     // FEU pendant la demo : nouvelle partie
 bool gDemo = true;                  // le jeu joue tout seul
@@ -283,6 +293,7 @@ bool gFire() {
   return true;
 }
 void gHitPlayer() {
+  rumbleReq = true;
   gBoomAt(gPx + 4, gPY + 3);
   gLives--;
   gDead = gLives > 0 ? 50 : 120;  // pause avant le vaisseau suivant (plus longue apres GAME OVER)
@@ -474,7 +485,7 @@ void gameDraw() {
 
 // joueur : deplacement aux touches, tir tant que FEU est appuye (3 tirs a l'ecran au plus)
 void gPlayerControl() {
-  uint8_t k = keys | (millis() - lastNowRx < 500 ? keysNow : 0);
+  uint8_t k = keys | keysPs4 | (millis() - lastNowRx < 500 ? keysNow : 0);
   float sp = W > 128 ? 2.4f : 1.7f;
   if ((k & 1) && !(k & 2)) gPx -= sp;
   if ((k & 2) && !(k & 1)) gPx += sp;
@@ -505,7 +516,13 @@ void gOverlay() {
   }
   if (!gDemo) return;
   if ((gFrame / 40) & 1) gText(H / 2 + 6, "DEMO", rgb(255, 220, 0));
+#ifdef GAMES_PS4
+  else gText(H / 2 + 6, PS4.isConnected() ? "APPUIE SUR X" : "MANETTE: BOUTON PS", rgb(0, 220, 255));
+  if (!PS4.isConnected() && ipText[0]) gText(H / 2 + 18, ipText, rgb(110, 110, 130));  // adresse attendue par la manette
+  return;
+#else
   else gText(H / 2 + 6, "APPUIE SUR FEU", rgb(0, 220, 255));
+#endif
   if (ipText[0]) gText(H / 2 + 18, ipText, rgb(110, 110, 130));
 }
 
@@ -536,6 +553,7 @@ void gameUpdate() {
   gOverlay();
 }
 
+#ifndef GAMES_PS4
 // ---------------------------------------------------------------- manette ESP-NOW (2e ESP32, sans box)
 // Le jeu emet une balise 2 fois par seconde sur son canal ; la manette la cherche sur les canaux 1 a 13,
 // puis envoie ses touches (a chaque changement et toutes les 100 ms). Paquets identiques dans manette.ino.
@@ -689,11 +707,126 @@ void handleBootButton() {
   } else down = 0;
 }
 
+#else  // ================================================================ version manette PS4 (Bluetooth)
+uint32_t restartAt = 0;
+uint32_t brightSaveAt = 0;  // luminosite changee : enregistree 2 s plus tard
+
+// Adresse Bluetooth que l'ESP32 prend : celle que la manette connait deja (sa console, ou ecrite avec
+// SixaxisPairTool). Vide : adresse d'origine de l'ESP32, a ecrire dans la manette.
+void ps4Begin() {
+  String mac = prefs.getString("ps4mac", "");
+  bool ok = mac.length() == 17 ? PS4.begin(mac.c_str()) : PS4.begin();
+  snprintf(ipText, sizeof(ipText), "%s", PS4.getAddress().c_str());
+  Serial.printf("Manette PS4 : Bluetooth %s, adresse %s, memoire libre %u\n", ok ? "pret" : "ECHEC", ipText, ESP.getFreeHeap());
+}
+
+// lecture de la manette a chaque tour de boucle ; barre lumineuse selon le stage, vibration quand on est touche
+void ps4Poll() {
+  static bool was = false;
+  static int lastTier = -2;
+  static uint32_t rumbleOff = 0, lastBr = 0, combo = 0;
+  if (!PS4.isConnected()) {
+    keysPs4 = 0;
+    if (was) { was = false; Serial.println("Manette PS4 deconnectee"); }
+    return;
+  }
+  if (!was) { was = true; lastTier = -2; Serial.printf("Manette PS4 connectee, batterie %u/15\n", PS4.Battery()); }
+  uint8_t k = 0;
+  if (PS4.Left() || PS4.UpLeft() || PS4.DownLeft() || PS4.LStickX() < -40) k |= 1;
+  if (PS4.Right() || PS4.UpRight() || PS4.DownRight() || PS4.LStickX() > 40) k |= 2;
+  if (PS4.Cross() || PS4.Circle() || PS4.Square() || PS4.Triangle() || PS4.R1() || PS4.L1() || PS4.R2Value() > 60) k |= 4;
+  if ((k & 4) && !(keysPs4 & 4)) startReq = true;
+  if (k) lastInput = millis();
+  keysPs4 = k;
+  if ((PS4.Up() || PS4.Down()) && millis() - lastBr > 150) {  // croix haut / bas : luminosite
+    lastBr = millis();
+    bright = constrain(bright + (PS4.Up() ? 15 : -15), 5, 255);
+    dma->setBrightness8(bright);
+    brightSaveAt = millis() + 2000;
+  }
+  if (PS4.Share() && PS4.Options()) {  // Share + Options 3 s : redemarrage
+    if (!combo) combo = millis();
+    else if (millis() - combo > 3000) restartAt = millis();
+  } else combo = 0;
+  bool send = false;
+  int tier = gDemo ? -1 : gTier();
+  if (tier != lastTier) {  // barre lumineuse : bleu sombre en demo, puis couleur du vaisseau
+    static const uint8_t LED[5][3] = { { 0, 0, 40 }, { 0, 90, 255 }, { 40, 230, 80 }, { 0, 220, 255 }, { 255, 40, 40 } };
+    lastTier = tier;
+    PS4.setLed(LED[tier + 1][0], LED[tier + 1][1], LED[tier + 1][2]);
+    send = true;
+  }
+  if (rumbleReq) {
+    rumbleReq = false;
+    PS4.setRumble(0, 220);
+    rumbleOff = millis() + 300;
+    send = true;
+  } else if (rumbleOff && millis() > rumbleOff) {
+    rumbleOff = 0;
+    PS4.setRumble(0, 0);
+    send = true;
+  }
+  if (send) PS4.sendToController();
+}
+
+// reglages par le moniteur serie (pas de page web dans cette version)
+void serialMenu() {
+  Serial.println();
+  Serial.println("===== Game hub v" GAMES_VERSION " - manette PS4 =====");
+  Serial.printf("Adresse Bluetooth de l'ESP32 : %s\n", ipText);
+  Serial.printf("Dalles : %u, disposition %u, retourne %u, serpentin %u -> ecran %dx%d\n", nPanels, arrange, flipAll, serpent, W, H);
+  Serial.println("  a xx:xx:xx:xx:xx:xx : adresse de la console connue par la manette (redemarre)");
+  Serial.println("  a                   : revenir a l'adresse d'origine de l'ESP32 (redemarre)");
+  Serial.println("  c NDFS : dalles. N nombre 1-4, D 0 l'une sous l'autre / 1 cote a cote / 2 carre,");
+  Serial.println("           F ecran retourne 0/1, S une dalle sur deux retournee 0/1. Ex. : c 2000");
+  Serial.println("  ? : ce menu");
+}
+void handleSerial() {
+  static char line[32];
+  static uint8_t n = 0;
+  while (Serial.available()) {
+    char ch = Serial.read();
+    if (ch != '\n' && ch != '\r') {
+      if (n < sizeof(line) - 1) line[n++] = ch;
+      continue;
+    }
+    line[n] = 0;
+    char *p = line;
+    while (*p == ' ') p++;
+    char cmd = *p;
+    char *arg = p + (cmd ? 1 : 0);
+    while (*arg == ' ') arg++;
+    n = 0;
+    if (cmd == 'a') {
+      if (strlen(arg) == 17 || strlen(arg) == 0) {
+        prefs.putString("ps4mac", arg);
+        Serial.printf("Adresse manette : %s, redemarrage\n", arg[0] ? arg : "origine");
+        restartAt = millis() + 300;
+      } else Serial.println("Format : a xx:xx:xx:xx:xx:xx");
+    } else if (cmd == 'c') {
+      if (strlen(arg) == 4 && arg[0] >= '1' && arg[0] <= '4' && arg[1] >= '0' && arg[1] <= '2') {
+        prefs.putUChar("nb", arg[0] - '0');
+        prefs.putUChar("arr", arg[1] - '0');
+        prefs.putBool("flip", arg[2] == '1');
+        prefs.putBool("serp", arg[3] == '1');
+        Serial.println("Dalles enregistrees, redemarrage");
+        restartAt = millis() + 300;
+      } else Serial.println("Format : c NDFS (ex. c 2000)");
+    } else if (cmd == '?') serialMenu();
+    else if (cmd) Serial.println("Commande inconnue, tapez ?");
+  }
+}
+#endif
+
 // ---------------------------------------------------------------- demarrage
 void setup() {
   Serial.begin(115200);
+#ifdef GAMES_PS4
+  Serial.println("Games v" GAMES_VERSION " (manette PS4, sans wifi)");
+#else
   Serial.println("Games v" GAMES_VERSION);
   btStop();
+#endif
   pinMode(BOOT_PIN, INPUT_PULLUP);
   prefs.begin("games", false);
   bright = prefs.getUChar("bright", 120);
@@ -710,7 +843,7 @@ void setup() {
     cfg.clkphase = false;
     dma = new MatrixPanel_I2S_DMA(cfg);
     if (dma->begin()) {
-      if (ESP.getFreeHeap() >= 110000 || depth == 3) {
+      if (ESP.getFreeHeap() >= 110000 || depth == 3) {  // assez pour le wifi ou le Bluetooth
         Serial.printf("Ecran %dx%d (%d dalles), couleurs %d bits, memoire libre %u\n", 128 * panelCols(), 64 * panelRows(), nPanels, depth,
                       ESP.getFreeHeap());
         break;
@@ -731,6 +864,10 @@ void setup() {
   dma->setBrightness8(bright);
   gfx->fillScreen(0);
 
+#ifdef GAMES_PS4
+  ps4Begin();
+  serialMenu();
+#else
   // wifi : reseau connu, sinon portail "Games-Setup" pendant 3 min (puis demo seule, sans page web)
   wifiScreen("CONNEXION WIFI", "", "");
   WiFi.mode(WIFI_STA);
@@ -753,14 +890,21 @@ void setup() {
     Serial.println("Wifi a regler : reseau Games-Setup (192.168.4.1)");
   }
   nowBegin();
+#endif
 
   gameSetup();
   gDemo = true;
 }
 
 void loop() {
-  handleBootButton();
   if (restartAt && millis() > restartAt) ESP.restart();
+#ifdef GAMES_PS4
+  ps4Poll();
+  handleSerial();
+  if (brightSaveAt && millis() > brightSaveAt) { brightSaveAt = 0; prefs.putUChar("bright", bright); }
+  gameUpdate();
+#else
+  handleBootButton();
   if (portalOn) {
     wm.process();
     if (WiFi.status() == WL_CONNECTED) {  // reseau choisi : on ferme le portail, la page de jeu demarre
@@ -777,5 +921,6 @@ void loop() {
   gameUpdate();
   sendStatus();
   nowBeacon();
+#endif
   vTaskDelay(1);
 }
