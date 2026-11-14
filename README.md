@@ -6,7 +6,12 @@ Jeux d'arcade sur 1 à 4 dalles LED 128x64, avec un ESP32 classique et une **man
 - **Partition unique de 3 Mo :** il reste de la place pour d'autres jeux.
 - **Son en option :** une broche PWM vers un petit ampli et un haut-parleur.
 
-Premier jeu : un **shoot'em up** original, repris du mode Jeu du VU-mètre. Il a un menu, des niveaux de difficulté, des stages, un vaisseau qui évolue, et des ennemis qui arrivent en vol.
+**3 jeux originaux**, à choisir dans le menu :
+- **ESSAIM** : le shoot'em up repris du mode Jeu du VU-mètre ;
+- **RAID** : un shoot vertical avec un boss à la fin de chaque stage ;
+- **COURSE** : un petit bonhomme qui court et saute.
+
+Ils ont en commun les niveaux de difficulté, les stages, les vies, les meilleurs scores et la démo automatique.
 
 ![Le jeu sur les configurations de dalles](docs/rendu.png)
 
@@ -20,12 +25,12 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. **Sans manette
 
 | Ligne | Action |
 |---|---|
-| **JOUER** | lance la partie |
+| **JOUER** | **gauche / droite : choix du jeu** (ESSAIM, RAID, COURSE). ✕ ou OPTIONS lance la partie. Le choix est gardé en mémoire. |
 | **NIVEAU** | Facile / Normal / Difficile (gauche / droite ou ✕), choix gardé en mémoire |
 | **LUMINOSITE** | 0 à 100 % par pas de 10 % (gauche / droite ou ✕), visible tout de suite et gardée en mémoire. À 0 %, les dalles restent très faiblement allumées pour qu'on voie encore le menu. |
 | **VOLUME** | volume du son, 0 à 100 % par pas de 10 % (gauche / droite ou ✕). Un bip fait entendre le niveau. 0 % = muet. C'est le rapport cyclique du PWM : le potentiomètre de l'ampli règle le maximum. |
-| **SCORES** | les 5 meilleurs scores : rang, **nom**, score, niveau (F/N/D) et stage atteint |
-| **DEMO** | cache le menu : le jeu tourne tout seul, avec « DEMO » qui clignote |
+| **SCORES** | les 5 meilleurs scores **du jeu choisi** : rang, **nom**, score, niveau (F/N/D) et stage atteint. Chaque jeu a son propre tableau. |
+| **DEMO** | lance **la démo du jeu choisi** : il tourne tout seul avec un pilote automatique, et « DEMO » clignote |
 
 | Réglage du volume | Réglage de la luminosité |
 |---|---|
@@ -52,7 +57,25 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. **Sans manette
 | Normal | 3 | — |
 | Difficile | 3 | tirent plus, piquent plus souvent, tirs plus rapides |
 
-## Le jeu
+## RAID
+
+![RAID](docs/jeu-raid.gif)
+
+Un shoot vertical : tu te déplaces partout dans le bas de l'écran, et des vagues d'ennemis descendent en formation.
+- **Commandes :** croix ou stick pour bouger, ✕ pour tirer (en continu si tu restes appuyé).
+- **Capsules « P » :** certaines vagues en lâchent une, qui améliore ton arme (3 niveaux). Perdre une vie fait baisser l'arme d'un niveau.
+- **Boss :** après 7 vagues, un gros boss apparaît, avec sa barre de vie en haut de l'écran. Il tire en éventail et vise ton vaisseau. Le détruire termine le stage : gros bonus et une vie en plus.
+
+## COURSE
+
+![COURSE](docs/jeu-course.gif)
+
+Un petit bonhomme original (casquette rouge, t-shirt bleu) court tout seul vers la droite.
+- **Commandes :** ✕ ou haut pour sauter. Garde le bouton appuyé pour sauter plus haut.
+- **Le parcours :** saute par-dessus les **trous** et les **piques**, et de **plateforme en plateforme**. Ramasse les **cristaux** (50 points).
+- **Points et stages :** la distance parcourue rapporte des points. Tous les 1500 pixels, c'est un nouveau stage : la course va plus vite et tu gagnes une vie.
+
+## ESSAIM (le shoot'em up)
 
 - **Écran :** score et record en haut ; **vies en haut à droite** (une icône et le nombre, par exemple `X3`) . Le vaisseau est tout en bas de l'écran. Le stage s'affiche dans l'annonce, au début de chaque stage.
 - **Vies :** Chaque stage terminé donne **une vie de plus** (9 au maximum).
@@ -186,8 +209,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V2.25_complet.bin](firmware/GameHub_V2.25_complet.bin) | 0x0 | `d8c3188dae0180b82c1aa84a858db6df` |
-| [firmware/GameHub_V2.25.bin](firmware/GameHub_V2.25.bin) | 0x10000 | `242f75cacf1bd5098435975034e43db6` |
+| [firmware/GameHub_V3.00_complet.bin](firmware/GameHub_V3.00_complet.bin) | 0x0 | `4e03015a77cd250584285c637bc1a7dc` |
+| [firmware/GameHub_V3.00.bin](firmware/GameHub_V3.00.bin) | 0x10000 | `72e420ee251d08e65cacf76553d33fa6` |
 
 Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB SPIFFS)** dans Outils → Partition Scheme.
 
@@ -204,6 +227,6 @@ Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB S
   - La copie corrigée cherche l'en-tête du paquet avant de le lire.
   - Elle demande aussi à la manette un rapport toutes les 4 ms. Avec 0, elle n'en envoyait qu'environ un toutes les 2 s, et les appuis brefs étaient perdus.
   - Le jeu interdit enfin le mode veille Bluetooth (sniff) et force le lien de la manette en mode actif dès le premier rapport. Le moniteur série affiche le nombre de paquets reçus par seconde.
-- **Plans, aperçus et GIF :** `python docs/branchement.py`, `python docs/rendu.py`, `python docs/gif_manette_ps4.py`, `python docs/gif_arrivee.py`, `python docs/gif_menus.py`, `python docs/branchement_son.py` (Pillow).
+- **Plans, aperçus et GIF :** `python docs/branchement.py`, `python docs/rendu.py`, `python docs/gif_manette_ps4.py`, `python docs/gif_arrivee.py`, `python docs/gif_menus.py`, `python docs/gif_jeux.py`, `python docs/branchement_son.py` (Pillow).
 
 L'ancienne version avec wifi, page web et manette ESP-NOW reste disponible dans l'historique Git, jusqu'au commit `fb11367`.

@@ -275,14 +275,14 @@ for page in ('menu', 'scores', 'nom'):
         s.text(26, 'RECORD 30800 JER', (255, 40, 40))
         y = 64 - 22
         box(s, y - 6, y + 6 * 11 + 16)
-        for i, t in enumerate(('> JOUER', 'NIVEAU NORMAL', 'LUMINOSITE 60%', 'VOLUME 60%', 'SCORES', 'DEMO')):
+        for i, t in enumerate(('> JOUER <RAID>', 'NIVEAU NORMAL', 'LUMINOSITE 60%', 'VOLUME 60%', 'SCORES', 'DEMO')):
             text_bg(s, y + i * 11, t, SEL if i == 0 else OFF)
         text_bg(s, y + 6 * 11 + 4, 'OPTIONS : JOUER', DIM)
-        title, sub = 'Menu', 'Croix haut / bas, X : valider, OPTIONS : jouer'
+        title, sub = 'Menu', 'Gauche / droite sur JOUER : choix du jeu'
     elif page == 'scores':  # tableau avec les noms (3 lettres)
         y = 64 - 36
         box(s, y - 5, y + 6 * 11 + 18)
-        text_bg(s, y, 'MEILLEURS SCORES', SEL)
+        text_bg(s, y, 'SCORES ESSAIM', SEL)
         rows = ['1 JER  30800 N S6', '2 DEN  21450 D S4', '3 LEA  12750 N S3', '4 MAX   8500 F S2', '5 ---   4200 N S1']
         for i, t in enumerate(rows):
             text_bg(s, y + (i + 1) * 11 + 2, t, (230, 230, 230) if i == 0 else OFF)
