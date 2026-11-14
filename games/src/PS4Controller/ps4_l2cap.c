@@ -302,6 +302,8 @@ static void ps4_l2cap_disconnect_cfm_cback(uint16_t l2cap_cid, uint16_t result) 
 uint8_t ps4DbgHdr[24];     // debut du 1er paquet recu (affiche dans le moniteur serie par le jeu)
 volatile int ps4DbgPos = -2;  // position de l'entete 0xA1 trouvee (-1 : introuvable, -2 : rien recu)
 volatile uint8_t ps4DbgType = 0;
+volatile uint8_t ps4DbgRaw[12];  // octets 13 a 24 du paquet recale
+volatile int ps4DbgLen = 0;
 static void ps4_l2cap_data_ind_cback(uint16_t l2cap_cid, BT_HDR *p_buf) {
   uint8_t *d = p_buf->data;
   int n = p_buf->offset + p_buf->length;
@@ -322,6 +324,8 @@ static void ps4_l2cap_data_ind_cback(uint16_t l2cap_cid, BT_HDR *p_buf) {
       int j = pos - shift + i;
       tmp[i] = (j >= 0 && j < n) ? d[j] : 0;
     }
+    for (int i = 0; i < 12; i++) ps4DbgRaw[i] = tmp[13 + i];  // sticks, boutons, gachettes (diagnostic)
+    ps4DbgLen = n - pos;
     parsePacket(tmp);
   }
 

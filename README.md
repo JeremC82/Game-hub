@@ -168,8 +168,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V2.10_complet.bin](firmware/GameHub_V2.10_complet.bin) | 0x0 | `61a6eb555acec73aeb0406a297f383fe` |
-| [firmware/GameHub_V2.10.bin](firmware/GameHub_V2.10.bin) | 0x10000 | `19cc5db224dbbaf104150cf5321034a1` |
+| [firmware/GameHub_V2.11_complet.bin](firmware/GameHub_V2.11_complet.bin) | 0x0 | `1ad3162c3673835701022ebb20f43587` |
+| [firmware/GameHub_V2.11.bin](firmware/GameHub_V2.11.bin) | 0x10000 | `589bf6ae9b50c0546b70829a58e66876` |
 
 Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB SPIFFS)** dans Outils → Partition Scheme.
 

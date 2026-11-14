@@ -28,7 +28,7 @@
 #include <driver/i2s.h>
 #include "game_types.h"
 
-#define GAMES_VERSION "2.10"
+#define GAMES_VERSION "2.11"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -916,6 +916,8 @@ void ps4Begin() {
 extern "C" uint8_t ps4DbgHdr[24];
 extern "C" volatile int ps4DbgPos;
 extern "C" volatile uint8_t ps4DbgType;
+extern "C" volatile uint8_t ps4DbgRaw[12];
+extern "C" volatile int ps4DbgLen;
 void ps4Poll() {
   static bool dbgShown = false;
   if (!dbgShown && ps4DbgPos != -2) {  // diagnostic : debut du 1er paquet de la manette
@@ -975,6 +977,15 @@ void ps4Poll() {
                (PS4.Options() && !PS4.Share()) << 6;
   uint8_t edge = bt & ~prevB;
   prevB = bt;
+  {  // diagnostic : octets bruts des boutons (5e a 7e octet apres les sticks) a chaque changement
+    static uint8_t prevRaw[3] = { 0, 0, 0 };
+    uint8_t b5 = ps4DbgRaw[4], b6 = ps4DbgRaw[5], b7 = ps4DbgRaw[6] & 0x03;  // b7 : PS et pave (le reste est un compteur)
+    if (b5 != prevRaw[0] || b6 != prevRaw[1] || b7 != prevRaw[2]) {
+      prevRaw[0] = b5; prevRaw[1] = b6; prevRaw[2] = b7;
+      Serial.printf("Brut : rapport 0x%02X long %d | sticks %02X %02X %02X %02X | boutons %02X %02X %02X | L2 %02X R2 %02X\n", ps4DbgType,
+                    ps4DbgLen, ps4DbgRaw[0], ps4DbgRaw[1], ps4DbgRaw[2], ps4DbgRaw[3], b5, b6, ps4DbgRaw[6], ps4DbgRaw[7], ps4DbgRaw[8]);
+    }
+  }
   if (edge) {  // journal des appuis dans le moniteur serie (verifier que la manette est bien lue)
     static const char *const NAMES[7] = { "HAUT", "BAS", "GAUCHE", "DROITE", "X", "ROND", "OPTIONS" };
     Serial.print("Bouton :");
