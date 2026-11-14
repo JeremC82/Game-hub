@@ -29,7 +29,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "2.23"
+#define GAMES_VERSION "2.24"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -107,7 +107,15 @@ bool gDemo = true;                  // le jeu joue tout seul (menu par-dessus qu
 bool gPaused = false;               // START pendant une partie : pause
 uint8_t gDiff = 1;                  // difficulte : 0 facile, 1 normal, 2 difficile
 const char *const DIFF_NAME[3] = { "FACILE", "NORMAL", "DIFFICILE" };
-uint8_t menuSel = 0;                // ligne choisie : 0 jouer, 1 niveau, 2 scores, 3 demo
+uint8_t menuSel = 0;                // ligne choisie : 0 jouer, 1 niveau, 2 luminosite, 3 scores, 4 demo
+#define MENU_N 5
+int brightPct() { return (bright * 100 + 127) / 255 / 10 * 10; }  // luminosite en %, arrondie a 10 %
+void setBrightPct(int p) {  // 0 % : tres faible mais jamais noir (le menu reste visible)
+  p = constrain(p, 0, 100);
+  bright = p == 0 ? 3 : p * 255 / 100;
+  dma->setBrightness8(bright);
+  prefs.putUChar("bright", bright);
+}
 bool gAttract = false;              // mode demo : menu cache (ligne DEMO, ou 30 s sans toucher la manette)
 #define MENU_IDLE_MS 30000UL        // menu sans activite : passage en mode demo
 bool menuScores = false;            // page des meilleurs scores affichee
@@ -454,7 +462,7 @@ void gameSetup() {
   static const int8_t T7[7] = { 0, 0, 1, 1, 1, 2, 2 }, T5[5] = { 0, 1, 1, 2, 2 }, T3[3] = { 0, 1, 2 };
   for (int r = 0; r < gRows; r++) gRowType[r] = huge ? T7[r] : tall ? T5[r] : T3[r];
   gTop = 13;
-  gPY = tall ? H - 15 : H - 8;  // sur 128x128 : la ligne du bas montre vies et vague
+  gPY = tall ? H - 10 : H - 8;  // vaisseau en bas de l'ecran (vies en haut a droite)
   gPYBase = gPY;
   gPYMin = max(gTop + gRows * 9 + 12, H * 55 / 100);  // zone du vaisseau : les 45 % du bas, sous la formation
   topLoad();
@@ -756,12 +764,6 @@ void gameDraw() {
   tinyText(*gfx, lx, 1, sc, white);
   gMark(lx, 1, lw, 5);
   gSprite(SPR_LIFE, 5, 4, lx - 7, 1, palFull, 0, 0);
-  if (H >= 128) {  // stage en bas a droite
-    snprintf(sc, sizeof(sc), "STAGE %d", gWave);
-    int sw = tinyWidth(sc);
-    tinyText(*gfx, W - 1 - sw, H - 6, sc, palFull[2]);
-    gMark(W - 1 - sw, H - 6, sw, 5);
-  }
 }
 
 // joueur : deplacement aux touches, tir tant que FEU est appuye (3 tirs a l'ecran au plus)
@@ -815,17 +817,18 @@ void drawMenu() {
     if (tall) gText(y + (n + 1) * step + 6, "X : RETOUR", dim);
     return;
   }
-  int y = tall ? H / 2 - 22 : 14, step = tall ? 13 : 11;
-  gBox(y - 6, tall ? y + 4 * step + 16 : y + 3 * step + 12);
-  const char *items[4] = { "JOUER", nullptr, "SCORES", "DEMO" };
-  for (int i = 0; i < 4; i++) {
+  int y = tall ? H / 2 - 22 : 12, step = tall ? 13 : 9;
+  gBox(y - 6, tall ? y + MENU_N * step + 16 : y + (MENU_N - 1) * step + 12);
+  const char *items[MENU_N] = { "JOUER", nullptr, nullptr, "SCORES", "DEMO" };
+  for (int i = 0; i < MENU_N; i++) {
     const char *t = items[i];
     if (i == 1) { snprintf(b, sizeof(b), "NIVEAU %s%s%s", i == menuSel ? "<" : "", DIFF_NAME[gDiff], i == menuSel ? ">" : ""); t = b; }
+    if (i == 2) { snprintf(b, sizeof(b), "LUMINOSITE %s%d%%%s", i == menuSel ? "<" : "", brightPct(), i == menuSel ? ">" : ""); t = b; }
     char line[26];
     snprintf(line, sizeof(line), "%s%s", i == menuSel ? "> " : "", t);
     gText(y + i * step, line, i == menuSel ? sel : off);
   }
-  if (tall) gText(y + 4 * step + 4, "OPTIONS : JOUER", dim);
+  if (tall) gText(y + MENU_N * step + 4, "OPTIONS : JOUER", dim);
 }
 void gOverlay() {
   gfx->setFont(NULL);
@@ -1192,8 +1195,16 @@ void menuInput(uint8_t edge) {
     return;
   }
   if (edge & 64) { startReq = true; return; }
-  if (edge & 1) { menuSel = (menuSel + 3) % 4; sfxMenu(); }
-  if (edge & 2) { menuSel = (menuSel + 1) % 4; sfxMenu(); }
+  if (edge & 1) { menuSel = (menuSel + MENU_N - 1) % MENU_N; sfxMenu(); }
+  if (edge & 2) { menuSel = (menuSel + 1) % MENU_N; sfxMenu(); }
+  if (menuSel == 2 && (edge & (4 | 8 | 16))) {  // luminosite : gauche -10 %, droite ou X +10 % (X boucle 100 -> 0)
+    int p = brightPct();
+    if (edge & 4) p -= 10;
+    else if (edge & 8) p += 10;
+    else p = p >= 100 ? 0 : p + 10;
+    setBrightPct(p);
+    sfxMenu();
+  }
   if (menuSel == 1 && (edge & (4 | 8 | 16))) {
     gDiff = (gDiff + ((edge & 4) ? 2 : 1)) % 3;
     prefs.putUChar("diff", gDiff);
@@ -1201,8 +1212,8 @@ void menuInput(uint8_t edge) {
   }
   if (edge & 16) {
     if (menuSel == 0) startReq = true;
-    else if (menuSel == 2) { menuScores = true; sfxMenu(); }
-    else if (menuSel == 3) { gAttract = true; menuSel = 0; sfxMenu(); }  // ligne DEMO
+    else if (menuSel == 3) { menuScores = true; sfxMenu(); }
+    else if (menuSel == 4) { gAttract = true; menuSel = 0; sfxMenu(); }  // ligne DEMO
   }
 }
 

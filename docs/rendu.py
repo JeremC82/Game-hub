@@ -100,7 +100,7 @@ def game_frame(w, h, demo=False, stage=1, banner=False, seed=3):
             if (t == 0 and c % 2) or (r, c) in dead:
                 continue
             s.sprite(SPR_E[t][(c + r) % 2], x0 + c * 11, 13 + r * 9, ('p', 'o') if (t == 0 and c == 4) else None)
-    py = h - 15 if tall else h - 8
+    py = h - 10 if tall else h - 8
     shipx = w // 2 - 6
     if not banner:
         if tall:  # ennemis en pique
@@ -130,9 +130,6 @@ def game_frame(w, h, demo=False, stage=1, banner=False, seed=3):
     lw = len('X3') * 4 - 1  # vies en haut a droite : icone + nombre
     s.tiny(w - 1 - lw, 1, 'X3', (230, 230, 230))
     s.sprite(SPR_LIFE, w - 1 - lw - 7, 1)
-    if tall:  # stage en bas a droite
-        t = f'STAGE {stage}'
-        s.tiny(w - 1 - (len(t) * 4 - 1), h - 6, t, PAL['y'])
     if banner:  # annonce du stage
         y = h // 2 - 22 if tall else h // 2 - 10
         s.text(y, f'STAGE {stage}', (255, 220, 0))
@@ -277,10 +274,10 @@ for page in ('menu', 'scores', 'nom'):
         text_big(s, (128 - 96) // 2, 8, 'GAME HUB', SEL)
         s.text(26, 'RECORD 30800 JER', (255, 40, 40))
         y = 64 - 22
-        box(s, y - 6, y + 4 * 13 + 16)
-        for i, t in enumerate(('> JOUER', 'NIVEAU NORMAL', 'SCORES', 'DEMO')):
+        box(s, y - 6, y + 5 * 13 + 16)
+        for i, t in enumerate(('> JOUER', 'NIVEAU NORMAL', 'LUMINOSITE 60%', 'SCORES', 'DEMO')):
             text_bg(s, y + i * 13, t, SEL if i == 0 else OFF)
-        text_bg(s, y + 4 * 13 + 4, 'OPTIONS : JOUER', DIM)
+        text_bg(s, y + 5 * 13 + 4, 'OPTIONS : JOUER', DIM)
         title, sub = 'Menu', 'Croix haut / bas, X : valider, OPTIONS : jouer'
     elif page == 'scores':  # tableau avec les noms (3 lettres)
         y = 64 - 36

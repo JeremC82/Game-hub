@@ -22,6 +22,7 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. **Sans manette
 |---|---|
 | **JOUER** | lance la partie |
 | **NIVEAU** | Facile / Normal / Difficile (gauche / droite ou ✕), choix gardé en mémoire |
+| **LUMINOSITE** | 0 à 100 % par pas de 10 % (gauche / droite ou ✕), visible tout de suite et gardée en mémoire. À 0 %, les dalles restent très faiblement allumées pour qu'on voie encore le menu. |
 | **SCORES** | les 5 meilleurs scores : rang, **nom**, score, niveau (F/N/D) et stage atteint |
 | **DEMO** | cache le menu : le jeu tourne tout seul, avec « DEMO » qui clignote |
 
@@ -46,7 +47,7 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. **Sans manette
 
 ## Le jeu
 
-- **Écran :** score et record en haut ; **vies en haut à droite** (une icône et le nombre, par exemple `X3`) ; stage en cours en bas à droite (`STAGE 5`).
+- **Écran :** score et record en haut ; **vies en haut à droite** (une icône et le nombre, par exemple `X3`) . Le vaisseau est tout en bas de l'écran. Le stage s'affiche dans l'annonce, au début de chaque stage.
 - **Vies :** Chaque stage terminé donne **une vie de plus** (9 au maximum).
 - **Stages, sans fin :** quand tous les ennemis sont détruits, l'annonce « STAGE n » s'affiche avec le nom du monde et un bonus de 500 points × le numéro du stage.
   - Les ennemis tirent plus souvent à chaque stage, et leurs tirs vont plus vite.
@@ -90,7 +91,7 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. **Sans manette
 | OPTIONS | jouer depuis le menu, pause en partie |
 | ○ (rond), pendant la pause | quitter la partie et revenir au menu |
 | croix haut / bas, au menu | choisir la ligne |
-| Share + croix haut / bas | luminosité (enregistrée) |
+| Share + croix haut / bas | luminosité (enregistrée), aussi réglable dans le menu |
 | Share + Options pendant 3 s | redémarrer l'ESP32 |
 
 - **Vibration :** la manette vibre quand ton vaisseau est touché.
@@ -118,6 +119,7 @@ La commande `a` seule rend à l'ESP32 son adresse d'origine.
 
 Le son passe par **une seule broche, GPIO 22** (depuis la V2.23). L'ESP32 y sort des notes carrées, façon consoles 8 bits, sans I2S et presque sans travail pour le processeur. Le signal est filtré, puis envoyé à un ampli analogique.
 
+- **Le module ampli :** sur le schéma, la carte verte porte la puce au centre, le potentiomètre de volume, l'entrée L / GND / R à gauche, les borniers des haut-parleurs (L+ L- R+ R-) à droite et le bornier d'alimentation + / - en bas. Suis les repères imprimés sur ta carte : l'ordre peut changer d'un vendeur à l'autre.
 - **Filtre :** 1 kΩ en série, 10 nF vers la masse, puis 10 µF en série vers l'entrée de l'ampli. Relie l'entrée L à l'entrée R : le son est mono.
 - **Amplis NS4110B ou PAM8610 :** ils demandent **7 à 15 V**, pas le 5 V des dalles. Alimente-les avec un bloc 12 V à part, ou avec un élévateur 5 V → 12 V (MT3608, XL6009).
 - **Plus simple :** un **PAM8403** (2 x 3 W) fonctionne directement en 5 V.
@@ -177,8 +179,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V2.23_complet.bin](firmware/GameHub_V2.23_complet.bin) | 0x0 | `e7627f2c8d426cf0bfe678bdfe28288c` |
-| [firmware/GameHub_V2.23.bin](firmware/GameHub_V2.23.bin) | 0x10000 | `a8d1cab75930a9e2f5544e7d28d1bc85` |
+| [firmware/GameHub_V2.24_complet.bin](firmware/GameHub_V2.24_complet.bin) | 0x0 | `6846a0917fe29e2caa83dbc1e605c7d9` |
+| [firmware/GameHub_V2.24.bin](firmware/GameHub_V2.24.bin) | 0x10000 | `df5f766e1ac08ecb9b98eb74d07305e5` |
 
 Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB SPIFFS)** dans Outils → Partition Scheme.
 
