@@ -247,29 +247,69 @@ SEL, OFF, DIM = (255, 220, 0), (0, 160, 200), (110, 110, 130)
 
 def box(s, y0, y1):  # cadre noir borde de bleu, comme gBox()
     ImageDraw.Draw(s.im).rectangle((4, y0, 123, y1 - 1), fill=(0, 0, 0), outline=(40, 70, 170))
-pages = []
-for page in ('menu', 'scores'):
+
+
+def text_big(s, x, y, t, col):  # police 6x8 en taille 2 (12x16), comme setTextSize(2)
+    for ch in t:
+        for i in range(5):
+            line = GLCD_BYTES[ord(ch) * 5 + i]
+            for j in range(8):
+                if line & (1 << j):
+                    for a in range(2):
+                        for b in range(2):
+                            s.px(x + i * 2 + a, y + j * 2 + b, col)
+        x += 12
+
+
+def star_screen(seed):  # fond du menu : etoiles en noir et blanc
     s = Screen(128, 128)
-    s.im = game_frame(128, 128, demo=False, stage=1, seed=11)
-    if page == 'menu':
+    rnd = random.Random(seed)
+    for _ in range(74):
+        g = int(70 + rnd.uniform(.2, 1.0) * 120)
+        s.px(rnd.randrange(128), rnd.randrange(128), (g, g, g))
+    return s
+
+
+pages = []
+for page in ('menu', 'scores', 'nom'):
+    s = star_screen(11)
+    if page == 'menu':  # titre, record avec le nom, puis le menu
+        text_big(s, (128 - 96) // 2, 8, 'GAME HUB', SEL)
+        s.text(26, 'RECORD 30800 JER', (255, 40, 40))
         y = 64 - 22
         box(s, y - 6, y + 4 * 13 + 16)
         for i, t in enumerate(('> JOUER', 'NIVEAU NORMAL', 'SCORES', 'DEMO')):
             text_bg(s, y + i * 13, t, SEL if i == 0 else OFF)
         text_bg(s, y + 4 * 13 + 4, 'OPTIONS : JOUER', DIM)
-    else:
+        title, sub = 'Menu', 'Croix haut / bas, X : valider, OPTIONS : jouer'
+    elif page == 'scores':  # tableau avec les noms (3 lettres)
         y = 64 - 36
         box(s, y - 5, y + 6 * 11 + 18)
         text_bg(s, y, 'MEILLEURS SCORES', SEL)
-        rows = ['1  30800 N S6', '2  21450 D S4', '3  12750 N S3', '4   8500 F S2', '5   4200 N S1']
+        rows = ['1 JER  30800 N S6', '2 DEN  21450 D S4', '3 LEA  12750 N S3', '4 MAX   8500 F S2', '5 ---   4200 N S1']
         for i, t in enumerate(rows):
             text_bg(s, y + (i + 1) * 11 + 2, t, (230, 230, 230) if i == 0 else OFF)
         text_bg(s, y + 6 * 11 + 6, 'X : RETOUR', DIM)
-    pages.append(panels(s.im, 1, 2, 'Menu' if page == 'menu' else 'Meilleurs scores',
-                        'Croix haut / bas, X : valider, OPTIONS : jouer' if page == 'menu' else 'Rang, score, niveau (F/N/D), stage atteint', pitch=4))
-out = Image.new('RGB', (pages[0].width * 2 + 20, pages[0].height), (12, 12, 16))
-out.paste(pages[0], (0, 0))
-out.paste(pages[1], (pages[0].width + 20, 0))
+        title, sub = 'Meilleurs scores', 'Rang, nom, score, niveau (F/N/D), stage'
+    else:  # saisie du nom, facon borne d'arcade
+        y = 64 - 40
+        box(s, y - 6, y + 74)
+        s.text(y, 'NOUVEAU RECORD !', SEL)
+        s.text(y + 11, 'SCORE 31250', (230, 230, 230))
+        ly, lx = y + 26, (128 - 44) // 2
+        for k, ch in enumerate('JER'):
+            text_big(s, lx + k * 16, ly, ch, SEL if k == 1 else (0, 220, 255))
+        ImageDraw.Draw(s.im).rectangle((lx + 16, ly + 17, lx + 16 + 9, ly + 18), fill=SEL)
+        s.text(y + 50, 'HAUT/BAS : LETTRE', DIM)
+        s.text(y + 61, 'OPTIONS : VALIDER', DIM)
+        title, sub = 'Saisie du nom', '3 lettres, a chaque record (top 5)'
+    pages.append(panels(s.im, 1, 2, title, sub, pitch=4))
+gap = 20
+out = Image.new('RGB', (sum(p.width for p in pages) + gap * 2, pages[0].height), (12, 12, 16))
+x = 0
+for p in pages:
+    out.paste(p, (x, 0))
+    x += p.width + gap
 path = os.path.join(DOC, 'rendu-menu.png')
 out.save(path)
 print(path)

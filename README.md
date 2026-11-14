@@ -4,7 +4,7 @@ Jeux d'arcade sur 1 à 4 dalles LED 128x64, avec un ESP32 classique et une **man
 
 - **Pas de wifi :** la manette se connecte directement à l'ESP32 des dalles.
 - **Partition unique de 3 Mo :** il reste de la place pour d'autres jeux.
-- **Son en option :** un petit ampli I2S et un haut-parleur.
+- **Son en option :** un petit ampli I2S et un haut-parleur. Il est coupé pour l'instant, car il gêne la manette (voir la section Son).
 
 Premier jeu : un **shoot'em up** original, repris du mode Jeu du VU-mètre. Il a un menu, des niveaux de difficulté, des stages, un vaisseau qui évolue, et des ennemis qui arrivent en vol.
 
@@ -16,7 +16,7 @@ Premier jeu : un **shoot'em up** original, repris du mode Jeu du VU-mètre. Il a
 
 Sans partie en cours, le jeu tourne tout seul en démo, sans son. **Sans manette connectée**, la démo affiche « DEMO » et une petite indication, « MANETTE : BOUTON PS », avec l'adresse Bluetooth de l'ESP32. Dès que la manette est connectée, le menu s'affiche **sur son propre écran**, sans la démo derrière. On y voit un fond d'étoiles, le titre GAME HUB et le record avec le nom de son détenteur :
 
-![Menu et meilleurs scores](docs/rendu-menu.png)
+![Menu, meilleurs scores avec les noms, saisie du nom](docs/rendu-menu.png)
 
 | Ligne | Action |
 |---|---|
@@ -114,7 +114,7 @@ La commande `a` seule rend à l'ESP32 son adresse d'origine.
 
 ## Son (option)
 
-> En V2.17, sans son, la manette ne perdait plus de paquets. Depuis la V2.18, le son est calculé sans bloquer les interruptions. Depuis la V2.19, il tourne en plus sur le cœur 0 de l'ESP32, à l'écart du jeu et du Bluetooth de la manette. Si la manette redevient lente, mets `#define SON_ACTIF 0` dans games.ino pour couper le son.
+> **Son coupé depuis la V2.21** (`#define SON_ACTIF 0` dans games.ino). Avec le canal audio actif, la manette PS4 perd la plupart de ses paquets, et les commandes deviennent lentes. Le code du son reste en place. Pour le réactiver, mets `SON_ACTIF 1` et recompile.
 
 Module **ampli I2S MAX98357A**, par exemple [Adafruit MAX98357A, réf. 3006](https://www.adafruit.com/product/3006). On trouve aussi des modules compatibles en cherchant « MAX98357A I2S ». Il faut y ajouter un **haut-parleur de 3 W, 4 ou 8 Ω** (40 à 50 mm).
 
@@ -179,8 +179,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V2.20_complet.bin](firmware/GameHub_V2.20_complet.bin) | 0x0 | `7cc791b8966606812c85a3ea507c4f78` |
-| [firmware/GameHub_V2.20.bin](firmware/GameHub_V2.20.bin) | 0x10000 | `5d80a620b654c06c46f4d1d1a0236356` |
+| [firmware/GameHub_V2.22_complet.bin](firmware/GameHub_V2.22_complet.bin) | 0x0 | `c6809c57b57ff21f30efa6d509061ed5` |
+| [firmware/GameHub_V2.22.bin](firmware/GameHub_V2.22.bin) | 0x10000 | `06d119714bef41bb39c8bcd7c340ab0c` |
 
 Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB SPIFFS)** dans Outils → Partition Scheme.
 

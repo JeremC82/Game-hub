@@ -29,7 +29,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "2.20"
+#define GAMES_VERSION "2.22"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -154,7 +154,7 @@ void tinyText(Adafruit_GFX &g, int x, int y, const char *s, uint16_t col) {
 // ---------------------------------------------------------------- son : ampli I2S MAX98357A (option)
 // I2S0 (les dalles utilisent l'I2S1). Synthetiseur 4 voix (carre ou bruit, glissando, decroissance)
 // calcule dans une petite tache ; sans ampli branche, rien ne se passe.
-#define SON_ACTIF 1  // 0 : son coupe (V2.17 : sans son, la manette PS4 ne perdait plus de rapports)
+#define SON_ACTIF 0  // son coupe : avec le canal audio actif, la manette PS4 perd des rapports (V2.17 a V2.20)
 #define SND_BCLK 22
 #define SND_LRC 21
 #define SND_DIN 33
@@ -949,7 +949,7 @@ void menuScreen() {
   }
   gfx->setFont(NULL);
   if (H >= 128 && !menuScores && !gNameEntry) {  // titre et record au-dessus du menu
-    int ty = H / 2 - 50;
+    int ty = H / 2 - 56;  // titre et record au-dessus du cadre du menu (qui commence a H/2 - 28)
     gfx->setTextSize(2);
     gfx->setTextColor(rgb(255, 220, 0));
     int tw = 8 * 12;
@@ -959,7 +959,7 @@ void menuScreen() {
     gfx->setTextSize(1);
     char b[24];
     snprintf(b, sizeof(b), "RECORD %lu %s", (unsigned long)gHi, gBest[0].score ? gBest[0].name : "");
-    gText(ty + 19, b, rgb(255, 40, 40));
+    gText(ty + 18, b, rgb(255, 40, 40));
   }
   gfx->setTextSize(1);
   if (gNameEntry) drawNameEntry();
