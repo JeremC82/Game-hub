@@ -29,7 +29,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "3.10"
+#define GAMES_VERSION "3.20"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -119,10 +119,10 @@ void setBrightPct(int p) {  // 0 % : tres faible mais jamais noir (le menu reste
 bool gAttract = false;              // mode demo : menu cache (ligne DEMO, ou 30 s sans toucher la manette)
 #define MENU_IDLE_MS 30000UL        // menu sans activite : passage en mode demo
 bool menuScores = false;            // page des meilleurs scores affichee
-#define N_GAMES 4
-const char *const GAME_NAME[N_GAMES] = { "ESSAIM", "RAID", "COURSE", "RAQUETTES" };
+#define N_GAMES 5
+const char *const GAME_NAME[N_GAMES] = { "ESSAIM", "RAID", "COURSE", "RAQUETTES", "BULLES" };
 uint8_t gGame = 0;                  // jeu choisi dans le menu (gauche / droite sur la ligne JOUER)
-const char *topKey() { static const char *const K[N_GAMES] = { "top", "top1", "top2", "top3" }; return K[gGame % N_GAMES]; }
+const char *topKey() { static const char *const K[N_GAMES] = { "top", "top1", "top2", "top3", "top4" }; return K[gGame % N_GAMES]; }
 #define TOP_N 5
 HiScore gBest[TOP_N];                // meilleurs scores (gardes en memoire)
 uint8_t gLastRank = 0;              // place obtenue a la derniere partie (0 : hors tableau)
@@ -164,69 +164,89 @@ void tinyText(Adafruit_GFX &g, int x, int y, const char *s, uint16_t col) {
 }
 
 // ---------------------------------------------------------------- son : une broche PWM (GPIO 22) vers un ampli analogique
-// Le generateur PWM materiel (LEDC) joue une note carree ; une minuterie de 1 ms (esp_timer) fait varier la
-// frequence (glissandos, bruit des explosions) et le rapport cyclique (decroissance du volume).
-// Pas d'I2S ni de tache son : l'ancien son I2S faisait perdre ses rapports a la manette PS4.
+// La broche sert de petite sortie audio : PWM tres rapide (250 kHz, 8 bits) dont le rapport cyclique est mis a jour
+// 16 000 fois par seconde par une interruption materielle (sur le coeur 0). Le filtre RC (1 k + 10 nF) ne garde
+// que le son. Synthese en nombres entiers, 3 voix melangees :
+//   voix 0 : bruitages (onde carree avec glissando), voix 1 : bruit (explosions), voix 2 : jingles (notes).
+// Volume et decroissance agissent sur l'amplitude (le timbre ne change pas), pas de craquement pendant les glissandos.
 // Branchement : GPIO 22 -> 1 k -> (10 nF vers la masse) -> 10 uF -> entree de l'ampli (voir docs/branchement-son.png).
+#include <soc/ledc_struct.h>
 #define SON_ACTIF 1
 #define SND_PIN 22
-#define SND_LEDC 6        // canal LEDC (timer 3) : libre (les dalles n'utilisent pas le LEDC)
-#define SND_BITS 8        // rapport cyclique sur 8 bits : 128 = 50 % (le plus fort)
-uint8_t volume = 6;       // 0 a 10 (moniteur serie : v N)
+#define SND_LEDC 6           // canal LEDC 6 (groupe rapide 0) : libre, les dalles n'utilisent pas le LEDC
+#define SND_RATE 16000       // echantillons par seconde
+#define SND_CARRIER 250000   // frequence du PWM (bien au-dessus de l'audible, filtree par le RC)
+uint8_t volume = 6;          // 0 a 10 (menu VOLUME ou moniteur serie : v N)
+struct SynthVoice {          // une voix (modifiee par sndRaw, lue par l'interruption)
+  volatile uint32_t phase, inc;   // phase sur 32 bits, increment par echantillon (frequence)
+  volatile int32_t incStep;       // variation de l'increment par echantillon (glissando)
+  volatile int32_t amp, ampStep;  // amplitude << 8 et sa decroissance par echantillon
+  volatile uint32_t left;         // echantillons restants (0 : voix muette)
+  volatile uint8_t prio;
+  volatile bool noise;
+};
+SynthVoice sv[3];
+volatile uint16_t sndLfsr = 0xACE1;  // generateur de bruit
 const Note *melody = nullptr;  // jingle en cours (notes jouees l'une apres l'autre)
 uint8_t melodyLen = 0, melodyPos = 0;
 uint32_t melodyNext = 0;
-// son en cours (une seule voix ; un son plus important remplace un son mineur)
-volatile float sF0 = 0, sF1 = 0, sVol = 0;
-volatile uint32_t sStart = 0, sDur = 0;
-volatile bool sNoise = false, sOn = false;
-volatile uint8_t sPrio = 0;
-portMUX_TYPE sndMux = portMUX_INITIALIZER_UNLOCKED;
 bool sndReady = false;
+hw_timer_t *sndTimer = nullptr;
 
+// interruption : un echantillon (somme des voix) -> rapport cyclique du PWM
+void IRAM_ATTR sndIsr() {
+  int32_t mix = 0;
+  for (int i = 0; i < 3; i++) {
+    SynthVoice &v = sv[i];
+    if (!v.left) continue;
+    uint32_t old = v.phase;
+    v.phase += v.inc;
+    int32_t s;
+    if (v.noise) {  // bruit : le generateur avance a chaque tour de phase (la frequence regle le grain)
+      if (v.phase < old) {
+        uint16_t l = sndLfsr;
+        sndLfsr = (l >> 1) ^ (-(int16_t)(l & 1) & 0xB400);
+      }
+      s = (sndLfsr & 1) ? 1 : -1;
+    } else {
+      s = (v.phase & 0x80000000u) ? 1 : -1;  // onde carree
+    }
+    mix += s * (v.amp >> 8);
+    v.inc += v.incStep;
+    v.amp -= v.ampStep;
+    if (v.amp < 0) v.amp = 0;
+    v.left--;
+  }
+  int32_t out = 128 + mix / 2;
+  if (out < 0) out = 0;
+  if (out > 255) out = 255;
+  LEDC.channel_group[0].channel[SND_LEDC].duty.duty = out << 4;  // rapport cyclique (4 bits de fraction)
+  LEDC.channel_group[0].channel[SND_LEDC].conf1.duty_start = 1;
+}
+
+// lance un son : frequence de depart, d'arrivee, duree, volume 0-1, bruit ou carre, priorite
 void sndRaw(float f0, float f1, uint16_t ms, float vol, bool noise, uint8_t prio) {
   if (!SON_ACTIF || !sndReady || volume == 0) return;
-  uint32_t now = millis();
-  portENTER_CRITICAL(&sndMux);
-  bool busy = sOn && now - sStart < sDur;
-  if (!busy || prio >= sPrio) {
-    sF0 = f0; sF1 = f1; sDur = ms; sVol = vol; sNoise = noise; sPrio = prio; sStart = now; sOn = true;
-  }
-  portEXIT_CRITICAL(&sndMux);
+  int vi = noise ? 1 : prio >= 2 ? 2 : 0;  // bruit : voix 1 ; jingles : voix 2 ; bruitages : voix 0
+  SynthVoice &v = sv[vi];
+  if (v.left && prio < v.prio) return;  // un son plus important joue deja
+  uint32_t n = (uint32_t)SND_RATE * ms / 1000;
+  if (!n) return;
+  float k = 4294967296.0f / SND_RATE;
+  int32_t amp = (int32_t)(vol * volume / 10.0f * 120) << 8;  // 120 : marge pour le melange des 3 voix
+  v.left = 0;  // voix coupee pendant la mise a jour (l'interruption l'ignore)
+  v.inc = (uint32_t)(f0 * k);
+  v.incStep = (int32_t)((f1 - f0) * k / n);
+  v.amp = amp;
+  v.ampStep = (int32_t)(amp * 0.75f / n);  // decroissance jusqu'a 25 % de l'amplitude
+  v.noise = noise;
+  v.prio = prio;
+  v.left = n;  // la voix demarre
 }
 void sndPlay(float f0, float f1, uint16_t ms, float vol, bool noise, uint8_t prio) {
   if (!gDemo) sndRaw(f0, f1, ms, vol, noise, prio);  // demo muette
 }
-void sfxMenu() { sndRaw(1200, 1200, 35, 0.4f, false, 1); }
-
-// toutes les ms : frequence et volume du son en cours
-void sndTick(void *) {
-  static bool silent = true;
-  static uint32_t rnd = 12345;
-  float f0, f1, vol;
-  uint32_t start, dur;
-  bool noise, on;
-  portENTER_CRITICAL(&sndMux);
-  f0 = sF0; f1 = sF1; vol = sVol; start = sStart; dur = sDur; noise = sNoise; on = sOn;
-  portEXIT_CRITICAL(&sndMux);
-  uint32_t t = millis() - start;
-  if (!on || t >= dur || volume == 0) {
-    if (!silent) { ledcWrite(SND_LEDC, 0); silent = true; }
-    if (on && t >= dur) sOn = false;
-    return;
-  }
-  float k = (float)t / dur;
-  float f = f0 + (f1 - f0) * k;
-  if (noise) {  // bruit : frequence tiree au hasard autour de la frequence du moment
-    rnd = rnd * 1103515245 + 12345;
-    f *= 0.35f + ((rnd >> 16) & 1023) / 760.0f;
-  }
-  f = constrain(f, 40.0f, 9000.0f);
-  uint32_t duty = (uint32_t)(128 * vol * (volume / 10.0f) * (1 - 0.7f * k));  // decroissance douce
-  ledcChangeFrequency(SND_LEDC, (uint32_t)f, SND_BITS);
-  ledcWrite(SND_LEDC, constrain(duty, 1u, 128u));
-  silent = false;
-}
+void sfxMenu() { sndRaw(1320, 1320, 40, 0.35f, false, 1); }
 
 void sndMelody(const Note *m, uint8_t len) {
   if (gDemo || volume == 0) return;
@@ -236,17 +256,25 @@ void sndUpdate() {  // notes des jingles (appele a chaque tour de boucle)
   if (!melody || millis() < melodyNext) return;
   if (melodyPos >= melodyLen) { melody = nullptr; return; }
   const Note &n = melody[melodyPos++];
-  if (n.hz) sndPlay(n.hz, n.hz, n.ms * 9 / 10, 0.5f, false, 2);
+  if (n.hz) sndPlay(n.hz, n.hz, n.ms * 9 / 10, 0.45f, false, 2);
   melodyNext = millis() + n.ms;
 }
 const Note JINGLE_STAGE[] = { { 523, 90 }, { 659, 90 }, { 784, 90 }, { 1047, 220 } };
 const Note JINGLE_OVER[] = { { 523, 200 }, { 392, 200 }, { 330, 200 }, { 262, 450 } };
 const Note JINGLE_ARME[] = { { 784, 70 }, { 988, 70 }, { 1175, 70 }, { 1568, 200 } };
-void sfxShot() { sndPlay(1400, 500, 70, 0.35f, false, 1); }
-void sfxBoom() { sndPlay(900, 120, 260, 0.8f, true, 2); }
-void sfxHit() { sndPlay(700, 50, 700, 1.0f, true, 3); }
-void sfxDive() { sndPlay(1100, 350, 450, 0.25f, false, 1); }
+void sfxShot() { sndPlay(1600, 420, 60, 0.30f, false, 1); }                               // piou
+void sfxBoom() { sndPlay(3200, 260, 320, 0.9f, true, 2); }                                // pschhh
+void sfxHit() { sndPlay(2400, 120, 700, 1.0f, true, 3); sndPlay(300, 55, 600, 0.6f, false, 3); }  // gros boum + grondement
+void sfxDive() { sndPlay(1200, 380, 450, 0.22f, false, 1); }                              // piqué qui descend
 
+void sndTimerStart(void *) {  // cree l'interruption depuis le coeur 0 (elle y reste)
+  sndTimer = timerBegin(0, 80, true);  // 1 MHz
+  timerAttachInterrupt(sndTimer, &sndIsr, true);
+  timerAlarmWrite(sndTimer, 1000000 / SND_RATE, true);
+  timerAlarmEnable(sndTimer);
+  sndReady = true;
+  vTaskDelete(NULL);
+}
 void audioBegin() {
 #if !SON_ACTIF
   volume = 0;
@@ -254,19 +282,12 @@ void audioBegin() {
   return;
 #endif
   volume = constrain(prefs.getUChar("vol", 6), 0, 10);
-  ledcSetup(SND_LEDC, 1000, SND_BITS);
+  ledcSetup(SND_LEDC, SND_CARRIER, 8);
   ledcAttachPin(SND_PIN, SND_LEDC);
-  ledcWrite(SND_LEDC, 0);
-  esp_timer_create_args_t args = {};
-  args.callback = sndTick;
-  args.name = "son";
-  esp_timer_handle_t tm;
-  if (esp_timer_create(&args, &tm) != ESP_OK || esp_timer_start_periodic(tm, 1000) != ESP_OK) {
-    Serial.println("Son : minuterie indisponible");
-    return;
-  }
-  sndReady = true;
-  Serial.printf("Son : PWM sur GPIO %d (ampli analogique), volume %u/10\n", SND_PIN, volume);
+  ledcWrite(SND_LEDC, 128);  // repos au milieu (le condensateur de liaison bloque le continu)
+  xTaskCreatePinnedToCore(sndTimerStart, "son", 2048, NULL, 5, NULL, 0);
+  delay(20);
+  Serial.printf("Son : synthese 3 voix, %d Hz, PWM %d kHz sur GPIO %d, volume %u/10\n", SND_RATE, SND_CARRIER / 1000, SND_PIN, volume);
 }
 
 // ---------------------------------------------------------------- jeu : shoot'em up d'arcade (repris du VU-metre)
@@ -762,12 +783,8 @@ void gameDraw() {
   snprintf(sc, sizeof(sc), "%lu", (unsigned long)gHi);
   tinyText(*gfx, rx, 6, sc, white);
   gMark(rx, 6, tinyWidth(sc), 5);
-  // vies en haut a droite : une icone + le nombre (X3)
-  snprintf(sc, sizeof(sc), "X%d", max(0, gLives));
-  int lw = tinyWidth(sc), lx = W - 1 - lw;
-  tinyText(*gfx, lx, 1, sc, white);
-  gMark(lx, 1, lw, 5);
-  gSprite(SPR_LIFE, 5, 4, lx - 7, 1, palFull, 0, 0);
+  // vies en haut a droite : une petite icone par vie (6 au plus a l'ecran)
+  for (int i = 0; i < gLives && i < 6; i++) gSprite(SPR_LIFE, 5, 4, W - 6 - i * 7, 1, palFull, 0, 0);
 }
 
 // joueur : deplacement aux touches, tir tant que FEU est appuye (3 tirs a l'ecran au plus)
@@ -1775,10 +1792,303 @@ void qDraw() {
   altHud(palFull);
 }
 
+// ---------------------------------------------------------------- BULLES
+// Un petit blob (original) souffle des bulles sur un ecran de plateformes. Une bulle qui touche un ennemi
+// l'enferme et monte ; toucher la bulle la fait eclater et l'ennemi devient un cristal a ramasser.
+// Sans reaction, l'ennemi s'echappe (plus rapide). Niveau gagne quand tous les ennemis sont elimines.
+// Commandes : gauche / droite marcher, haut ou rond sauter, X souffler une bulle.
+#define B_PLAT 24
+#define B_EN 8
+#define B_BUB 8
+#define B_GEM 8
+struct BPlat { int16_t x0, x1, y; };
+struct BEnemy { float x, y, vx, vy; uint8_t type; bool on, fly, angry; };
+struct BBubble { float x, y, vx; int16_t t; int8_t en; bool on; };  // en : ennemi enferme (-1 : vide)
+struct BGem { float x, y, vy; int16_t t; bool on; };
+BPlat bPlat[B_PLAT];
+int bNPlat = 0;
+BEnemy bEn[B_EN];
+BBubble bBub[B_BUB];
+BGem bGem[B_GEM];
+float bX, bY, bVY;
+int bDir = 1, bCool = 0, bInv = 0, bLevelT = 0, bChain = 0, bChainT = 0;
+bool bGround = false, bPrevJump = false, bPrevFire = false;
+const char *const SPR_BLOB[2][8] = {  // heros original : blob cyan aux grands yeux
+  { ".cccccc.", "cwwccwwc", "cbwccbwc", "cccccccc", "cccyyccc", ".cccccc.", ".c.cc.c.", "cc....cc" },
+  { ".cccccc.", "cwwccwwc", "cbwccbwc", "cccccccc", "cccyyccc", ".cccccc.", "..c..c..", ".cc..cc." }
+};
+int bFloor() { return H - 4; }
+// plan du niveau : sol, rangees de plateformes avec des trous (symetriques), selon le numero du niveau
+void bBuildLevel() {
+  randomSeed(1234 + gWave * 97);
+  bNPlat = 0;
+  bPlat[bNPlat++] = { 0, (int16_t)W, (int16_t)bFloor() };
+  int rows = 0;
+  for (int y = bFloor() - 22; y > 24 && bNPlat < B_PLAT - 4; y -= 22, rows++) {
+    int pattern = random(4);
+    int half = W / 2;
+    if (pattern == 0) {  // deux longues plateformes, trou au centre
+      int g = random(10, 22);
+      bPlat[bNPlat++] = { 4, (int16_t)(half - g), (int16_t)y };
+      bPlat[bNPlat++] = { (int16_t)(half + g), (int16_t)(W - 4), (int16_t)y };
+    } else if (pattern == 1) {  // une plateforme au centre
+      int w = random(W / 4, W / 2);
+      bPlat[bNPlat++] = { (int16_t)(half - w / 2), (int16_t)(half + w / 2), (int16_t)y };
+    } else if (pattern == 2) {  // trois morceaux
+      int w = W / 5;
+      bPlat[bNPlat++] = { 4, (int16_t)(4 + w), (int16_t)y };
+      bPlat[bNPlat++] = { (int16_t)(half - w / 2), (int16_t)(half + w / 2), (int16_t)y };
+      bPlat[bNPlat++] = { (int16_t)(W - 4 - w), (int16_t)(W - 4), (int16_t)y };
+    } else {  // bords seulement
+      int w = random(W / 5, W / 3);
+      bPlat[bNPlat++] = { 4, (int16_t)(4 + w), (int16_t)y };
+      bPlat[bNPlat++] = { (int16_t)(W - 4 - w), (int16_t)(W - 4), (int16_t)y };
+    }
+  }
+  randomSeed(esp_random());
+  // ennemis : un par plateforme en hauteur (pas sur le sol), plus nombreux au fil des niveaux
+  for (auto &e : bEn) e.on = false;
+  int n = min(B_EN, 3 + gWave / 2 + (gEffDiff() - 1));
+  for (int i = 0; i < n; i++) {
+    BPlat &p = bPlat[1 + (i % max(1, bNPlat - 1))];
+    BEnemy &e = bEn[i];
+    e = {};
+    e.on = true;
+    e.type = i % 3;
+    e.fly = e.type == 2 && gWave >= 2;  // les insectes volent a partir du niveau 2
+    e.x = p.x0 + random(0, max(1, p.x1 - p.x0 - 9));
+    e.y = p.y - 7;
+    e.vx = (random(2) ? 1 : -1) * (0.45f + 0.05f * gWave) * (0.8f + 0.2f * gEffDiff());
+    e.vy = e.fly ? 0.5f : 0;
+  }
+  for (auto &b : bBub) b.on = false;
+  for (auto &g : bGem) g.on = false;
+  bX = 8; bY = bFloor() - 8; bVY = 0; bDir = 1; bInv = 60; bLevelT = 0;
+}
+void bReset() {
+  gLives = (!gDemo && gDiff == 0) ? 5 : 3;
+  gPaused = false;
+  gScore = 0; gWave = 1; gDead = 0; gBonus = 0; gLifeUp = false;
+  gStageT = 100;
+  sndMelody(JINGLE_STAGE, 4);
+  for (auto &b : gBoom) b.t = 0;
+  bBuildLevel();
+}
+// reste sur les plateformes : atterrissage en venant du dessus (on traverse par-dessous)
+bool bLand(float x, float &y, float &vy, int w, int h) {
+  if (vy < 0) return false;
+  for (int i = 0; i < bNPlat; i++) {
+    BPlat &p = bPlat[i];
+    if (x + w - 2 >= p.x0 && x + 1 <= p.x1 && y + h >= p.y && y + h - vy <= p.y + 2) {
+      y = p.y - h; vy = 0;
+      return true;
+    }
+  }
+  return false;
+}
+void bShoot() {
+  for (auto &b : bBub)
+    if (!b.on) { b = { bX + (bDir > 0 ? 8 : -6), bY + 1, 3.2f * bDir, 0, -1, true }; sfxShot(); return; }
+}
+// pilote automatique (demo) : va vers l'ennemi ou la bulle pleine la plus proche, souffle quand il est aligne
+uint8_t bAuto() {
+  uint8_t k = 0;
+  float tx = bX, ty = bY;
+  bool target = false;
+  for (auto &b : bBub)
+    if (b.on && b.en >= 0) { tx = b.x; ty = b.y; target = true; break; }
+  float best = 1e9;
+  if (!target)
+    for (auto &e : bEn)
+      if (e.on) {
+        float d = fabsf(e.x - bX) + fabsf(e.y - bY) * 2;
+        if (d < best) { best = d; tx = e.x; ty = e.y; }
+      }
+  if (tx < bX - 2) k |= 1;
+  else if (tx > bX + 2) k |= 2;
+  if (ty < bY - 10 && bGround && random(100) < 8) k |= 8;  // monte vers la cible
+  if (!target && fabsf(ty - bY) < 6 && fabsf(tx - bX) < 50 && (gFrame & 7) == 0) k |= 4;  // souffle
+  return k;
+}
+void bStep() {
+  gFrame++;
+  uint8_t k = gDemo ? bAuto() : keysPs4;
+  if (gDead > 0) {
+    if (--gDead == 0) {
+      if (gLives <= 0) {
+        if (gDemo) bReset();
+        else if (gLastRank) startNameEntry();
+        else toDemo();
+        return;
+      }
+      bX = 8; bY = bFloor() - 8; bVY = 0; bInv = 90;
+    }
+    return;
+  }
+  bLevelT++;
+  bool angryAll = bLevelT > 40 * 40;  // apres 40 s, les ennemis s'enervent
+  // joueur
+  if (k & 1) { bX -= 1.3f; bDir = -1; }
+  if (k & 2) { bX += 1.3f; bDir = 1; }
+  bX = constrain(bX, 4.0f, (float)(W - 12));
+  bool jumpKey = k & (8 | 32), fireKey = k & 4;
+  if (jumpKey && !bPrevJump && bGround) { bVY = -4.2f; bGround = false; sfxDive(); }
+  bPrevJump = jumpKey;
+  if (bCool > 0) bCool--;
+  if (fireKey && !bPrevFire && bCool == 0) { bShoot(); bCool = 10; }
+  bPrevFire = fireKey;
+  bVY = min(bVY + 0.3f, 3.5f);
+  bY += bVY;
+  bGround = bLand(bX, bY, bVY, 8, 8);
+  if (bY < 14) { bY = 14; bVY = 0; }
+  if (bInv > 0) bInv--;
+  if (bChainT > 0 && --bChainT == 0) bChain = 0;
+  // bulles : lancee horizontale, puis montee au plafond, derive, eclate apres un moment
+  for (auto &b : bBub) {
+    if (!b.on) continue;
+    b.t++;
+    if (b.t < 14) b.x += b.vx;
+    else { b.y -= 0.6f; b.x += sinf(b.t * 0.08f) * 0.3f; }
+    if (b.y < 16) b.y = 16;
+    b.x = constrain(b.x, 6.0f, (float)(W - 6));
+    if (b.en < 0 && b.t < 14)  // la bulle attrape un ennemi
+      for (int i = 0; i < B_EN; i++)
+        if (bEn[i].on && fabsf(bEn[i].x + 4 - b.x) < 7 && fabsf(bEn[i].y + 3 - b.y) < 7) {
+          bEn[i].on = false; b.en = i; b.t = 14; sfxMenu();
+          break;
+        }
+    int life = b.en >= 0 ? (angryAll ? 200 : 280) : 260;
+    if (b.t > life) {  // eclate seule : l'ennemi s'echappe, en colere
+      if (b.en >= 0) {
+        BEnemy &e = bEn[b.en];
+        e.on = true; e.angry = true; e.x = b.x - 4; e.y = b.y - 3;
+        e.vx = (random(2) ? 1 : -1) * 1.0f;
+      }
+      b.on = false;
+      continue;
+    }
+    // le joueur touche la bulle : elle eclate (ennemi -> cristal)
+    if (fabsf(b.x - (bX + 4)) < 8 && fabsf(b.y - (bY + 4)) < 8 && b.t > 6) {
+      b.on = false;
+      gBoomAt(b.x, b.y);
+      if (b.en >= 0) {
+        bChain++; bChainT = 40;
+        gScore += 100UL * bChain;
+        for (auto &g : bGem)
+          if (!g.on) { g = { b.x - 2, b.y, -1.5f, 0, true }; break; }
+        sfxBoom();
+      } else {
+        gScore += 10;
+      }
+    }
+  }
+  // ennemis : marchent, font demi-tour au bord, sautent parfois ; les insectes volent en diagonale
+  for (auto &e : bEn) {
+    if (!e.on) continue;
+    float sp = (e.angry || angryAll) ? 1.6f : 1;
+    if (e.fly) {
+      e.x += e.vx * sp; e.y += e.vy * sp;
+      if (e.x < 4 || e.x > W - 13) e.vx = -e.vx;
+      if (e.y < 14 || e.y > bFloor() - 7) e.vy = -e.vy;
+    } else {
+      e.x += e.vx * sp;
+      if (e.x < 4 || e.x > W - 13) { e.vx = -e.vx; e.x = constrain(e.x, 4.0f, (float)(W - 13)); }
+      e.vy = min(e.vy + 0.3f, 3.0f);
+      e.y += e.vy;
+      bool g = bLand(e.x, e.y, e.vy, 9, 7);
+      if (g && random(1000) < 6) e.vy = -4.0f;  // saute vers l'etage du dessus
+      if (g) {  // au bord d'une plateforme : demi-tour (sauf parfois)
+        bool under = false;
+        float fx = e.x + (e.vx > 0 ? 10 : -1);
+        for (int i = 0; i < bNPlat; i++)
+          if (fx >= bPlat[i].x0 && fx <= bPlat[i].x1 && bPlat[i].y == (int16_t)(e.y + 7)) under = true;
+        if (!under && random(100) < 70) e.vx = -e.vx;
+      }
+    }
+    if (gDead == 0 && bInv == 0 && e.x + 8 >= bX + 1 && e.x <= bX + 7 && e.y + 6 >= bY + 1 && e.y <= bY + 7) {
+      altLoseLife(bX + 4, bY + 4);
+      return;
+    }
+  }
+  // cristaux : tombent, rebondissent, a ramasser
+  for (auto &g : bGem) {
+    if (!g.on) continue;
+    g.t++;
+    g.vy = min(g.vy + 0.25f, 3.0f);
+    g.y += g.vy;
+    bLand(g.x, g.y, g.vy, 5, 5);
+    if (fabsf(g.x + 2 - (bX + 4)) < 7 && fabsf(g.y + 2 - (bY + 4)) < 8) {
+      g.on = false;
+      gScore += 500;
+      sfxMenu();
+    } else if (g.t > 400) g.on = false;
+  }
+  if (!gDemo && gScore > gHi) gHi = gScore;
+  // niveau gagne : plus d'ennemi (ni libre, ni enferme)
+  bool left = false;
+  for (auto &e : bEn) left |= e.on;
+  for (auto &b : bBub) left |= b.on && b.en >= 0;
+  if (!left && gStageT == 0) {
+    gWave++;
+    gStageT = 100;
+    altStageClear(1000UL * gWave);
+    sndMelody(JINGLE_STAGE, 4);
+    bBuildLevel();
+  }
+  if (gStageT > 0) gStageT--;
+}
+void bDraw() {
+  eraseOld();
+  uint16_t palFull[9];
+  altBackground(0.05f, palFull);
+  static const uint8_t PC[4][3] = { { 200, 80, 160 }, { 60, 160, 220 }, { 220, 140, 40 }, { 90, 200, 90 } };
+  const uint8_t *c = PC[(gWave - 1) % 4];
+  uint16_t plat = rgb(c[0], c[1], c[2]), platD = rgb(c[0] / 3, c[1] / 3, c[2] / 3);
+  for (int i = 0; i < bNPlat; i++) {  // plateformes (briques de la couleur du niveau)
+    BPlat &p = bPlat[i];
+    gfx->fillRect(p.x0, p.y, p.x1 - p.x0, 3, plat);
+    for (int x = p.x0 + 3; x < p.x1; x += 6) gfx->drawPixel(x, p.y + 1, platD);
+    gMark(p.x0, p.y, p.x1 - p.x0, 3);
+  }
+  gfx->fillRect(0, 12, 3, H - 12, plat);  // murs
+  gfx->fillRect(W - 3, 12, 3, H - 12, plat);
+  gMark(0, 12, 3, H - 12);
+  gMark(W - 3, 12, 3, H - 12);
+  uint16_t white[9], red[9];
+  for (int i = 0; i < 9; i++) { white[i] = palFull[0]; red[i] = palFull[1]; }
+  int w = (gWave - 1) % 4;
+  for (auto &e : bEn)
+    if (e.on) gSprite(SPR_W[w][e.type][(gFrame / 6) & 1], GW, GH, (int)e.x, (int)e.y, e.angry ? red : palFull, 0, 0);
+  for (auto &b : bBub) {  // bulles : contour, reflet, ennemi dedans
+    if (!b.on) continue;
+    bool full = b.en >= 0;
+    int r = full ? 6 : 4;
+    if (full) gSprite(SPR_W[w][bEn[b.en].type][(gFrame / 10) & 1], GW, GH, (int)b.x - 4, (int)b.y - 3, palFull, 0, 0);
+    bool warn = full && b.t > 200 && (gFrame & 4);  // va bientot eclater
+    gfx->drawCircle((int)b.x, (int)b.y, r, warn ? palFull[1] : palFull[5]);
+    gfx->drawPixel((int)b.x - r / 2, (int)b.y - r / 2, palFull[0]);
+    gMark((int)b.x - r, (int)b.y - r, 2 * r + 1, 2 * r + 1);
+  }
+  for (auto &g : bGem) {  // cristaux
+    if (!g.on) continue;
+    uint16_t gc = (gFrame & 8) ? palFull[4] : palFull[6];
+    int x = g.x, y = g.y;
+    gfx->drawPixel(x + 2, y, gc);
+    gfx->drawFastHLine(x + 1, y + 1, 3, gc);
+    gfx->drawFastHLine(x, y + 2, 5, gc);
+    gfx->drawFastHLine(x + 1, y + 3, 3, gc);
+    gfx->drawPixel(x + 2, y + 4, gc);
+    gMark(x, y, 5, 5);
+  }
+  altBooms(palFull);
+  if (gDead == 0 && !(bInv > 0 && (gFrame & 4))) gSprite(SPR_BLOB[bGround ? (gFrame / 6) & 1 : 0], 8, 8, (int)bX, (int)bY, palFull, 0, 0);
+  altHud(palFull);
+}
+
 // aiguillage selon le jeu choisi
-void altReset() { if (gGame == 1) rReset(); else if (gGame == 2) cReset(); else qReset(); }
-void altStep() { if (gGame == 1) rStep(); else if (gGame == 2) cStep(); else qStep(); }
-void altDraw() { if (gGame == 1) rDraw(); else if (gGame == 2) cDraw(); else qDraw(); }
+void altReset() { if (gGame == 1) rReset(); else if (gGame == 2) cReset(); else if (gGame == 3) qReset(); else bReset(); }
+void altStep() { if (gGame == 1) rStep(); else if (gGame == 2) cStep(); else if (gGame == 3) qStep(); else bStep(); }
+void altDraw() { if (gGame == 1) rDraw(); else if (gGame == 2) cDraw(); else if (gGame == 3) qDraw(); else bDraw(); }
 // remise a zero du jeu choisi (partie ou demo)
 void resetCurrent() { if (gGame == 0) gReset(); else altReset(); }
 

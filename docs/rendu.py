@@ -127,9 +127,8 @@ def game_frame(w, h, demo=False, stage=1, banner=False, seed=3):
     s.tiny(rx, 0, 'RECORD', PAL['r'])
     s.tiny(rx, 6, '30800', (230, 230, 230))
     lives = 3
-    lw = len('X3') * 4 - 1  # vies en haut a droite : icone + nombre
-    s.tiny(w - 1 - lw, 1, 'X3', (230, 230, 230))
-    s.sprite(SPR_LIFE, w - 1 - lw - 7, 1)
+    for i in range(lives):  # vies en haut a droite : une petite icone par vie
+        s.sprite(SPR_LIFE, w - 6 - i * 7, 1)
     if banner:  # annonce du stage
         y = h // 2 - 22 if tall else h // 2 - 10
         s.text(y, f'STAGE {stage}', (255, 220, 0))

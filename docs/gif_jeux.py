@@ -1,6 +1,7 @@
-"""GIF des jeux (apercus simules, comme les demos du jeu) : RAID, COURSE, RAQUETTES.
+"""GIF des jeux (apercus simules, comme les demos du jeu) : RAID, COURSE, RAQUETTES, BULLES.
 
-Sorties : docs/jeu-raid.gif, docs/jeu-course.gif, docs/jeu-raquettes.gif
+Sorties : docs/jeu-raid.gif, docs/jeu-course.gif, docs/jeu-raquettes.gif, docs/jeu-bulles.gif
+Usage : python docs/gif_jeux.py [raid course raquettes bulles]
 Memes sprites, regles et pilotes automatiques que games.ino (version simplifiee pour l'apercu).
 """
 import math
@@ -11,6 +12,9 @@ import re
 from PIL import Image, ImageDraw
 
 DOC = os.path.dirname(os.path.abspath(__file__))
+import sys
+GIF_ARGS = sys.argv[1:]  # jeux a generer (rendu.py lit sys.argv : on le vide avant de l'executer)
+sys.argv = sys.argv[:1]
 src = open(os.path.join(DOC, 'rendu.py'), encoding='utf-8').read()
 ns = {'__file__': os.path.join(DOC, 'rendu.py')}
 exec(src[:src.index('CONFIGS = [')], ns)
@@ -532,6 +536,135 @@ def raquettes():
     save(frames, 'jeu-raquettes.gif')
 
 
-raid()
-course()
-raquettes()
+# ================================================================ BULLES
+def bulles():
+    rnd = random.Random(11)
+    st = stars_init(rnd, 25)
+    blob = re.findall(r'"([.wrybcgpov]{8})"', re.search(r'SPR_BLOB\[2\]\[8\] = \{(.*?)\};', SRC, re.S).group(1))
+    BLOB = [blob[0:8], blob[8:16]]  # heros original : blob cyan
+    FL = H - 4
+    plats = [(0, W, FL), (4, 50, FL - 22), (78, W - 4, FL - 22), (40, 88, FL - 44), (4, 30, FL - 66), (98, W - 4, FL - 66),
+             (34, 94, FL - 88)]
+
+    def enemy(x, y, vx, t):
+        return {'x': x, 'y': y, 'vx': vx, 'vy': 0.0, 't': t, 'on': True}
+    en = [enemy(10.0, FL - 29.0, 0.5, 0), enemy(90.0, FL - 29.0, -0.5, 1), enemy(50.0, FL - 51.0, 0.5, 2), enemy(100.0, FL - 73.0, -0.5, 0)]
+    px, py, vy, dr_ = 10.0, FL - 8.0, 0.0, 1
+    bubs, gems, booms, score, frames, ground, cool = [], [], [], 0, [], True, 0
+
+    def land(x, y, v, w, h):
+        if v < 0:
+            return y, v, False
+        for p in plats:
+            if x + w - 2 >= p[0] and x + 1 <= p[1] and y + h >= p[2] and y + h - v <= p[2] + 2:
+                return p[2] - h, 0.0, True
+        return y, v, False
+    for f in range(420):
+        full = [b for b in bubs if b['en'] is not None]
+        live = [e for e in en if e['on']]
+        if full:  # pilote automatique : va eclater une bulle pleine, sinon vise l'ennemi le plus proche
+            tx, ty = full[0]['x'], full[0]['y']
+        elif live:
+            e = min(live, key=lambda e: abs(e['x'] - px) + abs(e['y'] - py) * 2)
+            tx, ty = e['x'], e['y']
+        else:
+            tx, ty = px, py
+        if tx < px - 2:
+            px -= 1.3
+            dr_ = -1
+        elif tx > px + 2:
+            px += 1.3
+            dr_ = 1
+        px = max(4, min(W - 12, px))
+        if ground and ty < py - 10 and rnd.random() < 0.08:
+            vy, ground = -4.2, False
+        cool -= 1
+        if not full and live and abs(ty - py) < 6 and abs(tx - px) < 50 and cool <= 0:
+            bubs.append({'x': px + (8 if dr_ > 0 else -6), 'y': py + 1, 'vx': 3.2 * dr_, 't': 0, 'en': None})
+            cool = 12
+        vy = min(vy + 0.3, 3.5)
+        py += vy
+        py, vy, ground = land(px, py, vy, 8, 8)
+        for b in list(bubs):
+            b['t'] += 1
+            if b['t'] < 14:
+                b['x'] += b['vx']
+            else:
+                b['y'] = max(16, b['y'] - 0.6)
+                b['x'] += math.sin(b['t'] * 0.08) * 0.3
+            b['x'] = max(6, min(W - 6, b['x']))
+            if b['en'] is None and b['t'] < 14:
+                for e in en:
+                    if e['on'] and abs(e['x'] + 4 - b['x']) < 7 and abs(e['y'] + 3 - b['y']) < 7:
+                        e['on'] = False
+                        b['en'], b['t'] = e, 14
+                        break
+            if abs(b['x'] - px - 4) < 8 and abs(b['y'] - py - 4) < 8 and b['t'] > 6:
+                bubs.remove(b)
+                booms.append([int(b['x']), int(b['y']), 1])
+                if b['en'] is not None:
+                    gems.append([b['x'] - 2, b['y'], -1.5])
+                    score += 100
+                continue
+            if b['t'] > 260:
+                bubs.remove(b)
+        for e in en:
+            if not e['on']:
+                continue
+            e['x'] += e['vx']
+            if e['x'] < 4 or e['x'] > W - 13:
+                e['vx'] = -e['vx']
+            e['vy'] = min(e['vy'] + 0.3, 3)
+            e['y'] += e['vy']
+            e['y'], e['vy'], _ = land(e['x'], e['y'], e['vy'], 9, 7)
+        for gm in list(gems):
+            gm[2] = min(gm[2] + 0.25, 3)
+            gm[1] += gm[2]
+            gm[1], gm[2], _ = land(gm[0], gm[1], gm[2], 5, 5)
+            if abs(gm[0] + 2 - px - 4) < 7 and abs(gm[1] + 2 - py - 4) < 8:
+                gems.remove(gm)
+                score += 500
+        if not any(e['on'] for e in en) and not full and not gems:  # niveau suivant (dans l'apercu : nouveaux ennemis)
+            for k, e in enumerate(en):
+                e.update(on=True, x=float(rnd.randrange(10, W - 20)), y=float(plats[1 + k % 6][2] - 7), vx=0.6 if k & 1 else -0.6)
+        for b in booms:
+            b[2] += 1
+        booms = [b for b in booms if b[2] < 12]
+        if f % 2:
+            continue
+        s = Screen(W, H)
+        stars_draw(s, st, 0.05, rnd)
+        dw = ImageDraw.Draw(s.im)
+        for p in plats:
+            dw.rectangle((p[0], p[2], p[1] - 1, p[2] + 2), fill=(200, 80, 160))
+            for x in range(p[0] + 3, p[1], 6):
+                s.px(x, p[2] + 1, (66, 26, 53))
+        dw.rectangle((0, 12, 2, H - 1), fill=(200, 80, 160))
+        dw.rectangle((W - 3, 12, W - 1, H - 1), fill=(200, 80, 160))
+        for e in en:
+            if e['on']:
+                s.sprite(SPR_W[0][e['t']][(f // 6) & 1], int(e['x']), int(e['y']))
+        for b in bubs:
+            r = 6 if b['en'] is not None else 4
+            if b['en'] is not None:
+                s.sprite(SPR_W[0][b['en']['t']][(f // 10) & 1], int(b['x']) - 4, int(b['y']) - 3)
+            dw.ellipse((int(b['x']) - r, int(b['y']) - r, int(b['x']) + r, int(b['y']) + r), outline=PAL['g'])
+            s.px(int(b['x']) - r // 2, int(b['y']) - r // 2, PAL['w'])
+        for gm in gems:
+            c = PAL['c'] if f & 8 else PAL['p']
+            for dx, dy in ((2, 0), (1, 1), (2, 1), (3, 1), (0, 2), (1, 2), (2, 2), (3, 2), (4, 2), (1, 3), (2, 3), (3, 3), (2, 4)):
+                s.px(int(gm[0]) + dx, int(gm[1]) + dy, c)
+        for b in booms:
+            boom(s, b)
+        s.sprite(BLOB[(f // 6) & 1 if ground else 0], int(px), int(py))
+        hud(s, score)
+        frames.append(page(led(s.im), 'BULLES', 'Un petit blob souffle des bulles : enfermer les ennemis, puis faire eclater les bulles.',
+                           ['Commandes :', 'gauche / droite : marcher', 'haut ou rond : sauter', 'X : souffler une bulle', '',
+                            'Regles :', 'bulle + ennemi = piege', 'toucher la bulle : elle', "eclate, l'ennemi devient",
+                            'un cristal (500)', "sinon il s'echappe", 'tous elimines : niveau', 'suivant, +1 vie']))
+    save(frames, 'jeu-bulles.gif')
+
+
+todo = GIF_ARGS or ['raid', 'course', 'raquettes', 'bulles']
+for name in todo:
+    globals()[name]()

@@ -6,9 +6,9 @@ Jeux d'arcade sur 1 à 4 dalles LED 128x64, avec un ESP32 classique et une **man
 - **Partition unique de 3 Mo :** il reste de la place pour d'autres jeux.
 - **Son en option :** une broche PWM vers un petit ampli et un haut-parleur.
 
-**4 jeux originaux**, à choisir dans le menu (gauche / droite sur la ligne JOUER). Au démarrage, c'est toujours **ESSAIM** qui est proposé.
+**5 jeux originaux**, à choisir dans le menu (gauche / droite sur la ligne JOUER). Au démarrage, c'est toujours **ESSAIM** qui est proposé.
 
-Les 4 jeux ont en commun les niveaux de difficulté, les stages, les vies, les meilleurs scores avec les noms et la démo automatique.
+Les 5 jeux ont en commun les niveaux de difficulté, les stages, les vies, les meilleurs scores avec les noms et la démo automatique.
 
 
 # ESSAIM
@@ -22,7 +22,7 @@ Le jeu principal : un shoot'em up original, repris du mode Jeu du VU-mètre. Une
 *Aperçu simulé, généré par `docs/rendu.py` avec les mêmes sprites que le jeu. Chaque configuration en grand : [128x128](docs/rendu-128x128.png), [256x64](docs/rendu-256x64.png), [128x256](docs/rendu-128x256.png).*
 
 
-- **Écran :** score et record en haut ; **vies en haut à droite** (une icône et le nombre, par exemple `X3`) . Le vaisseau est tout en bas de l'écran. Le stage s'affiche dans l'annonce, au début de chaque stage.
+- **Écran :** score et record en haut ; **vies en haut à droite**, une petite icône de vaisseau par vie . Le vaisseau est tout en bas de l'écran. Le stage s'affiche dans l'annonce, au début de chaque stage.
 - **Vies :** Chaque stage terminé donne **une vie de plus** (9 au maximum).
 - **Stages, sans fin :** quand tous les ennemis sont détruits, l'annonce « STAGE n » s'affiche avec le nom du monde et un bonus de 500 points × le numéro du stage.
   - Les ennemis tirent plus souvent à chaque stage, et leurs tirs vont plus vite.
@@ -90,6 +90,17 @@ Un petit bonhomme original (casquette rouge, t-shirt bleu) court tout seul vers 
 - **Trous et piques :** les toucher fait perdre une vie. Les cristaux, plus rares, valent 200 points.
 - **Stages :** tous les 1500 pixels, la course accélère et tu gagnes une vie.
 
+### BULLES
+
+![BULLES](docs/jeu-bulles.gif)
+
+Un petit blob cyan original souffle des bulles, sur un écran de plateformes différent à chaque niveau.
+- **Commandes :** gauche / droite pour marcher, **haut ou ○ pour sauter**, **✕ pour souffler une bulle**. On traverse les plateformes par-dessous en sautant, et on retombe dessus.
+- **Piéger un ennemi :** une bulle qui touche un ennemi l'**enferme**, puis monte vers le plafond. **Touche la bulle** pour la faire éclater : l'ennemi devient un **cristal** qui tombe, et le ramasser rapporte 500 points. Éclater plusieurs bulles à la suite donne un bonus de chaîne.
+- **Attention :** une bulle qui clignote en rouge va éclater toute seule, et l'ennemi s'échappe, en colère et plus rapide. Au bout de 40 s, tous les ennemis s'énervent.
+- **Les ennemis :** ceux des mondes d'ESSAIM. Certains marchent et sautent d'étage en étage, et à partir du niveau 2, les insectes volent en diagonale.
+- **Niveau gagné :** tous les ennemis sont éliminés. Tu passes à un nouveau plan, avec plus d'ennemis, et tu gagnes une vie en plus.
+
 ### RAQUETTES
 
 ![RAQUETTES](docs/jeu-raquettes.gif)
@@ -108,7 +119,7 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. **Sans manette
 
 | Ligne | Action |
 |---|---|
-| **JOUER** | **gauche / droite : choix du jeu** (ESSAIM, RAID, COURSE, RAQUETTES). Au démarrage : ESSAIM. ✕ ou OPTIONS lance la partie. |
+| **JOUER** | **gauche / droite : choix du jeu** (ESSAIM, RAID, COURSE, RAQUETTES, BULLES). Au démarrage : ESSAIM. ✕ ou OPTIONS lance la partie. |
 | **NIVEAU** | Facile / Normal / Difficile (gauche / droite ou ✕), choix gardé en mémoire |
 | **LUMINOSITE** | 0 à 100 % par pas de 10 % (gauche / droite ou ✕), visible tout de suite et gardée en mémoire. À 0 %, les dalles restent très faiblement allumées pour qu'on voie encore le menu. |
 | **VOLUME** | volume du son, 0 à 100 % par pas de 10 % (gauche / droite ou ✕). Un bip fait entendre le niveau. 0 % = muet. C'est le rapport cyclique du PWM : le potentiomètre de l'ampli règle le maximum. |
@@ -147,7 +158,7 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. **Sans manette
 | stick gauche ou croix gauche / droite | bouger |
 | stick gauche ou croix haut / bas | avancer / reculer (dans le bas de l'écran, environ 45 %) |
 | croix, carré, triangle, R1, L1 ou R2 | tirer (ESSAIM, RAID), sauter (COURSE) |
-| ○ (rond) | bombe dans RAID ; dans les menus : retour |
+| ○ (rond) | bombe dans RAID, saut dans BULLES ; dans les menus : retour |
 | OPTIONS | jouer depuis le menu, pause en partie |
 | ○ (rond), pendant la pause | quitter la partie et revenir au menu |
 | croix haut / bas, au menu | choisir la ligne |
@@ -177,7 +188,10 @@ La commande `a` seule rend à l'ESP32 son adresse d'origine.
 
 ![Branchement du son](docs/branchement-son.png)
 
-Le son passe par **une seule broche, GPIO 22** (depuis la V2.23). L'ESP32 y sort des notes carrées, façon consoles 8 bits, sans I2S et presque sans travail pour le processeur. Le signal est filtré, puis envoyé à un ampli analogique.
+Le son passe par **une seule broche, GPIO 22**. Depuis la V3.11, c'est une vraie **synthèse à 3 voix** :
+- **Le signal :** la broche sort un PWM à 250 kHz, dont la valeur est recalculée 16 000 fois par seconde par une courte interruption sur le cœur 0. Le filtre RC n'en garde que le son.
+- **Les voix :** les bruitages (onde carrée qui glisse en fréquence), le bruit des explosions et les jingles se mélangent.
+- **Le volume :** il change l'amplitude, sans modifier le timbre. L'ESP32 y sort des notes carrées, façon consoles 8 bits, sans I2S et presque sans travail pour le processeur. Le signal est filtré, puis envoyé à un ampli analogique.
 
 - **Le module ampli :** sur le schéma, la carte verte porte la puce au centre, le potentiomètre de volume, l'entrée L / GND / R à gauche, les borniers des haut-parleurs (L+ L- R+ R-) à droite et le bornier d'alimentation + / - en bas. Suis les repères imprimés sur ta carte : l'ordre peut changer d'un vendeur à l'autre.
 - **Filtre :** 1 kΩ en série, 10 nF vers la masse, puis 10 µF en série vers l'entrée de l'ampli. Relie l'entrée L à l'entrée R : le son est mono.
@@ -187,7 +201,6 @@ Le son passe par **une seule broche, GPIO 22** (depuis la V2.23). L'ESP32 y sort
 - **Volume :** avec le potentiomètre de l'ampli. Commence au minimum.
 
 - **Bruitages :** tir, explosion, vaisseau touché, piqué d'un ennemi, jingles de stage, de nouvelle arme et de fin de partie, bips du menu et de la saisie du nom. La démo reste muette.
-- **Une seule voix :** un son important (vaisseau touché, explosion) passe avant un son mineur (tir, bip).
 - **Volume :** ligne VOLUME du menu (0 à 100 %), ou `v 0` à `v 10` dans le moniteur série, en plus du potentiomètre de l'ampli.
 - **Sans ampli branché :** le jeu marche normalement.
 
@@ -239,8 +252,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V3.10_complet.bin](firmware/GameHub_V3.10_complet.bin) | 0x0 | `6048935896b87ed95166a6cc82634d0b` |
-| [firmware/GameHub_V3.10.bin](firmware/GameHub_V3.10.bin) | 0x10000 | `893b95f20d8c8e73db0ff8d3fe4fac9f` |
+| [firmware/GameHub_V3.20_complet.bin](firmware/GameHub_V3.20_complet.bin) | 0x0 | `8fb18becafecb67784ef51504fd388a4` |
+| [firmware/GameHub_V3.20.bin](firmware/GameHub_V3.20.bin) | 0x10000 | `201ec13a53de4e7fb8a86468febc95da` |
 
 Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB SPIFFS)** dans Outils → Partition Scheme.
 
@@ -257,6 +270,6 @@ Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB S
   - La copie corrigée cherche l'en-tête du paquet avant de le lire.
   - Elle demande aussi à la manette un rapport toutes les 4 ms. Avec 0, elle n'en envoyait qu'environ un toutes les 2 s, et les appuis brefs étaient perdus.
   - Le jeu interdit enfin le mode veille Bluetooth (sniff) et force le lien de la manette en mode actif dès le premier rapport. Le moniteur série affiche le nombre de paquets reçus par seconde.
-- **Plans, aperçus et GIF :** `python docs/branchement.py`, `python docs/rendu.py`, `python docs/gif_manette_ps4.py`, `python docs/gif_arrivee.py`, `python docs/gif_menus.py`, `python docs/gif_jeux.py`, `python docs/branchement_son.py` (Pillow).
+- **Plans, aperçus et GIF :** `python docs/branchement.py`, `python docs/rendu.py`, `python docs/gif_manette_ps4.py`, `python docs/gif_arrivee.py`, `python docs/gif_menus.py`, `python docs/gif_jeux.py [raid course raquettes bulles]`, `python docs/branchement_son.py` (Pillow).
 
 L'ancienne version avec wifi, page web et manette ESP-NOW reste disponible dans l'historique Git, jusqu'au commit `fb11367`.
