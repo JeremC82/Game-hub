@@ -1,7 +1,7 @@
-"""GIF des jeux (apercus simules, comme les demos du jeu) : RAID, COURSE, RAQUETTES, BULLES, LABYRINTHE, SAUTERELLE.
+"""GIF des jeux (apercus simules, comme les demos du jeu) : RAID, COURSE, RAQUETTES, BULLES, LABYRINTHE, SAUTERELLE, ORBITE.
 
-Sorties : docs/jeu-raid.gif, docs/jeu-course.gif, docs/jeu-raquettes.gif, docs/jeu-bulles.gif, docs/jeu-labyrinthe.gif, docs/jeu-sauterelle.gif
-Usage : python docs/gif_jeux.py [raid course raquettes bulles labyrinthe sauterelle]
+Sorties : docs/jeu-raid.gif, docs/jeu-course.gif, docs/jeu-raquettes.gif, docs/jeu-bulles.gif, docs/jeu-labyrinthe.gif, docs/jeu-sauterelle.gif, docs/jeu-orbite.gif
+Usage : python docs/gif_jeux.py [raid course raquettes bulles labyrinthe sauterelle orbite]
 Memes sprites, regles et pilotes automatiques que games.ino (version simplifiee pour l'apercu).
 """
 import math
@@ -1044,6 +1044,187 @@ def sauterelle():
     save(frames, 'jeu-sauterelle.gif')
 
 
-todo = GIF_ARGS or ['raid', 'course', 'raquettes', 'bulles', 'labyrinthe', 'sauterelle']
+
+
+# ================================================================ ORBITE
+def orbite():
+    rnd = random.Random(11)
+    cx, cy, rx, ry = W / 2, 8 + (H - 8) / 2, W / 2 - 6, (H - 8) / 2 - 4
+    TAU = 2 * math.pi
+
+    def X(a, r): return cx + math.cos(a) * r * rx
+    def Y(a, r): return cy + math.sin(a) * r * ry
+
+    def adiff(a, b):
+        d = (a - b) % TAU
+        return d - TAU if d > math.pi else d
+    stars = [{'a': rnd.random() * TAU, 'r': rnd.random()} for _ in range(40)]
+    en = []
+    for i in range(32):
+        w, k = i // 8, i % 8
+        en.append({'on': True, 'state': 0, 't': -(w * 110 + k * 9), 'a0': w * math.pi / 2 + 0.7, 'dir': -1 if w & 1 else 1,
+                   'type': (w + 1) % 3, 'carrier': i == 13, 'r': 0, 'a': 0, 'sa': 0, 'shot': False, 'i': i})
+    shots, buls, booms, frames = [], [], [], []
+    pa, rot, cool, dive, score, power, cap, stage_t = math.pi / 2, 0, 0, 150, 0, 0, None, 60
+    SPR = (((0x0E, 0x1F, 0x15, 0x1F, 0x0A), (0x0E, 0x1F, 0x15, 0x1F, 0x11)),
+           ((0x0E, 0x11, 0x15, 0x11, 0x0E), (0x0E, 0x1B, 0x11, 0x1B, 0x0E)),
+           ((0x11, 0x1B, 0x0E, 0x1B, 0x11), (0x0A, 0x1B, 0x0E, 0x1B, 0x0A)))
+    EC = ((255, 60, 200), (0, 220, 255), (255, 200, 0))
+    for f in range(620):
+        warp = 4 if stage_t else 1
+        for s in stars:
+            s['r'] += warp * (0.004 + s['r'] * 0.03)
+            if s['r'] > 1.25:
+                s['r'], s['a'] = 0.02, rnd.random() * TAU
+        if stage_t:
+            stage_t -= 1
+        else:
+            # pilote automatique : vise l'ennemi le plus proche, evite les tirs
+            ta, best = pa, -1
+            for e in en:
+                if e['on'] and e['state'] >= 1 and e['r'] > best:
+                    best, ta = e['r'], e['a']
+            for b in buls:
+                if b['r'] > 0.55 and abs(adiff(b['a'], pa)) < 0.3:
+                    ta = pa + (-0.9 if adiff(b['a'], pa) > 0 else 0.9)
+            d = adiff(ta, pa)
+            pa = (pa + max(-0.075, min(0.075, d))) % TAU
+            cool = max(0, cool - 1)
+            if cool == 0:
+                for k in ((-0.07, 0.07) if power else (0,)):
+                    if len(shots) < 8:
+                        shots.append({'a': pa + k, 'r': 0.92})
+                cool = 7
+            for s in shots:
+                s['r'] -= 0.02 + 0.035 * s['r']
+            shots = [s for s in shots if s['r'] >= 0.06]
+            rot += 0.006
+            for e in en:
+                if not e['on']:
+                    continue
+                e['t'] += 1
+                if e['state'] == 0:
+                    if e['t'] >= 0:
+                        e['state'], e['t'] = 1, 0
+                    continue
+                fr = 0.44 + (e['i'] & 1) * 0.11
+                if e['state'] == 1:
+                    u = min(1, e['t'] / 100)
+                    e['r'] = fr * u + 0.5 * math.sin(math.pi * u)
+                    e['a'] = e['a0'] + e['dir'] * 4.4 * u
+                    if u >= 1:
+                        e['state'], e['sa'] = 2, e['a'] - rot
+                elif e['state'] == 2:
+                    e['a'] = e['sa'] + rot
+                    e['r'] = fr + 0.04 * math.sin(f * 0.05 + e['sa'])
+                elif e['state'] == 3:
+                    e['r'] += 0.006 + 0.016 * e['r'] + 0.002
+                    e['a'] += max(-0.025, min(0.025, adiff(pa, e['a'])))
+                    if not e['shot'] and e['r'] > 0.45:
+                        e['shot'] = True
+                        if rnd.random() < 0.65:
+                            buls.append({'a': e['a'], 'r': e['r']})
+                    if e['r'] > 1.2:
+                        e['state'], e['r'] = 4, 0
+                elif e['state'] == 4:
+                    e['a'] = e['sa'] + rot
+                    e['r'] += 0.01
+                    if e['r'] >= fr:
+                        e['state'] = 2
+                for s in shots:
+                    if abs(s['r'] - e['r']) <= 0.07 and abs(adiff(s['a'], e['a'])) * max(e['r'], 0.15) < 0.075:
+                        s['r'] = -1
+                        e['on'] = False
+                        booms.append([int(X(e['a'], e['r'])), int(Y(e['a'], e['r'])), 1])
+                        score += (2 if e['state'] == 3 else 1) * (50, 80, 100)[e['type']]
+                        if e['carrier']:
+                            cap = {'a': e['a'], 'r': max(0.2, e['r'])}
+                        break
+                shots = [s for s in shots if s['r'] >= 0]
+            dive -= 1
+            if dive <= 0:
+                dive = 80 + rnd.randrange(40)
+                cand = [e for e in en if e['on'] and e['state'] == 2]
+                if cand:
+                    e = rnd.choice(cand)
+                    e['state'], e['shot'] = 3, False
+            for b in buls:
+                b['r'] += 0.012 + 0.018 * b['r']
+            buls = [b for b in buls if b['r'] <= 1.2]
+            if cap:
+                cap['r'] += 0.012
+                if cap['r'] > 0.92 and abs(adiff(cap['a'], pa)) < 0.2:
+                    cap, power, score = None, 1, score + 500
+                elif cap['r'] > 1.15:
+                    cap = None
+        for b in booms:
+            b[2] += 1
+        booms = [b for b in booms if b[2] < 12]
+        if f % 2:
+            continue
+        s = Screen(W, H)
+        for i, st in enumerate(stars):
+            x, y = int(X(st['a'], st['r'])), int(Y(st['a'], st['r']))
+            g = int(40 + min(1, st['r']) * 200)
+            if y >= 8:
+                s.px(x, y, (g // 2, g // 2, g) if i % 4 == 0 else (g, g, g))
+        for e in en:
+            if not e['on'] or e['state'] == 0:
+                continue
+            x, y = int(X(e['a'], e['r'])), int(Y(e['a'], e['r']))
+            c = ((255, 255, 255) if f & 8 else (150, 150, 150)) if e['carrier'] else EC[e['type']]
+            if e['r'] < 0.18:
+                s.px(x, y, c)
+            elif e['r'] < 0.4:
+                for dx, dy in ((0, 0), (-1, 0), (1, 0), (0, -1), (0, 1)):
+                    s.px(x + dx, y + dy, c)
+            else:
+                sp = SPR[e['type']][(f // 8) & 1]
+                for r in range(5):
+                    for cc in range(5):
+                        if sp[r] & (0x10 >> cc):
+                            s.px(x - 2 + cc, y - 2 + r, c)
+        for sh in shots:
+            s.px(int(X(sh['a'], sh['r'])), int(Y(sh['a'], sh['r'])), PAL['y'])
+            s.px(int(X(sh['a'], sh['r'] + 0.04)), int(Y(sh['a'], sh['r'] + 0.04)), PAL['w'])
+        for b in buls:
+            x, y = int(X(b['a'], b['r'])), int(Y(b['a'], b['r']))
+            s.px(x, y, PAL['r'])
+            if b['r'] > 0.5:
+                s.px(x + 1, y, PAL['r']); s.px(x, y + 1, PAL['w'])
+        if cap:
+            x, y = int(X(cap['a'], cap['r'])), int(Y(cap['a'], cap['r']))
+            c = PAL['y'] if f & 4 else PAL['g']
+            for dx, dy in ((0, -1), (-1, 0), (1, 0), (0, 1)):
+                s.px(x + dx, y + dy, c)
+            s.px(x, y, PAL['w'])
+        d = ImageDraw.Draw(s.im)
+        px, py = X(pa, 1), Y(pa, 1)
+        ux, uy = cx - px, cy - py
+        n = math.hypot(ux, uy)
+        ux, uy = ux / n, uy / n
+        vx, vy = -uy, ux
+        nose = (int(px + 3 * ux), int(py + 3 * uy))
+        lw = (int(px - 2 * ux + 3 * vx), int(py - 2 * uy + 3 * vy))
+        rw = (int(px - 2 * ux - 3 * vx), int(py - 2 * uy - 3 * vy))
+        body = PAL['c'] if power else (60, 140, 255)
+        d.line((nose, lw), fill=body); d.line((nose, rw), fill=body)
+        d.line((lw, (int(px), int(py))), fill=body); d.line((rw, (int(px), int(py))), fill=body)
+        s.px(int(px + ux), int(py + uy), PAL['w'])
+        s.px(int(px - 3 * ux), int(py - 3 * uy), PAL['o'])
+        for b in booms:
+            boom(s, b)
+        if stage_t:
+            s.text(H // 2 - 22, 'STAGE 1', (255, 220, 0))
+            s.text(H // 2 - 11, 'ORBITE', (255, 60, 200))
+        hud(s, score)
+        frames.append(page(led(s.im), 'ORBITE', "Le vaisseau tourne sur le bord et tire vers le centre, d'où sortent les ennemis.",
+                           ['Commandes :', 'stick / croix : direction', '  (le vaisseau y glisse)', 'X : tirer', '',
+                            'Regles :', 'ennemis en spirale,', 'puis en anneau ;', 'ils plongent et tirent', 'en pique : points x2',
+                            'blanc : capsule', '  = double tir', 'tout detruit : stage +1']))
+    save(frames, 'jeu-orbite.gif')
+
+
+todo = GIF_ARGS or ['raid', 'course', 'raquettes', 'bulles', 'labyrinthe', 'sauterelle', 'orbite']
 for name in todo:
     globals()[name]()

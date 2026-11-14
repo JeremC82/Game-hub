@@ -6,9 +6,9 @@ Jeux d'arcade sur 1 à 4 dalles LED 128x64, avec un ESP32 classique et une **man
 - **Partition unique de 3 Mo :** il reste de la place pour d'autres jeux.
 - **Son en option :** une broche PWM vers un petit ampli et un haut-parleur.
 
-**7 jeux originaux**, à choisir dans le menu (gauche / droite sur la ligne JOUER). Au démarrage, c'est toujours **ESSAIM** qui est proposé.
+**8 jeux originaux**, à choisir dans le menu (gauche / droite sur la ligne JOUER). Au démarrage, c'est toujours **ESSAIM** qui est proposé.
 
-Les 7 jeux ont en commun les niveaux de difficulté, les stages, les vies, les meilleurs scores avec les noms et la démo automatique.
+Les 8 jeux ont en commun les niveaux de difficulté, les stages, les vies, les meilleurs scores avec les noms et la démo automatique.
 
 
 # ESSAIM
@@ -37,6 +37,11 @@ Le jeu principal : un shoot'em up original, repris du mode Jeu du VU-mètre. Une
   | 2, 6, 10… | Crabes | formation qui balance plus vite et plus large, piqués **à deux** |
   | 3, 7, 11… | Cristaux | **un tir de plus** pour chaque ennemi, piqués **en zigzag** |
   | 4, 8, 12… | Orbes | la formation **descend et remonte**, et leurs tirs **visent ton vaisseau** |
+- **Formation :** 10 ennemis par rangée sur une dalle de 128 de large. Il reste de la place sur les côtés, alors l'essaim se balance bien de droite à gauche.
+- **Boss tous les 4 stages (4, 8, 12…) :** une fois la formation détruite, un grand vaisseau-mère arrive en haut de l'écran. Il va et vient et tire en éventail, et sa barre de vie s'affiche sous le score.
+  - **2e phase :** sous la moitié de sa vie, il devient rouge et tire plus souvent, en éventail de 5.
+  - **Quand tu le casses :** gros bonus (2000 × numéro du boss), puis il **éclate en 5 petits vaisseaux qui plongent aussitôt vers toi**. Il faut les détruire pour passer au stage suivant.
+  - Il est plus résistant à chaque nouveau boss, et selon le niveau choisi (facile, normal, difficile).
 - **Arrivée en vol :** les ennemis arrivent en files, par groupes en miroir. Ils suivent des trajectoires courbes avec des boucles, puis rejoignent leur place. Abattus en vol, ils rapportent **double**.
 
   ![Arrivée des ennemis](docs/arrivee-ennemis.gif)
@@ -128,6 +133,17 @@ Une sauterelle verte parcourt un **grand labyrinthe en relief** (plan original) 
 - **Couloir du milieu :** ouvert sur les deux côtés.
 - **Stages :** tout manger fait passer au stage suivant. Les créatures sont plus rapides, les murs changent de couleur, et tu gagnes une vie.
 
+### ORBITE
+
+![ORBITE](docs/jeu-orbite.gif)
+
+Ton vaisseau **tourne sur le bord de l'écran** et tire **vers le centre**. Les étoiles jaillissent du centre, ce qui donne de la profondeur.
+- **Commandes :** pousse le stick ou la croix dans une direction, et le vaisseau **glisse sur son orbite** jusque-là. ✕ (ou carré, triangle, R1, L1, R2) pour tirer en continu.
+- **Les ennemis :** ils sortent du centre **en spirale**, se rangent en anneau, puis **plongent vers toi** en tirant. Ils grossissent en approchant : un point au loin, une petite croix, puis le sprite.
+- **Points :** 50, 80 ou 100 selon l'ennemi, **doublés s'il est en piqué**.
+- **Ennemi blanc :** il lâche une capsule. Rattrape-la sur ton orbite pour avoir le **double tir**, jusqu'à la prochaine vie perdue.
+- **Stages :** 4 vagues de 8 ennemis. Tout détruire fait passer au stage suivant, avec un **saut en hyperespace** (les étoiles accélèrent). Les ennemis piquent plus souvent, et tu gagnes une vie.
+
 ### RAQUETTES
 
 ![RAQUETTES](docs/jeu-raquettes.gif)
@@ -146,7 +162,7 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. **Sans manette
 
 | Ligne | Action |
 |---|---|
-| **JOUER** | **gauche / droite : choix du jeu** (ESSAIM, RAID, COURSE, RAQUETTES, BULLES, LABYRINTHE, SAUTERELLE). Au démarrage : ESSAIM. ✕ ou OPTIONS lance la partie. |
+| **JOUER** | **gauche / droite : choix du jeu** (ESSAIM, RAID, COURSE, RAQUETTES, BULLES, LABYRINTHE, SAUTERELLE, ORBITE). Au démarrage : ESSAIM. ✕ ou OPTIONS lance la partie. |
 | **NIVEAU** | Facile / Normal / Difficile (gauche / droite ou ✕), choix gardé en mémoire |
 | **LUMINOSITE** | 0 à 100 % par pas de 10 % (gauche / droite ou ✕), visible tout de suite et gardée en mémoire. À 0 %, les dalles restent très faiblement allumées pour qu'on voie encore le menu. |
 | **VOLUME** | volume du son, 0 à 100 % par pas de 10 % (gauche / droite ou ✕). Un bip fait entendre le niveau. 0 % = muet. C'est le rapport cyclique du PWM : le potentiomètre de l'ampli règle le maximum. |
@@ -184,7 +200,7 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. **Sans manette
 |---|---|
 | stick gauche ou croix gauche / droite | bouger |
 | stick gauche ou croix haut / bas | avancer / reculer (dans le bas de l'écran, environ 45 %) |
-| croix, carré, triangle, R1, L1 ou R2 | tirer (ESSAIM, RAID), sauter (COURSE, SAUTERELLE) |
+| croix, carré, triangle, R1, L1 ou R2 | tirer (ESSAIM, RAID, ORBITE), sauter (COURSE, SAUTERELLE) |
 | ○ (rond) | bombe dans RAID, saut dans BULLES et SAUTERELLE ; dans les menus : retour |
 | OPTIONS | jouer depuis le menu, pause en partie |
 | ○ (rond), pendant la pause | quitter la partie et revenir au menu |
@@ -279,8 +295,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V3.41_complet.bin](firmware/GameHub_V3.41_complet.bin) | 0x0 | `9b54993e1ff9c52d5806121880ff685d` |
-| [firmware/GameHub_V3.41.bin](firmware/GameHub_V3.41.bin) | 0x10000 | `1a4214f96d2913165624d9fb08a240f5` |
+| [firmware/GameHub_V3.51_complet.bin](firmware/GameHub_V3.51_complet.bin) | 0x0 | `257ef16134a0f353573297fb56dfce68` |
+| [firmware/GameHub_V3.51.bin](firmware/GameHub_V3.51.bin) | 0x10000 | `037bbb9362b1a726782303af3dc35392` |
 
 Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB SPIFFS)** dans Outils → Partition Scheme.
 

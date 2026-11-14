@@ -39,7 +39,7 @@ def path_pos(kind, mirror, t):
 
 # formation (comme gNewWave : 5 rangees, meduses une place sur deux)
 types = [0, 1, 1, 2, 2]
-cols = max(4, min(20, (W - 6) // 11))
+cols = max(4, min(20, (W - 6) // 11 - 1))  # comme gCols : une colonne de moins, plus de balancement
 en = []
 for r, t in enumerate(types):
     for c in range(cols):

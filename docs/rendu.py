@@ -103,7 +103,7 @@ def game_frame(w, h, demo=False, stage=1, banner=False, seed=3):
         s.px(rnd.randrange(w), rnd.randrange(12, h), (g, g, g))
     tall = h >= 128
     types = [0, 0, 1, 1, 1, 2, 2] if h >= 256 else [0, 1, 1, 2, 2] if tall else [0, 1, 2]
-    cols = max(4, min(20, (w - 6) // 11))
+    cols = max(4, min(20, (w - 6) // 11 - 1))
     x0 = (w - cols * 11) // 2 + 1 + 2
     dead = {(r, c) for r in range(7) for c in range(cols) if rnd.random() < 0.18}
     for r, t in enumerate(types):

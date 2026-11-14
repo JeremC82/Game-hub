@@ -170,7 +170,7 @@ def reglage(kind):
 # ================================================================ mode demo (jeu simule, pilote automatique)
 def mode_demo():
     rnd = random.Random(5)
-    cols, types = 11, [0, 1, 1, 2, 2]
+    cols, types = 10, [0, 1, 1, 2, 2]
     en = [{'r': r, 'c': c, 't': t, 'st': 0, 'x': 0.0, 'y': 0.0, 'tt': 0, 'dir': 1, 'alive': True}
           for r, t in enumerate(types) for c in range(cols) if not (t == 0 and c % 2)]
     ship_x, shots, booms, bombs = 58.0, [], [], []
