@@ -121,7 +121,9 @@ void ps4Enable() {
 **
 *******************************************************************************/
 void ps4Cmd(ps4_cmd_t cmd) {
-  hid_cmd_t hidCommand = { .data = { 0x80, 0x00, 0xFF } };
+  // Game hub (modification, GPL-3) : 0x80 | 4 = rapports HID toutes les 4 ms (comme le pilote Linux) ;
+  // avec 0, la manette n'envoyait qu'environ un rapport toutes les 2 s et les appuis brefs etaient perdus.
+  hid_cmd_t hidCommand = { .data = { 0x80 | 4, 0x00, 0xFF } };
   uint16_t length = sizeof(hidCommand.data);
 
   hidCommand.code = hid_cmd_code_set_report | hid_cmd_code_type_output;

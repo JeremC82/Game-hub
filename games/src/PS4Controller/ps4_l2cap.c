@@ -304,10 +304,12 @@ volatile int ps4DbgPos = -2;  // position de l'entete 0xA1 trouvee (-1 : introuv
 volatile uint8_t ps4DbgType = 0;
 volatile uint8_t ps4DbgRaw[12];  // octets 13 a 24 du paquet recale
 volatile int ps4DbgLen = 0;
+volatile uint32_t ps4DbgCount = 0;  // paquets recus (le jeu affiche le nombre par seconde)
 static void ps4_l2cap_data_ind_cback(uint16_t l2cap_cid, BT_HDR *p_buf) {
   uint8_t *d = p_buf->data;
   int n = p_buf->offset + p_buf->length;
   int pos = -1;
+  ps4DbgCount++;
   if (p_buf->offset < n - 1 && d[p_buf->offset] == 0xA1 && (d[p_buf->offset + 1] == 0x11 || d[p_buf->offset + 1] == 0x01))
     pos = p_buf->offset;
   for (int i = 0; pos < 0 && i + 1 < n && i < 32; i++)

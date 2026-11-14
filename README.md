@@ -168,8 +168,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V2.11_complet.bin](firmware/GameHub_V2.11_complet.bin) | 0x0 | `1ad3162c3673835701022ebb20f43587` |
-| [firmware/GameHub_V2.11.bin](firmware/GameHub_V2.11.bin) | 0x10000 | `589bf6ae9b50c0546b70829a58e66876` |
+| [firmware/GameHub_V2.12_complet.bin](firmware/GameHub_V2.12_complet.bin) | 0x0 | `3fad0066bb4a45c9150f5265ff09615d` |
+| [firmware/GameHub_V2.12.bin](firmware/GameHub_V2.12.bin) | 0x10000 | `dbe5f0c888e69fc1745383268586e87a` |
 
 Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB SPIFFS)** dans Outils → Partition Scheme.
 
@@ -184,6 +184,8 @@ Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB S
 - **PS4Controller 1.1.0 :** une copie corrigée est incluse dans `games/src/PS4Controller/` (licence GPL-3, modification signalée dans `ps4_l2cap.c`).
   - Avec le core ESP32 2.0.17, la bibliothèque d'origine lisait les paquets de la manette décalés d'un octet : seul « haut » était détecté et la batterie était fausse.
   - La copie corrigée cherche l'en-tête du paquet avant de le lire.
+  - Elle demande aussi à la manette un rapport toutes les 4 ms. Avec 0, elle n'en envoyait qu'environ un toutes les 2 s, et les appuis brefs étaient perdus.
+  - Le jeu interdit enfin le mode veille Bluetooth (sniff). Le moniteur série affiche le nombre de paquets reçus par seconde.
 - **Plans, aperçus et GIF :** `python docs/branchement.py`, `python docs/rendu.py`, `python docs/gif_manette_ps4.py`, `python docs/gif_arrivee.py` (Pillow).
 
 L'ancienne version avec wifi, page web et manette ESP-NOW reste disponible dans l'historique Git, jusqu'au commit `fb11367`.

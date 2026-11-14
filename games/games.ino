@@ -27,8 +27,9 @@
 #include <esp_gap_bt_api.h>
 #include <driver/i2s.h>
 #include "game_types.h"
+extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "2.11"
+#define GAMES_VERSION "2.12"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -899,6 +900,8 @@ uint32_t brightSaveAt = 0;  // luminosite changee : enregistree 2 s plus tard
 void ps4Begin() {
   String mac = prefs.getString("ps4mac", "");
   bool ok = mac.length() == 17 ? PS4.begin(mac.c_str()) : PS4.begin();
+  // pas de mode veille Bluetooth (sniff) : sinon les rapports de la manette n'arrivent que toutes les 1 a 2 s
+  BTM_SetDefaultLinkPolicy(0x0001);  // HCI_ENABLE_MASTER_SLAVE_SWITCH seul (sniff, hold et park interdits)
   // anciens appairages gardes par l'ESP32 : cause connue de deconnexion juste apres la connexion
   int nb = esp_bt_gap_get_bond_device_num();
   if (nb > 0) {
@@ -918,6 +921,7 @@ extern "C" volatile int ps4DbgPos;
 extern "C" volatile uint8_t ps4DbgType;
 extern "C" volatile uint8_t ps4DbgRaw[12];
 extern "C" volatile int ps4DbgLen;
+extern "C" volatile uint32_t ps4DbgCount;
 void ps4Poll() {
   static bool dbgShown = false;
   if (!dbgShown && ps4DbgPos != -2) {  // diagnostic : debut du 1er paquet de la manette
@@ -946,8 +950,11 @@ void ps4Poll() {
   }
   if (millis() - lastLog > 2000) {  // diagnostic : etat toutes les 2 s
     lastLog = millis();
-    Serial.printf("  PS4 ok %lu s, batterie %u/15, memoire libre %u (min %u, bloc %u)\n", (millis() - since) / 1000, PS4.Battery(),
-                  ESP.getFreeHeap(), ESP.getMinFreeHeap(), ESP.getMaxAllocHeap());
+    static uint32_t lastCount = 0;
+    uint32_t cnt = ps4DbgCount;
+    Serial.printf("  PS4 ok %lu s, %lu paquets/s, batterie %u/15, memoire libre %u (min %u, bloc %u)\n", (millis() - since) / 1000,
+                  (unsigned long)((cnt - lastCount) / 2), PS4.Battery(), ESP.getFreeHeap(), ESP.getMinFreeHeap(), ESP.getMaxAllocHeap());
+    lastCount = cnt;
   }
   static bool stable = false;
   if (!stable && millis() - since > 15000) {  // connexion stable : les couleurs choisies tiennent
