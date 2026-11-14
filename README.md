@@ -4,6 +4,10 @@ Le shoot'em up du mode Jeu du VU-mètre, jouable de deux façons :
 - depuis une **page web** (téléphone, tablette, PC) ;
 - avec une **manette ESP32**, un 2ᵉ ESP32 avec des boutons qui parle directement au jeu par radio ESP-NOW. Il n'y a besoin ni de box ni de page web.
 
+![Le jeu sur les 3 configurations de dalles](docs/rendu.png)
+
+*Aperçu simulé (généré par `docs/rendu.py`, mêmes sprites que le jeu). Chaque configuration en grand : [128x128](docs/rendu-128x128.png), [256x64](docs/rendu-256x64.png), [256x128](docs/rendu-256x128.png).*
+
 ## Écrans
 
 Choix dans la page web (Réglages → Écran). Le choix est gardé en mémoire et l'ESP32 redémarre.
@@ -15,6 +19,8 @@ Choix dans la page web (Réglages → Écran). Le choix est gardé en mémoire e
 | 256x128 | 4 | haut gauche → haut droite → bas gauche → bas droite, toutes dans le même sens |
 
 Brochage identique à l'horloge ClockV1 et au VU-mètre.
+
+![Branchement des dalles](docs/branchement-dalles.png)
 
 La profondeur de couleur est choisie au démarrage : la plus haute qui laisse assez de mémoire au wifi, entre 6 et 3 bits. En 256x128, on aura probablement 3 bits. Si même 3 bits ne passe pas, l'ESP32 revient tout seul en 128x128.
 
@@ -50,6 +56,8 @@ Sketch : [manette/manette.ino](manette/manette.ino). Il marche sur n'importe que
 | Feu (2ᵉ bouton, ou bouton du joystick) | 26 |
 | LED de la carte | 2 : clignote = recherche du jeu, allumée = reliée |
 
+![Branchement de la manette](docs/branchement-manette.png)
+
 En option, un joystick analogique (module KY-023) : axe X sur GPIO 34, alimenté en 3,3 V. Mets `#define JOYSTICK 1` dans manette.ino.
 
 **Fonctionnement (ESP-NOW, la radio directe d'Espressif entre ESP32) :**
@@ -61,6 +69,17 @@ En option, un joystick analogique (module KY-023) : axe X sur GPIO 34, alimenté
 
 Pourquoi pas le Bluetooth : sa pile prend 50 à 100 Ko de RAM, ce qui ne tient pas avec la mémoire des dalles. ESP-NOW passe par la radio wifi déjà active et ne coûte presque rien.
 
+## Firmware
+
+Binaires prêts à flasher sur un ESP32 classique, à l'adresse 0x10000 :
+
+| Fichier | Rôle | MD5 |
+|---|---|---|
+| [firmware/Games_V1.00.bin](firmware/Games_V1.00.bin) | le jeu, pour l'ESP32 des dalles | `81553beeffc47d9e5dc4a5f807cdd8ef` |
+| [firmware/Manette_V1.00.bin](firmware/Manette_V1.00.bin) | la manette ESP-NOW | `598ccc714d7c450ee49a337ae10b483b` |
+
+Le jeu publié ne contient aucun réseau wifi. Au premier démarrage, règle le wifi avec le réseau **Games-Setup**. Pour intégrer tes propres réseaux, crée `games/secrets.h` et recompile.
+
 ## Compilation
 
 ```powershell
@@ -69,6 +88,8 @@ Pourquoi pas le Bluetooth : sa pile prend 50 à 100 Ko de RAM, ce qui ne tient p
 ```
 
 Avec arduino-cli, pour un ESP32 classique sur le core 2.0.17.
+
+Plans et aperçus : `python docs/branchement.py` et `python docs/rendu.py` (Pillow).
 
 Le script utilise les bibliothèques de l'horloge : ESP32-HUB75-MatrixPanel-I2S-DMA, Adafruit GFX, ESPAsyncWebServer, AsyncTCP et WiFiManager.
 
