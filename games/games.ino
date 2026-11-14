@@ -29,7 +29,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "2.18"
+#define GAMES_VERSION "2.20"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -114,6 +114,10 @@ bool menuScores = false;            // page des meilleurs scores affichee
 #define TOP_N 5
 HiScore gBest[TOP_N];                // meilleurs scores (gardes en memoire)
 uint8_t gLastRank = 0;              // place obtenue a la derniere partie (0 : hors tableau)
+bool gNameEntry = false;            // saisie du nom apres un score qui entre au tableau
+char gName[4] = "AAA";              // nom en cours de saisie (3 lettres)
+uint8_t gNamePos = 0;               // lettre en cours (0 a 2)
+const char NAME_CHARS[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 -";
 #define IDLE_TO_DEMO_MS 60000UL     // partie abandonnee : retour a la demo apres 1 min sans appui
 char ipText[20] = "";  // adresse Bluetooth de l'ESP32, affichee pendant la demo
 
@@ -254,6 +258,11 @@ void audioBegin() {
   return;
 #endif
   volume = constrain(prefs.getUChar("vol", 6), 0, 10);
+  // le son tourne sur le coeur 0 (pilote I2S installe depuis ce coeur : ses interruptions y restent) ;
+  // le coeur 1 reste au jeu et aux interruptions Bluetooth de la manette
+  xTaskCreatePinnedToCore(audioStart, "son", 4096, NULL, 1, NULL, 0);
+}
+void audioStart(void *) {
   i2s_config_t cfg = {};
   cfg.mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX);
   cfg.sample_rate = SND_RATE;
@@ -271,11 +280,12 @@ void audioBegin() {
   pins.data_in_num = I2S_PIN_NO_CHANGE;
   if (i2s_driver_install(I2S_NUM_0, &cfg, 0, NULL) != ESP_OK || i2s_set_pin(I2S_NUM_0, &pins) != ESP_OK) {
     Serial.println("Son : I2S indisponible");
+    vTaskDelete(NULL);
     return;
   }
-  xTaskCreatePinnedToCore(audioTask, "son", 3072, NULL, 1, NULL, 1);  // meme priorite que le jeu
-  Serial.printf("Son : ampli I2S (BCLK %d, LRC %d, DIN %d), volume %u/10, memoire libre %u\n", SND_BCLK, SND_LRC, SND_DIN, volume,
-                ESP.getFreeHeap());
+  Serial.printf("Son : ampli I2S (BCLK %d, LRC %d, DIN %d) sur le coeur %d, volume %u/10, memoire libre %u\n", SND_BCLK, SND_LRC, SND_DIN,
+                xPortGetCoreID(), volume, ESP.getFreeHeap());
+  audioTask(NULL);  // ne revient jamais
 }
 
 // ---------------------------------------------------------------- jeu : shoot'em up d'arcade (repris du VU-metre)
@@ -504,13 +514,30 @@ bool gFire() {
 int gEffDiff() { return gDemo ? 1 : gDiff; }  // la demo joue en normal
 
 // meilleurs scores : chargement (ancien record repris) et ajout en fin de partie
+void setBest(HiScore &h, uint32_t score, uint8_t stage, uint8_t diff, const char *name) {  // remplit une ligne du tableau
+  h.score = score;
+  h.stage = stage;
+  h.diff = diff;
+  strncpy(h.name, name, 3);
+  h.name[3] = 0;
+}
 void topLoad() {
   memset(gBest, 0, sizeof(gBest));
-  if (!prefs.isKey("top") || prefs.getBytes("top", gBest, sizeof(gBest)) != sizeof(gBest)) {  // 1er lancement : pas encore de tableau
-    memset(gBest, 0, sizeof(gBest));
-    gBest[0] = { prefs.getUInt("hiscore", 0), 0, 1 };
+  size_t len = prefs.isKey("top") ? prefs.getBytesLength("top") : 0;
+  if (len == sizeof(gBest)) {
+    prefs.getBytes("top", gBest, sizeof(gBest));
+  } else if (len == sizeof(HiScoreV1) * TOP_N) {  // ancien tableau sans noms : repris avec le nom "---"
+    HiScoreV1 old[TOP_N];
+    prefs.getBytes("top", old, sizeof(old));
+    for (int i = 0; i < TOP_N; i++) setBest(gBest[i], old[i].score, old[i].stage, old[i].diff, "---");
+  } else {  // 1er lancement : ancien record seul
+    setBest(gBest[0], prefs.getUInt("hiscore", 0), 0, 1, "---");
   }
+  for (auto &b : gBest) b.name[3] = 0;
   gHi = gBest[0].score;
+  String last = prefs.getString("lastname", "AAA");  // dernier nom saisi, propose la fois suivante
+  for (int i = 0; i < 3; i++) gName[i] = i < (int)last.length() ? last[i] : 'A';
+  gName[3] = 0;
 }
 void topAdd() {
   gLastRank = 0;
@@ -519,7 +546,7 @@ void topAdd() {
   while (pos > 0 && gScore > gBest[pos - 1].score) pos--;
   if (pos >= TOP_N) return;
   for (int i = TOP_N - 1; i > pos; i--) gBest[i] = gBest[i - 1];
-  gBest[pos] = { gScore, (uint8_t)min(gWave, 255), gDiff };
+  setBest(gBest[pos], gScore, (uint8_t)min(gWave, 255), gDiff, "---");  // nom saisi juste apres
   prefs.putBytes("top", gBest, sizeof(gBest));
   gLastRank = pos + 1;
   gHi = gBest[0].score;
@@ -654,6 +681,7 @@ void gameStep() {
         }
   } else if (--gDead == 0 && gLives <= 0) {
     if (gDemo) gReset();  // demo : on recommence
+    else if (gLastRank) startNameEntry();  // score au tableau : saisie du nom
     else toDemo();        // fin de partie du joueur : retour a la demo
   }
   for (auto &s : gShot) {  // tirs du vaisseau
@@ -809,8 +837,10 @@ void drawMenu() {
     gBox(y - 5, tall ? y + (n + 1) * step + 18 : y + n * step + 13);
     gText(y, "MEILLEURS SCORES", sel);
     for (int i = 0; i < n; i++) {
-      if (gBest[i].score) snprintf(b, sizeof(b), "%d %6lu %c S%u", i + 1, (unsigned long)gBest[i].score, DIFF_NAME[gBest[i].diff % 3][0], gBest[i].stage);
-      else snprintf(b, sizeof(b), "%d      -     ", i + 1);
+      if (gBest[i].score)
+        snprintf(b, sizeof(b), "%d %-3s %6lu %c S%u", i + 1, gBest[i].name, (unsigned long)gBest[i].score, DIFF_NAME[gBest[i].diff % 3][0],
+                 gBest[i].stage);
+      else snprintf(b, sizeof(b), "%d ---      -      ", i + 1);
       gText(y + (i + 1) * step + 2, b, i == 0 ? rgb(230, 230, 230) : off);
     }
     if (tall) gText(y + (n + 1) * step + 6, "X : RETOUR", dim);
@@ -857,7 +887,7 @@ void gOverlay() {
     if (gLifeUp) gText(yy, "VIE +1", rgb(0, 220, 255));
   }
   if (!gDemo) return;
-  if (PS4.isConnected() && !gAttract) { drawMenu(); return; }  // manette la : menu par-dessus la demo
+  if (PS4.isConnected() && !gAttract) return;  // manette la : le menu a son propre ecran (menuScreen)
   if (PS4.isConnected()) {  // mode demo : le menu revient au premier appui
     if ((gFrame / 40) & 1) gText(H / 2 + 6, "DEMO", rgb(255, 220, 0));
     else gText(H / 2 + 6, "APPUIE : MENU", rgb(0, 220, 255));
@@ -895,6 +925,113 @@ void toDemo() {
   gReset();
 }
 
+// Ecran du menu : fond d'etoiles qui defile, titre GAME HUB, record, puis le menu.
+// La demo ne tourne plus derriere (sprites, annonces et scores de la demo melanges au menu).
+void menuScreen() {
+  gFrame++;
+  for (int i = 0; i < gNStar; i++) {  // etoiles qui defilent doucement
+    GStar &s = gStar[i];
+    s.y += s.v * 0.5f;
+    if (s.y >= H) { s.y = 0; s.x = random(W); }
+  }
+  if (gOverflow) { gOverflow = false; gNOld = 0; gfx->fillScreen(0); }
+  for (int i = 0; i < gNOld; i++) {  // efface l'image precedente
+    GRect &rc = gOld[i];
+    int x0 = max(0, (int)rc.x), y0 = max(0, (int)rc.y), x1 = min(W, rc.x + rc.w), y1 = min(H, rc.y + rc.h);
+    if (x1 > x0 && y1 > y0) gfx->fillRect(x0, y0, x1 - x0, y1 - y0, 0);
+  }
+  gNOld = 0;
+  for (int i = 0; i < gNStar; i++) {
+    GStar &s = gStar[i];
+    if (((gFrame + i * 7) & 31) < 3) continue;
+    uint8_t gr = 70 + s.v * 120;
+    gPix(s.x, (int)s.y, rgb(gr, gr, gr));
+  }
+  gfx->setFont(NULL);
+  if (H >= 128 && !menuScores && !gNameEntry) {  // titre et record au-dessus du menu
+    int ty = H / 2 - 50;
+    gfx->setTextSize(2);
+    gfx->setTextColor(rgb(255, 220, 0));
+    int tw = 8 * 12;
+    gfx->setCursor((W - tw) / 2, ty);
+    gfx->print("GAME HUB");
+    gMark((W - tw) / 2, ty, tw, 16);
+    gfx->setTextSize(1);
+    char b[24];
+    snprintf(b, sizeof(b), "RECORD %lu %s", (unsigned long)gHi, gBest[0].score ? gBest[0].name : "");
+    gText(ty + 19, b, rgb(255, 40, 40));
+  }
+  gfx->setTextSize(1);
+  if (gNameEntry) drawNameEntry();
+  else drawMenu();
+}
+
+// saisie du nom (3 lettres, facon borne d'arcade) apres un score qui entre au tableau
+void startNameEntry() {
+  gNameEntry = true;
+  gNamePos = 0;
+  gPaused = false;
+  lastInput = millis();
+  sndMelody(JINGLE_STAGE, 4);
+}
+void finishNameEntry() {
+  gNameEntry = false;
+  if (gLastRank) {
+    memcpy(gBest[gLastRank - 1].name, gName, 4);
+    prefs.putBytes("top", gBest, sizeof(gBest));
+    prefs.putString("lastname", gName);
+  }
+  toDemo();
+  menuScores = true;  // on montre le tableau avec le nouveau nom
+  lastInput = millis();
+}
+void drawNameEntry() {
+  bool tall = H >= 128;
+  int y = tall ? H / 2 - 40 : 6;
+  gBox(y - 6, tall ? y + 74 : y + 54);
+  char b[24];
+  if (gLastRank == 1) snprintf(b, sizeof(b), "NOUVEAU RECORD !");
+  else snprintf(b, sizeof(b), "BRAVO ! RANG %u", gLastRank);
+  gText(y, b, rgb(255, 220, 0));
+  snprintf(b, sizeof(b), "SCORE %lu", (unsigned long)gScore);
+  gText(y + 11, b, rgb(230, 230, 230));
+  int ly = y + (tall ? 26 : 22), lx = (W - 44) / 2;  // 3 grandes lettres (taille 2)
+  gfx->setTextSize(2);
+  for (int i = 0; i < 3; i++) {
+    gfx->setTextColor(i == gNamePos ? rgb(255, 220, 0) : rgb(0, 220, 255));
+    gfx->setCursor(lx + i * 16, ly);
+    gfx->print(gName[i]);
+  }
+  gfx->setTextSize(1);
+  gMark(lx, ly, 44, 16);
+  if ((gFrame / 10) & 1) {  // curseur qui clignote sous la lettre en cours
+    gfx->fillRect(lx + gNamePos * 16, ly + 17, 10, 2, rgb(255, 220, 0));
+  }
+  gMark(lx, ly + 17, 44, 2);
+  if (tall) {
+    gText(y + 50, "HAUT/BAS : LETTRE", rgb(110, 110, 130));
+    gText(y + 61, "OPTIONS : VALIDER", rgb(110, 110, 130));
+  } else {
+    gText(y + 42, "OPTIONS: VALIDER", rgb(110, 110, 130));
+  }
+}
+// croix haut / bas : lettre ; gauche / droite ou X : lettre precedente / suivante ; rond : retour ; OPTIONS : valider
+void nameInput(uint8_t edge) {
+  if (!edge) return;
+  int n = strlen(NAME_CHARS);
+  const char *p = strchr(NAME_CHARS, gName[gNamePos]);
+  int c = p ? p - NAME_CHARS : 0;
+  if (edge & 1) { gName[gNamePos] = NAME_CHARS[(c + 1) % n]; sfxMenu(); }
+  if (edge & 2) { gName[gNamePos] = NAME_CHARS[(c + n - 1) % n]; sfxMenu(); }
+  if (edge & (4 | 32)) { if (gNamePos > 0) gNamePos--; sfxMenu(); }
+  if (edge & 8) { if (gNamePos < 2) gNamePos++; sfxMenu(); }
+  if (edge & 16) {  // X : lettre suivante, ou valider sur la derniere
+    if (gNamePos < 2) { gNamePos++; sfxMenu(); }
+    else { finishNameEntry(); return; }
+  }
+  if (edge & 64) finishNameEntry();
+}
+
 void gameUpdate() {
   uint32_t now = millis();
   if (now - gLastStep < 25) return;  // 40 images par seconde
@@ -903,6 +1040,13 @@ void gameUpdate() {
     startReq = false;
     if (gDemo || (gLives <= 0)) startGame();
   }
+  if (gNameEntry) {  // saisie du nom : ecran a part (60 s sans toucher : nom valide tel quel)
+    static bool shown = false;
+    if (!shown) { shown = true; gfx->fillScreen(0); gNOld = 0; }
+    if (now - lastInput > 60000UL) finishNameEntry();
+    else { menuScreen(); return; }
+    shown = false;
+  }
   if (gPaused) {  // pause : l'image reste figee
     gameDraw();
     gOverlay();
@@ -910,6 +1054,16 @@ void gameUpdate() {
   }
   if (!gDemo && now - lastInput > IDLE_TO_DEMO_MS) toDemo();
   if (gDemo && !gAttract && now - lastInput > MENU_IDLE_MS) { gAttract = true; menuScores = false; }  // menu sans activite
+  // changement d'ecran (menu / demo / partie) : on efface tout, aucun reste de l'ecran precedent
+  bool menuMode = gDemo && PS4.isConnected() && !gAttract;
+  static int lastScreen = -1;
+  int screen = menuMode ? 0 : gDemo ? 1 : 2;  // (saisie du nom : ecran 3, gere plus haut)
+  if (screen != lastScreen) {
+    lastScreen = screen;
+    gfx->fillScreen(0);
+    gNOld = 0;
+  }
+  if (menuMode) { menuScreen(); return; }
   gameStep();
   gameDraw();
   gOverlay();
@@ -1018,7 +1172,8 @@ void ps4Poll() {
   uint8_t edge = bt & ~prevB;
   prevB = bt;
   if (edge) lastInput = millis();
-  if (gDemo && gAttract) {  // mode demo : n'importe quel bouton ou le stick fait revenir le menu (sans autre effet)
+  if (gNameEntry) nameInput(edge);  // saisie du nom
+  else if (gDemo && gAttract) {  // mode demo : n'importe quel bouton ou le stick fait revenir le menu (sans autre effet)
     if (edge || k) { gAttract = false; lastInput = millis(); sfxMenu(); prevB = 0xFF; }
   } else if (gDemo) menuInput(edge);
   else if (edge & 64 && gLives > 0) { gPaused = !gPaused; sfxMenu(); }  // OPTIONS : pause / reprise
@@ -1026,7 +1181,8 @@ void ps4Poll() {
     gPaused = false;
     topAdd();
     sfxMenu();
-    toDemo();
+    if (gLastRank) startNameEntry();
+    else toDemo();
   }
   if (PS4.Share() && (PS4.Up() || PS4.Down()) && millis() - lastBr > 150) {  // Share + croix haut / bas : luminosite
     lastBr = millis();

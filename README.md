@@ -14,7 +14,7 @@ Premier jeu : un **shoot'em up** original, repris du mode Jeu du VU-mètre. Il a
 
 ## Menu
 
-Sans partie en cours, le jeu tourne tout seul en démo, sans son. **Sans manette connectée**, la démo affiche « DEMO » et une petite indication, « MANETTE : BOUTON PS », avec l'adresse Bluetooth de l'ESP32. Dès que la manette est connectée, un menu s'affiche par-dessus :
+Sans partie en cours, le jeu tourne tout seul en démo, sans son. **Sans manette connectée**, la démo affiche « DEMO » et une petite indication, « MANETTE : BOUTON PS », avec l'adresse Bluetooth de l'ESP32. Dès que la manette est connectée, le menu s'affiche **sur son propre écran**, sans la démo derrière. On y voit un fond d'étoiles, le titre GAME HUB et le record avec le nom de son détenteur :
 
 ![Menu et meilleurs scores](docs/rendu-menu.png)
 
@@ -22,14 +22,21 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. **Sans manette
 |---|---|
 | **JOUER** | lance la partie |
 | **NIVEAU** | Facile / Normal / Difficile (gauche / droite ou ✕), choix gardé en mémoire |
-| **SCORES** | les 5 meilleurs scores : rang, score, niveau (F/N/D) et stage atteint |
+| **SCORES** | les 5 meilleurs scores : rang, **nom**, score, niveau (F/N/D) et stage atteint |
 | **DEMO** | cache le menu : le jeu tourne tout seul, avec « DEMO » qui clignote |
 
 - **Navigation :** la croix haut / bas choisit la ligne, ✕ valide.
 - **OPTIONS** (le « START » de la manette PS4) lance la partie depuis n'importe quelle ligne.
 - **Mode démo :** au bout de **30 s sans toucher la manette**, le menu se cache et la démo tourne seule. Le premier appui sur un bouton, ou un mouvement du stick, fait revenir le menu, sans autre effet.
 - **En partie, OPTIONS met en pause** : OPTIONS reprend la partie, **○ (rond) revient au menu**. Si ton score entre dans les 5 meilleurs, il est enregistré.
-- **Fin de partie :** « GAME OVER » s'affiche, avec « NOUVEAU RECORD ! » ou ton rang si tu entres dans le tableau. Le jeu revient ensuite au menu, puis passe en mode démo après 30 s.
+- **Fin de partie :** « GAME OVER » s'affiche. Le jeu revient ensuite au menu, puis passe en mode démo après 30 s.
+- **Saisie du nom :** si ton score entre dans les 5 meilleurs, un écran affiche « NOUVEAU RECORD ! » (ou « BRAVO ! RANG n ») puis **3 grandes lettres** à choisir, comme sur une borne d'arcade.
+  - Croix haut / bas : change la lettre (A à Z, chiffres, espace, tiret).
+  - Gauche / droite, ou ✕ : passe à la lettre précédente ou suivante.
+  - ○ : revient à la lettre précédente.
+  - OPTIONS : valide. ✕ sur la dernière lettre valide aussi.
+  - Le dernier nom saisi est proposé la fois suivante.
+  - Après validation, le tableau des scores s'affiche avec ton nom. Sans appui pendant 60 s, le nom est validé tel quel.
 
 | Niveau | Vies au départ | Ennemis |
 |---|---|---|
@@ -107,7 +114,7 @@ La commande `a` seule rend à l'ESP32 son adresse d'origine.
 
 ## Son (option)
 
-> En V2.17, sans son, la manette ne perdait plus de paquets. La V2.18 réactive le son avec un calcul qui ne bloque plus les interruptions. Si la manette redevient lente, mets `#define SON_ACTIF 0` dans games.ino pour couper le son.
+> En V2.17, sans son, la manette ne perdait plus de paquets. Depuis la V2.18, le son est calculé sans bloquer les interruptions. Depuis la V2.19, il tourne en plus sur le cœur 0 de l'ESP32, à l'écart du jeu et du Bluetooth de la manette. Si la manette redevient lente, mets `#define SON_ACTIF 0` dans games.ino pour couper le son.
 
 Module **ampli I2S MAX98357A**, par exemple [Adafruit MAX98357A, réf. 3006](https://www.adafruit.com/product/3006). On trouve aussi des modules compatibles en cherchant « MAX98357A I2S ». Il faut y ajouter un **haut-parleur de 3 W, 4 ou 8 Ω** (40 à 50 mm).
 
@@ -172,8 +179,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V2.18_complet.bin](firmware/GameHub_V2.18_complet.bin) | 0x0 | `7e34c51db216cbff5d051c22ef002f2e` |
-| [firmware/GameHub_V2.18.bin](firmware/GameHub_V2.18.bin) | 0x10000 | `c3becfc70fff48511100d13d6286c8c2` |
+| [firmware/GameHub_V2.20_complet.bin](firmware/GameHub_V2.20_complet.bin) | 0x0 | `7cc791b8966606812c85a3ea507c4f78` |
+| [firmware/GameHub_V2.20.bin](firmware/GameHub_V2.20.bin) | 0x10000 | `5d80a620b654c06c46f4d1d1a0236356` |
 
 Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB SPIFFS)** dans Outils → Partition Scheme.
 
