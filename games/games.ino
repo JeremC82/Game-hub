@@ -23,12 +23,12 @@
 #include <Preferences.h>
 #include <ESP32-HUB75-MatrixPanel-I2S-DMA.h>
 #include <Adafruit_GFX.h>
-#include <PS4Controller.h>
+#include "src/PS4Controller/PS4Controller.h"  // copie corrigee de PS4Controller 1.1.0 (GPL-3), voir ps4_l2cap.c
 #include <esp_gap_bt_api.h>
 #include <driver/i2s.h>
 #include "game_types.h"
 
-#define GAMES_VERSION "2.07"
+#define GAMES_VERSION "2.10"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -482,7 +482,7 @@ int gEffDiff() { return gDemo ? 1 : gDiff; }  // la demo joue en normal
 // meilleurs scores : chargement (ancien record repris) et ajout en fin de partie
 void topLoad() {
   memset(gBest, 0, sizeof(gBest));
-  if (prefs.getBytes("top", gBest, sizeof(gBest)) != sizeof(gBest)) {
+  if (!prefs.isKey("top") || prefs.getBytes("top", gBest, sizeof(gBest)) != sizeof(gBest)) {  // 1er lancement : pas encore de tableau
     memset(gBest, 0, sizeof(gBest));
     gBest[0] = { prefs.getUInt("hiscore", 0), 0, 1 };
   }
@@ -812,7 +812,14 @@ void gOverlay() {
     if (gLastRank == 1) gText(H / 2 + 8, "NOUVEAU RECORD !", rgb(255, 220, 0));
     else if (gLastRank) { char b[12]; snprintf(b, sizeof(b), "RANG %u", gLastRank); gText(H / 2 + 8, b, rgb(0, 220, 255)); }
   }
-  if (gPaused) gTextBg(H / 2 - 4, "PAUSE", rgb(255, 220, 0));
+  if (gPaused) {  // pause : reprendre ou revenir au menu
+    bool tall = H >= 128;
+    int y = tall ? H / 2 - 14 : H / 2 - 12;
+    gBox(y - 6, y + (tall ? 38 : 32));
+    gText(y, "PAUSE", rgb(255, 220, 0));
+    gText(y + (tall ? 13 : 11), tall ? "OPTIONS : REPRENDRE" : "OPTIONS: REPRENDRE", rgb(0, 160, 200));
+    gText(y + (tall ? 24 : 21), "ROND : MENU", rgb(0, 160, 200));
+  }
   if (gStageT > 0 && gLives > 0) {  // annonce du stage, bonus et nouvelle arme
     char b[20];
     int y = H >= 128 ? H / 2 - 22 : H / 2 - 10;
@@ -906,7 +913,17 @@ void ps4Begin() {
 }
 
 // lecture de la manette a chaque tour de boucle ; barre lumineuse selon le stage, vibration quand on est touche
+extern "C" uint8_t ps4DbgHdr[24];
+extern "C" volatile int ps4DbgPos;
+extern "C" volatile uint8_t ps4DbgType;
 void ps4Poll() {
+  static bool dbgShown = false;
+  if (!dbgShown && ps4DbgPos != -2) {  // diagnostic : debut du 1er paquet de la manette
+    dbgShown = true;
+    Serial.printf("1er paquet manette : entete 0xA1 en position %d, rapport 0x%02X, octets :", ps4DbgPos, ps4DbgType);
+    for (int i = 0; i < 24; i++) Serial.printf(" %02X", ps4DbgHdr[i]);
+    Serial.println();
+  }
   static bool was = false;
   static int lastTier = -2;
   static uint32_t rumbleOff = 0, lastBr = 0, combo = 0, lastLog = 0, since = 0;
@@ -969,7 +986,13 @@ void ps4Poll() {
   if (gDemo && gAttract) {  // mode demo : n'importe quel bouton ou le stick fait revenir le menu (sans autre effet)
     if (edge || k) { gAttract = false; lastInput = millis(); sfxMenu(); prevB = 0xFF; }
   } else if (gDemo) menuInput(edge);
-  else if (edge & 64 && gLives > 0) { gPaused = !gPaused; sfxMenu(); }  // START : pause / reprise
+  else if (edge & 64 && gLives > 0) { gPaused = !gPaused; sfxMenu(); }  // OPTIONS : pause / reprise
+  else if (gPaused && (edge & 32)) {  // pause + rond : on quitte la partie (score enregistre s'il entre au tableau)
+    gPaused = false;
+    topAdd();
+    sfxMenu();
+    toDemo();
+  }
   if (PS4.Share() && (PS4.Up() || PS4.Down()) && millis() - lastBr > 150) {  // Share + croix haut / bas : luminosite
     lastBr = millis();
     bright = constrain(bright + (PS4.Up() ? 15 : -15), 5, 255);

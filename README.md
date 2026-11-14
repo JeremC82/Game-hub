@@ -28,7 +28,7 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. **Sans manette
 - **Navigation :** la croix haut / bas choisit la ligne, ✕ valide.
 - **OPTIONS** (le « START » de la manette PS4) lance la partie depuis n'importe quelle ligne.
 - **Mode démo :** au bout de **30 s sans toucher la manette**, le menu se cache et la démo tourne seule. Le premier appui sur un bouton, ou un mouvement du stick, fait revenir le menu, sans autre effet.
-- **En partie, OPTIONS met en pause**, et un 2ᵉ appui reprend.
+- **En partie, OPTIONS met en pause** : OPTIONS reprend la partie, **○ (rond) revient au menu**. Si ton score entre dans les 5 meilleurs, il est enregistré.
 - **Fin de partie :** « GAME OVER » s'affiche, avec « NOUVEAU RECORD ! » ou ton rang si tu entres dans le tableau. Le jeu revient ensuite au menu, puis passe en mode démo après 30 s.
 
 | Niveau | Vies au départ | Ennemis |
@@ -81,6 +81,7 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. **Sans manette
 | stick gauche ou croix haut / bas | avancer / reculer (dans le bas de l'écran, environ 45 %) |
 | croix, rond, carré, triangle, R1, L1 ou R2 | tirer |
 | OPTIONS | jouer depuis le menu, pause en partie |
+| ○ (rond), pendant la pause | quitter la partie et revenir au menu |
 | croix haut / bas, au menu | choisir la ligne |
 | Share + croix haut / bas | luminosité (enregistrée) |
 | Share + Options pendant 3 s | redémarrer l'ESP32 |
@@ -167,8 +168,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V2.07_complet.bin](firmware/GameHub_V2.07_complet.bin) | 0x0 | `eeda9af81fa69d23d5ee1e56a0d9e27f` |
-| [firmware/GameHub_V2.07.bin](firmware/GameHub_V2.07.bin) | 0x10000 | `27a17922b9a7036d780b78a86f878f22` |
+| [firmware/GameHub_V2.10_complet.bin](firmware/GameHub_V2.10_complet.bin) | 0x0 | `61a6eb555acec73aeb0406a297f383fe` |
+| [firmware/GameHub_V2.10.bin](firmware/GameHub_V2.10.bin) | 0x10000 | `19cc5db224dbbaf104150cf5321034a1` |
 
 Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB SPIFFS)** dans Outils → Partition Scheme.
 
@@ -179,7 +180,10 @@ Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB S
                # -> GameHub_V<version>.bin et GameHub_V<version>_complet.bin
 ```
 
-- **Bibliothèques :** ESP32-HUB75-MatrixPanel-I2S-DMA, Adafruit GFX et PS4Controller 1.1.0.
+- **Bibliothèques :** ESP32-HUB75-MatrixPanel-I2S-DMA et Adafruit GFX.
+- **PS4Controller 1.1.0 :** une copie corrigée est incluse dans `games/src/PS4Controller/` (licence GPL-3, modification signalée dans `ps4_l2cap.c`).
+  - Avec le core ESP32 2.0.17, la bibliothèque d'origine lisait les paquets de la manette décalés d'un octet : seul « haut » était détecté et la batterie était fausse.
+  - La copie corrigée cherche l'en-tête du paquet avant de le lire.
 - **Plans, aperçus et GIF :** `python docs/branchement.py`, `python docs/rendu.py`, `python docs/gif_manette_ps4.py`, `python docs/gif_arrivee.py` (Pillow).
 
 L'ancienne version avec wifi, page web et manette ESP-NOW reste disponible dans l'historique Git, jusqu'au commit `fb11367`.
