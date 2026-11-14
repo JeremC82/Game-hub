@@ -20,6 +20,21 @@
 
 static void ps4_l2cap_init_service(const char *name, uint16_t psm, uint8_t security_id);
 static void ps4_l2cap_deinit_service(const char *name, uint16_t psm);
+/* Game hub (modification, GPL-3) : quelques secondes apres la connexion, le lien passait en veille
+   Bluetooth (sniff) et la manette n'arrivait plus qu'a ~1 rapport/s. On interdit la veille sur ce lien
+   et on le force en mode actif des le premier rapport recu (fonctions internes de Bluedroid). */
+typedef struct { uint16_t max, min, attempt, timeout; uint8_t mode; } gh_pm_pwr_md_t;  // = tBTM_PM_PWR_MD
+extern uint8_t BTM_SetPowerMode(uint8_t pm_id, BD_ADDR remote_bda, gh_pm_pwr_md_t *p_mode);
+extern uint8_t BTM_SetLinkPolicy(BD_ADDR remote_bda, uint16_t *settings);
+static BD_ADDR ps4PeerAddr;
+static volatile int ps4PmDone = 0;
+volatile int ps4DbgPmPolicy = -1, ps4DbgPmMode = -1;  // codes retour (0 = ok), affiches par le jeu
+static void ps4ForceActive(void) {
+  uint16_t policy = 0x0001;  // changement de role seul : sniff, hold et park interdits
+  gh_pm_pwr_md_t md = { 0, 0, 0, 0, 0x00 };  // BTM_PM_MD_ACTIVE
+  ps4DbgPmPolicy = BTM_SetLinkPolicy(ps4PeerAddr, &policy);
+  ps4DbgPmMode = BTM_SetPowerMode(0x80 /* BTM_PM_SET_ONLY_ID */, ps4PeerAddr, &md);
+}
 static void ps4_l2cap_connect_ind_cback(BD_ADDR bd_addr, uint16_t l2cap_cid, uint16_t psm, uint8_t l2cap_id);
 static void ps4_l2cap_connect_cfm_cback(uint16_t l2cap_cid, uint16_t result);
 static void ps4_l2cap_config_ind_cback(uint16_t l2cap_cid, tL2CAP_CFG_INFO *p_cfg);
@@ -180,6 +195,8 @@ static void ps4_l2cap_deinit_service(const char *name, uint16_t psm) {
 **
 *******************************************************************************/
 static void ps4_l2cap_connect_ind_cback(BD_ADDR bd_addr, uint16_t l2cap_cid, uint16_t psm, uint8_t l2cap_id) {
+  memcpy(ps4PeerAddr, bd_addr, 6);  // Game hub : adresse de la manette (lien force en mode actif ensuite)
+  ps4PmDone = 0;
   ESP_LOGI(PS4_TAG, "[%s] bd_addr: %s\n  l2cap_cid: 0x%02x\n  psm: %d\n  id: %d", __func__, bd_addr, l2cap_cid, psm, l2cap_id);
 
   /* Send connection pending response to the L2CAP layer. */
@@ -311,6 +328,7 @@ static void ps4_l2cap_data_ind_cback(uint16_t l2cap_cid, BT_HDR *p_buf) {
   int n = p_buf->offset + p_buf->length;
   int pos = -1;
   ps4DbgCount++;
+  if (ps4PmDone == 0 || (ps4PmDone < 4 && (ps4DbgCount & 255) == 0)) { ps4PmDone++; ps4ForceActive(); }  // 1er paquet puis 3 rappels
   if (p_buf->offset < n - 1 && d[p_buf->offset] == 0xA1 && (d[p_buf->offset + 1] == 0x11 || d[p_buf->offset + 1] == 0x01))
     pos = p_buf->offset;
   for (int i = 0; pos < 0 && i + 1 < n && i < 32; i++)

@@ -29,7 +29,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "2.14"
+#define GAMES_VERSION "2.15"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -923,6 +923,7 @@ extern "C" volatile uint8_t ps4DbgRaw[12];
 extern "C" volatile int ps4DbgLen;
 extern "C" volatile uint32_t ps4DbgCount;
 extern "C" volatile uint32_t ps4DbgSent;
+extern "C" volatile int ps4DbgPmPolicy, ps4DbgPmMode;
 void ps4Poll() {
   static bool dbgShown = false;
   if (!dbgShown && ps4DbgPos != -2) {  // diagnostic : debut du 1er paquet de la manette
@@ -934,6 +935,7 @@ void ps4Poll() {
   static bool was = false;
   static int lastTier = -2;
   static uint32_t rumbleOff = 0, lastBr = 0, combo = 0, lastLog = 0, since = 0;
+  static bool pmShown = false;
   if (!PS4.isConnected()) {
     keysPs4 = 0;
     if (was) {
@@ -948,6 +950,11 @@ void ps4Poll() {
     lastTier = -2;
     since = millis();
     Serial.printf("Manette PS4 connectee, memoire libre %u (plus petit bloc %u)\n", ESP.getFreeHeap(), ESP.getMaxAllocHeap());
+    pmShown = false;
+  }
+  if (!pmShown && ps4DbgPmMode != -1) {  // lien force en mode actif (code 0 = ok)
+    pmShown = true;
+    Serial.printf("Lien manette : veille interdite (code %d), mode actif demande (code %d)\n", ps4DbgPmPolicy, ps4DbgPmMode);
   }
   if (millis() - lastLog > 5000) {  // etat de la manette toutes les 5 s
     lastLog = millis();

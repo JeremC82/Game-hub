@@ -169,8 +169,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V2.14_complet.bin](firmware/GameHub_V2.14_complet.bin) | 0x0 | `31cb2693987e81f1e7abef9cc574a38d` |
-| [firmware/GameHub_V2.14.bin](firmware/GameHub_V2.14.bin) | 0x10000 | `746bebae90e011fcad52f6f3d367052a` |
+| [firmware/GameHub_V2.15_complet.bin](firmware/GameHub_V2.15_complet.bin) | 0x0 | `701e19a181fc3cca282678b28e67d8af` |
+| [firmware/GameHub_V2.15.bin](firmware/GameHub_V2.15.bin) | 0x10000 | `f48335a44273a83c5de1405f3c1ca7ef` |
 
 Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB SPIFFS)** dans Outils → Partition Scheme.
 
@@ -186,7 +186,7 @@ Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB S
   - Avec le core ESP32 2.0.17, la bibliothèque d'origine lisait les paquets de la manette décalés d'un octet : seul « haut » était détecté et la batterie était fausse.
   - La copie corrigée cherche l'en-tête du paquet avant de le lire.
   - Elle demande aussi à la manette un rapport toutes les 4 ms. Avec 0, elle n'en envoyait qu'environ un toutes les 2 s, et les appuis brefs étaient perdus.
-  - Le jeu interdit enfin le mode veille Bluetooth (sniff). Le moniteur série affiche le nombre de paquets reçus par seconde.
+  - Le jeu interdit enfin le mode veille Bluetooth (sniff) et force le lien de la manette en mode actif dès le premier rapport. Le moniteur série affiche le nombre de paquets reçus par seconde.
 - **Plans, aperçus et GIF :** `python docs/branchement.py`, `python docs/rendu.py`, `python docs/gif_manette_ps4.py`, `python docs/gif_arrivee.py` (Pillow).
 
 L'ancienne version avec wifi, page web et manette ESP-NOW reste disponible dans l'historique Git, jusqu'au commit `fb11367`.
