@@ -6,9 +6,9 @@ Jeux d'arcade sur 1 à 4 dalles LED 128x64, avec un ESP32 classique et une **man
 - **Partition unique de 3 Mo :** il reste de la place pour d'autres jeux.
 - **Son en option :** une broche PWM vers un petit ampli et un haut-parleur.
 
-**5 jeux originaux**, à choisir dans le menu (gauche / droite sur la ligne JOUER). Au démarrage, c'est toujours **ESSAIM** qui est proposé.
+**7 jeux originaux**, à choisir dans le menu (gauche / droite sur la ligne JOUER). Au démarrage, c'est toujours **ESSAIM** qui est proposé.
 
-Les 5 jeux ont en commun les niveaux de difficulté, les stages, les vies, les meilleurs scores avec les noms et la démo automatique.
+Les 7 jeux ont en commun les niveaux de difficulté, les stages, les vies, les meilleurs scores avec les noms et la démo automatique.
 
 
 # ESSAIM
@@ -22,7 +22,7 @@ Le jeu principal : un shoot'em up original, repris du mode Jeu du VU-mètre. Une
 *Aperçu simulé, généré par `docs/rendu.py` avec les mêmes sprites que le jeu. Chaque configuration en grand : [128x128](docs/rendu-128x128.png), [256x64](docs/rendu-256x64.png), [128x256](docs/rendu-128x256.png).*
 
 
-- **Écran :** score et record en haut ; **vies en haut à droite**, une petite icône de vaisseau par vie . Le vaisseau est tout en bas de l'écran. Le stage s'affiche dans l'annonce, au début de chaque stage.
+- **Écran :** le **score centré en haut**, sur une ligne. Le record n'est plus affiché pendant le jeu : il est dans le menu et sur la page des scores. Les **vies** sont en haut à droite, avec une petite icône par vie (au-delà de 5 : une icône et le nombre). C'est pareil dans tous les jeux . Le vaisseau est tout en bas de l'écran. Le stage s'affiche dans l'annonce, au début de chaque stage.
 - **Vies :** Chaque stage terminé donne **une vie de plus** (9 au maximum).
 - **Stages, sans fin :** quand tous les ennemis sont détruits, l'annonce « STAGE n » s'affiche avec le nom du monde et un bonus de 500 points × le numéro du stage.
   - Les ennemis tirent plus souvent à chaque stage, et leurs tirs vont plus vite.
@@ -101,6 +101,33 @@ Un petit blob cyan original souffle des bulles, sur un écran de plateformes dif
 - **Les ennemis :** ceux des mondes d'ESSAIM. Certains marchent et sautent d'étage en étage, et à partir du niveau 2, les insectes volent en diagonale.
 - **Niveau gagné :** tous les ennemis sont éliminés. Tu passes à un nouveau plan, avec plus d'ennemis, et tu gagnes une vie en plus.
 
+### LABYRINTHE
+
+![LABYRINTHE](docs/jeu-labyrinthe.gif)
+
+Un petit scarabée vert ramasse toutes les graines d'un labyrinthe original, poursuivi par 4 créatures piquantes.
+- **Commandes :** croix ou stick pour diriger le scarabée. La direction choisie est gardée jusqu'au prochain croisement possible.
+- **Les créatures :** chacune a son caractère.
+  - La violette fonce droit sur toi.
+  - L'orange vise devant toi.
+  - La verte essaie de te prendre en tenaille.
+  - La blanche, timide, repart dans son coin quand elle est trop près.
+- **Grosse graine lumineuse :** pendant quelques secondes, les créatures deviennent **bleues** et fuient. En attraper une rapporte 200, 400, 800 puis 1600 points, et elle retourne à sa maison.
+- **Couloir du milieu :** il est ouvert sur les deux côtés. Sortir d'un côté fait ressortir de l'autre.
+- **Stages :** tout manger fait passer au stage suivant. Les créatures sont plus rapides, les murs changent de couleur, et tu gagnes une vie.
+
+### SAUTERELLE
+
+![SAUTERELLE](docs/jeu-sauterelle.gif)
+
+Une sauterelle verte parcourt un **grand labyrinthe en relief** (plan original) qui **défile** pour la suivre. Elle ramasse les graines en évitant 4 créatures piquantes, et elle peut **sauter par-dessus**.
+- **Commandes :** croix ou stick pour diriger, **✕ ou ○ pour sauter**.
+- **Le saut :** en l'air, on passe au-dessus des créatures (et des graines, qu'on ne mange pas). Une ombre au sol montre où on va retomber.
+- **Grosse graine lumineuse :** les créatures deviennent bleues et fuient. En attraper une rapporte 200, 400, 800 puis 1600 points.
+- **À partir du stage 2 :** la créature violette **saute parfois en même temps que toi**. Si vous êtes tous les deux en l'air, elle t'attrape !
+- **Couloir du milieu :** ouvert sur les deux côtés.
+- **Stages :** tout manger fait passer au stage suivant. Les créatures sont plus rapides, les murs changent de couleur, et tu gagnes une vie.
+
 ### RAQUETTES
 
 ![RAQUETTES](docs/jeu-raquettes.gif)
@@ -119,12 +146,12 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. **Sans manette
 
 | Ligne | Action |
 |---|---|
-| **JOUER** | **gauche / droite : choix du jeu** (ESSAIM, RAID, COURSE, RAQUETTES, BULLES). Au démarrage : ESSAIM. ✕ ou OPTIONS lance la partie. |
+| **JOUER** | **gauche / droite : choix du jeu** (ESSAIM, RAID, COURSE, RAQUETTES, BULLES, LABYRINTHE, SAUTERELLE). Au démarrage : ESSAIM. ✕ ou OPTIONS lance la partie. |
 | **NIVEAU** | Facile / Normal / Difficile (gauche / droite ou ✕), choix gardé en mémoire |
 | **LUMINOSITE** | 0 à 100 % par pas de 10 % (gauche / droite ou ✕), visible tout de suite et gardée en mémoire. À 0 %, les dalles restent très faiblement allumées pour qu'on voie encore le menu. |
 | **VOLUME** | volume du son, 0 à 100 % par pas de 10 % (gauche / droite ou ✕). Un bip fait entendre le niveau. 0 % = muet. C'est le rapport cyclique du PWM : le potentiomètre de l'ampli règle le maximum. |
 | **SCORES** | les 5 meilleurs scores **du jeu choisi** : rang, **nom**, score, niveau (F/N/D) et stage atteint. Chaque jeu a son propre tableau. |
-| **DEMO** | lance **la démo du jeu choisi** : il tourne tout seul avec un pilote automatique, et « DEMO » clignote |
+| **DEMO** | lance **la démo du jeu choisi** : il tourne tout seul avec un pilote automatique. Seuls « DEMO / APPUIE : MENU » s'affichent (cachés pendant l'annonce d'un stage) |
 
 | Réglage du volume | Réglage de la luminosité |
 |---|---|
@@ -157,8 +184,8 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. **Sans manette
 |---|---|
 | stick gauche ou croix gauche / droite | bouger |
 | stick gauche ou croix haut / bas | avancer / reculer (dans le bas de l'écran, environ 45 %) |
-| croix, carré, triangle, R1, L1 ou R2 | tirer (ESSAIM, RAID), sauter (COURSE) |
-| ○ (rond) | bombe dans RAID, saut dans BULLES ; dans les menus : retour |
+| croix, carré, triangle, R1, L1 ou R2 | tirer (ESSAIM, RAID), sauter (COURSE, SAUTERELLE) |
+| ○ (rond) | bombe dans RAID, saut dans BULLES et SAUTERELLE ; dans les menus : retour |
 | OPTIONS | jouer depuis le menu, pause en partie |
 | ○ (rond), pendant la pause | quitter la partie et revenir au menu |
 | croix haut / bas, au menu | choisir la ligne |
@@ -252,8 +279,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V3.20_complet.bin](firmware/GameHub_V3.20_complet.bin) | 0x0 | `8fb18becafecb67784ef51504fd388a4` |
-| [firmware/GameHub_V3.20.bin](firmware/GameHub_V3.20.bin) | 0x10000 | `201ec13a53de4e7fb8a86468febc95da` |
+| [firmware/GameHub_V3.40_complet.bin](firmware/GameHub_V3.40_complet.bin) | 0x0 | `b6de52069df95feca813b5a4ec7e5e24` |
+| [firmware/GameHub_V3.40.bin](firmware/GameHub_V3.40.bin) | 0x10000 | `249538a97f791511e1169a085d8a9c16` |
 
 Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB SPIFFS)** dans Outils → Partition Scheme.
 
@@ -270,6 +297,6 @@ Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB S
   - La copie corrigée cherche l'en-tête du paquet avant de le lire.
   - Elle demande aussi à la manette un rapport toutes les 4 ms. Avec 0, elle n'en envoyait qu'environ un toutes les 2 s, et les appuis brefs étaient perdus.
   - Le jeu interdit enfin le mode veille Bluetooth (sniff) et force le lien de la manette en mode actif dès le premier rapport. Le moniteur série affiche le nombre de paquets reçus par seconde.
-- **Plans, aperçus et GIF :** `python docs/branchement.py`, `python docs/rendu.py`, `python docs/gif_manette_ps4.py`, `python docs/gif_arrivee.py`, `python docs/gif_menus.py`, `python docs/gif_jeux.py [raid course raquettes bulles]`, `python docs/branchement_son.py` (Pillow).
+- **Plans, aperçus et GIF :** `python docs/branchement.py`, `python docs/rendu.py`, `python docs/gif_manette_ps4.py`, `python docs/gif_arrivee.py`, `python docs/gif_menus.py`, `python docs/gif_jeux.py [raid course raquettes bulles labyrinthe]`, `python docs/branchement_son.py` (Pillow).
 
 L'ancienne version avec wifi, page web et manette ESP-NOW reste disponible dans l'historique Git, jusqu'au commit `fb11367`.

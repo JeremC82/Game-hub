@@ -1,7 +1,7 @@
-"""GIF des jeux (apercus simules, comme les demos du jeu) : RAID, COURSE, RAQUETTES, BULLES.
+"""GIF des jeux (apercus simules, comme les demos du jeu) : RAID, COURSE, RAQUETTES, BULLES, LABYRINTHE, SAUTERELLE.
 
-Sorties : docs/jeu-raid.gif, docs/jeu-course.gif, docs/jeu-raquettes.gif, docs/jeu-bulles.gif
-Usage : python docs/gif_jeux.py [raid course raquettes bulles]
+Sorties : docs/jeu-raid.gif, docs/jeu-course.gif, docs/jeu-raquettes.gif, docs/jeu-bulles.gif, docs/jeu-labyrinthe.gif, docs/jeu-sauterelle.gif
+Usage : python docs/gif_jeux.py [raid course raquettes bulles labyrinthe sauterelle]
 Memes sprites, regles et pilotes automatiques que games.ino (version simplifiee pour l'apercu).
 """
 import math
@@ -41,13 +41,8 @@ def led(img):
     return out
 
 
-def hud(s, score, lives=3):
-    s.tiny(1, 0, 'SCORE', PAL['r'])
-    s.tiny(1, 6, str(score), WHITE)
-    s.tiny(W // 2 - 11, 0, 'RECORD', PAL['r'])
-    s.tiny(W // 2 - 11, 6, '30800', WHITE)
-    s.tiny(W - 8, 1, 'X%d' % lives, WHITE)
-    s.sprite(SPR_LIFE, W - 15, 1)
+def hud(s, score, lives=3):  # score centre sur une ligne, vies en icones (comme le jeu)
+    ns['hud_top'](s, W, score, lives)
 
 
 def char6(s, x, y, ch, col):  # une lettre de la police 6x8 du jeu
@@ -665,6 +660,384 @@ def bulles():
     save(frames, 'jeu-bulles.gif')
 
 
-todo = GIF_ARGS or ['raid', 'course', 'raquettes', 'bulles']
+
+
+# ================================================================ LABYRINTHE
+def labyrinthe():
+    rnd = random.Random(3)
+    maze = re.findall(r'"([# .oPE]{21})"', re.search(r'L_MAZE\[L_ROWS\] = \{(.*?)\};', SRC, re.S).group(1))
+    R, C, T = len(maze), 21, 6
+    OX, OY = (W - C * T) // 2, 8 + ((H - 8) - R * T) // 2
+    dots = {(r, c): (1 if maze[r][c] == '.' else 2) for r in range(R) for c in range(C) if maze[r][c] in '.o'}
+
+    def opened(c, r, player):
+        if r < 0 or r >= R:
+            return False
+        if c < 0 or c >= C:
+            return r == 9
+        if maze[r][c] == '#':
+            return False
+        if player and ((r == 8 and c == 10) or (r == 9 and 9 <= c <= 11)):
+            return False
+        return True
+    DIRS = ((0, -1), (-1, 0), (0, 1), (1, 0))
+    # scarabee (pilote automatique : plus court chemin vers la graine la plus proche) et 4 creatures
+    p = {'c': 10, 'r': 11, 'x': 0.0, 'y': 0.0, 'dx': -1, 'dy': 0}
+    en = [{'c': 10, 'r': 7, 'dx': 0, 'dy': 0, 'wait': 0}, {'c': 9, 'r': 9, 'dx': 0, 'dy': 0, 'wait': 60},
+          {'c': 10, 'r': 9, 'dx': 0, 'dy': 0, 'wait': 140}, {'c': 11, 'r': 9, 'dx': 0, 'dy': 0, 'wait': 220}]
+    for m in [p] + en:
+        m['x'], m['y'] = OX + m['c'] * T + T / 2, OY + m['r'] * T + T / 2
+    fright, score, frames, booms = 0, 0, [], []
+
+    def bfs_step():
+        from collections import deque
+        q, seen = deque([(p['c'], p['r'])]), {(p['c'], p['r']): None}
+        while q:
+            c, r = q.popleft()
+            if (r, c) in dots and (c, r) != (p['c'], p['r']):
+                while seen[(c, r)] and seen[(c, r)][0] != (p['c'], p['r']):
+                    c, r = seen[(c, r)][0]
+                return seen[(c, r)][1] if seen[(c, r)] else (0, 0)
+            for dx, dy in DIRS:
+                nc, nr = (c + dx) % C, r + dy
+                if opened(c + dx, nr, True) and (nc, nr) not in seen:
+                    if any(abs(e['c'] - nc) + abs(e['r'] - nr) <= 1 for e in en if not fright and not e['wait']):
+                        continue
+                    seen[(nc, nr)] = ((c, r), (dx, dy))
+                    q.append((nc, nr))
+        return (0, 0)
+
+    def move(m, sp, chooser):
+        while sp > 0.001:
+            tx, ty = OX + m['c'] * T + T / 2, OY + m['r'] * T + T / 2
+            d = abs(tx - m['x']) + abs(ty - m['y'])
+            if d < 0.01:
+                m['x'], m['y'] = tx, ty
+                dx, dy = chooser(m)
+                if not dx and not dy:
+                    return
+                m['dx'], m['dy'] = dx, dy
+                nc = m['c'] + dx
+                if nc < 0:
+                    nc, m['x'] = C - 1, m['x'] + C * T
+                if nc >= C:
+                    nc, m['x'] = 0, m['x'] - C * T
+                m['c'], m['r'] = nc, m['r'] + dy
+                continue
+            st = min(sp, d)
+            m['x'] += st if tx > m['x'] else -st if tx < m['x'] else 0
+            m['y'] += st if ty > m['y'] else -st if ty < m['y'] else 0
+            sp -= st
+
+    def choose_player(m):
+        nonlocal score, fright
+        k = (m['r'], m['c'])
+        if k in dots:
+            if dots.pop(k) == 2:
+                fright = 220
+                score += 50
+            else:
+                score += 10
+        return bfs_step()
+
+    def chooser_enemy(i):
+        def ch(m):
+            opts = [(dx, dy) for dx, dy in DIRS if (dx, dy) != (-m['dx'], -m['dy']) and opened(m['c'] + dx, m['r'] + dy, False)
+                    and not (m['r'] == 7 and m['c'] == 10 and dy == 1)]
+            if not opts:
+                return (-m['dx'], -m['dy'])
+            if fright or rnd.random() < 0.2:
+                return rnd.choice(opts)
+            tc, tr = p['c'] + p['dx'] * (4 if i == 1 else 0), p['r'] + p['dy'] * (4 if i == 1 else 0)
+            return min(opts, key=lambda o: (m['c'] + o[0] - tc) ** 2 + (m['r'] + o[1] - tr) ** 2)
+        return ch
+    for f in range(480):
+        move(p, 0.95, choose_player)
+        if fright:
+            fright -= 1
+        for i, e in enumerate(en):
+            if e['wait']:
+                e['wait'] -= 1
+                if not e['wait']:
+                    e['c'], e['r'] = 10, 7
+                    e['x'], e['y'] = OX + 10 * T + T / 2, OY + 7 * T + T / 2
+                continue
+            move(e, 0.5 if fright else 0.82, chooser_enemy(i))
+            if abs(e['x'] - p['x']) + abs(e['y'] - p['y']) < T * 0.8:
+                if fright:
+                    score += 200
+                    booms.append([int(e['x']), int(e['y']), 1])
+                    e.update(c=10, r=9, dx=0, dy=0, wait=120)
+                    e['x'], e['y'] = OX + 10 * T + T / 2, OY + 9 * T + T / 2
+                else:  # dans l'apercu : le scarabee repart du depart
+                    p.update(c=10, r=11, dx=-1, dy=0)
+                    p['x'], p['y'] = OX + 10 * T + T / 2, OY + 11 * T + T / 2
+        for b in booms:
+            b[2] += 1
+        booms = [b for b in booms if b[2] < 12]
+        if f % 2:
+            continue
+        s = Screen(W, H)
+        d = ImageDraw.Draw(s.im)
+        for r in range(R):
+            for c in range(C):
+                x, y = OX + c * T, OY + r * T
+                if maze[r][c] == '#':
+                    d.rectangle((x, y, x + T - 1, y + T - 1), fill=(40, 60, 200))
+                    d.rectangle((x + 1, y + 1, x + T - 2, y + T - 2), fill=(10, 15, 50))
+                elif dots.get((r, c)) == 1:
+                    d.rectangle((x + 2, y + 2, x + 3, y + 3), fill=(230, 200, 140))
+                elif dots.get((r, c)) == 2 and f & 8:
+                    d.rectangle((x + 1, y + 1, x + 4, y + 4), fill=PAL['w'])
+        d.line((OX + 10 * T, OY + 8 * T + 3, OX + 11 * T - 1, OY + 8 * T + 3), fill=PAL['o'])
+        spike = (0x15, 0x0E, 0x1F, 0x0E, 0x15)
+        cols = ((170, 70, 255), (255, 140, 0), (170, 230, 40), (230, 230, 230))
+        for i, e in enumerate(en):
+            col = ((40, 90, 255) if not (fright < 60 and f & 4) else PAL['w']) if fright and not e['wait'] else cols[i]
+            x, y = int(e['x']) - 2, int(e['y']) - 2
+            for rr in range(5):
+                for cc in range(5):
+                    if spike[rr] & (0x10 >> cc):
+                        s.px(x + cc, y + rr, col)
+            if not fright or e['wait']:
+                s.px(x + 1, y + 2, PAL['w']); s.px(x + 3, y + 2, PAL['w'])
+        x, y = int(p['x']) - 2, int(p['y']) - 2  # scarabee vert
+        g, dk = PAL['g'], (10, 90, 30)
+        d.rectangle((x + 1, y, x + 3, y + 4), fill=g)
+        d.rectangle((x, y + 1, x + 4, y + 3), fill=g)
+        d.line((x + 2, y + 1, x + 2, y + 3), fill=dk)
+        ex, ey = x + 2 + p['dx'] * 2, y + 2 + p['dy'] * 2
+        if p['dx']:
+            s.px(ex, ey - 1, PAL['w']); s.px(ex, ey + 1, PAL['w'])
+        else:
+            s.px(ex - 1, ey, PAL['w']); s.px(ex + 1, ey, PAL['w'])
+        legs = ((x - 1, y + 1), (x + 5, y + 3)) if (f // 4) & 1 else ((x - 1, y + 3), (x + 5, y + 1))
+        for lx, ly in legs:
+            s.px(lx, ly, dk)
+        for b in booms:
+            boom(s, b)
+        hud(s, score)
+        frames.append(page(led(s.im), 'LABYRINTHE', 'Un scarabee ramasse les graines ; 4 creatures piquantes le poursuivent.',
+                           ['Commandes :', 'croix / stick : diriger', '', 'Regles :', 'graine : 10 points',
+                            'grosse graine : les', 'creatures deviennent', 'bleues et fuient', 'en attraper une :',
+                            '200, 400, 800, 1600', 'couloir du milieu ouvert', 'tout mange : stage +1 vie']))
+    save(frames, 'jeu-labyrinthe.gif')
+
+
+
+
+# ================================================================ SAUTERELLE
+def sauterelle():
+    from collections import deque
+    rnd = random.Random(5)
+    maze = re.findall(r'"([# .oE-]{31})"', re.search(r'J_MAZE\[J_ROWS\] = \{(.*?)\};', SRC, re.S).group(1))
+    R, C, T, JUMP = len(maze), 31, 8, 26
+    VH = H - 8
+    dots = {(r, c): (1 if maze[r][c] == '.' else 2) for r in range(R) for c in range(C) if maze[r][c] in '.o'}
+
+    def opened(c, r, player):
+        if r < 0 or r >= R:
+            return False
+        if c < 0 or c >= C:
+            return r == 11
+        if maze[r][c] == '#':
+            return False
+        if player and ((r == 10 and c == 15) or (r == 11 and 14 <= c <= 16)):
+            return False
+        return True
+
+    def wall(r, c):
+        return 0 <= r < R and 0 <= c < C and maze[r][c] == '#'
+
+    def height(t):
+        return math.sin(math.pi * (JUMP - t) / JUMP) * (T + 1) if t > 0 else 0
+    DIRS = ((0, -1), (-1, 0), (0, 1), (1, 0))
+    p = {'c': 15, 'r': 15, 'dx': -1, 'dy': 0, 'j': 0}
+    en = [{'c': 15, 'r': 9, 'dx': 0, 'dy': 0, 'wait': 0, 'j': 0}, {'c': 14, 'r': 11, 'dx': 0, 'dy': 0, 'wait': 60, 'j': 0},
+          {'c': 15, 'r': 11, 'dx': 0, 'dy': 0, 'wait': 140, 'j': 0}, {'c': 16, 'r': 11, 'dx': 0, 'dy': 0, 'wait': 220, 'j': 0}]
+    for m in [p] + en:
+        m['x'], m['y'] = m['c'] * T + T / 2, m['r'] * T + T / 2
+    fright, score, frames, booms = 0, 0, [], []
+
+    def bfs_step():
+        q, seen = deque([(p['c'], p['r'])]), {(p['c'], p['r']): None}
+        while q:
+            c, r = q.popleft()
+            if (r, c) in dots and (c, r) != (p['c'], p['r']):
+                while seen[(c, r)] and seen[(c, r)][0] != (p['c'], p['r']):
+                    c, r = seen[(c, r)][0]
+                return seen[(c, r)][1] if seen[(c, r)] else (0, 0)
+            for dx, dy in DIRS:
+                nc, nr = (c + dx) % C, r + dy
+                if opened(c + dx, nr, True) and (nc, nr) not in seen:
+                    seen[(nc, nr)] = ((c, r), (dx, dy))
+                    q.append((nc, nr))
+        return (0, 0)
+
+    def move(m, sp, chooser):
+        while sp > 0.001:
+            tx, ty = m['c'] * T + T / 2, m['r'] * T + T / 2
+            d = abs(tx - m['x']) + abs(ty - m['y'])
+            if d < 0.01:
+                m['x'], m['y'] = tx, ty
+                dx, dy = chooser(m)
+                if not dx and not dy:
+                    return
+                m['dx'], m['dy'] = dx, dy
+                nc = m['c'] + dx
+                if nc < 0:
+                    nc, m['x'] = C - 1, m['x'] + C * T
+                if nc >= C:
+                    nc, m['x'] = 0, m['x'] - C * T
+                m['c'], m['r'] = nc, m['r'] + dy
+                continue
+            st = min(sp, d)
+            m['x'] += st if tx > m['x'] else -st if tx < m['x'] else 0
+            m['y'] += st if ty > m['y'] else -st if ty < m['y'] else 0
+            sp -= st
+
+    def choose_player(m):
+        nonlocal score, fright
+        k = (m['r'], m['c'])
+        if k in dots and height(p['j']) <= 2:
+            if dots.pop(k) == 2:
+                fright = 220
+                score += 50
+            else:
+                score += 10
+        return bfs_step()
+
+    def chooser_enemy(i):
+        def ch(m):
+            opts = [(dx, dy) for dx, dy in DIRS if (dx, dy) != (-m['dx'], -m['dy']) and opened(m['c'] + dx, m['r'] + dy, False)
+                    and not (m['r'] == 9 and m['c'] == 15 and dy == 1)]
+            if not opts:
+                return (-m['dx'], -m['dy'])
+            if fright or rnd.random() < 0.2:
+                return rnd.choice(opts)
+            tc, tr = p['c'] + p['dx'] * (4 if i == 1 else 0), p['r'] + p['dy'] * (4 if i == 1 else 0)
+            return min(opts, key=lambda o: (m['c'] + o[0] - tc) ** 2 + (m['r'] + o[1] - tr) ** 2)
+        return ch
+    WALLC = (60, 90, 255)
+    top = tuple(v * 3 // 5 for v in WALLC)
+    front = tuple(v // 4 for v in WALLC)
+    shadow = (50, 50, 60)
+    for f in range(560):
+        near = any(abs(e['x'] - p['x']) + abs(e['y'] - p['y']) < T * 1.6 for e in en if not fright and not e['wait'])
+        if near and p['j'] == 0:  # saut par-dessus la creature ; la violette saute parfois aussi
+            p['j'] = JUMP
+            if en[0]['j'] == 0 and not fright and abs(en[0]['c'] - p['c']) + abs(en[0]['r'] - p['r']) <= 4 and rnd.random() < 0.3:
+                en[0]['j'] = JUMP
+        for m in [p] + en:
+            if m['j']:
+                m['j'] -= 1
+        move(p, 0.95 * T / 6, choose_player)
+        if fright:
+            fright -= 1
+        for i, e in enumerate(en):
+            if e['wait']:
+                e['wait'] -= 1
+                if not e['wait']:
+                    e['c'], e['r'] = 15, 9
+                    e['x'], e['y'] = 15 * T + T / 2, 9 * T + T / 2
+                continue
+            move(e, (0.5 if fright else 0.8) * T / 6, chooser_enemy(i))
+            if (height(p['j']) > 2) != (height(e['j']) > 2):
+                continue
+            if abs(e['x'] - p['x']) + abs(e['y'] - p['y']) < T * 0.8:
+                if fright:
+                    score += 200
+                    booms.append([e['x'], e['y'], 1])
+                    e.update(c=15, r=11, dx=0, dy=0, wait=120)
+                    e['x'], e['y'] = 15 * T + T / 2, 11 * T + T / 2
+                else:  # dans l'apercu : la sauterelle repart du depart
+                    p.update(c=15, r=15, dx=-1, dy=0, j=0)
+                    p['x'], p['y'] = 15 * T + T / 2, 15 * T + T / 2
+        for b in booms:
+            b[2] += 1
+        booms = [b for b in booms if b[2] < 12]
+        if f % 2:
+            continue
+        camx = max(0, min(C * T - W, int(p['x']) - W // 2))
+        camy = max(0, min(R * T - VH, int(p['y']) - VH // 2))
+        s = Screen(W, H)
+        d = ImageDraw.Draw(s.im)
+
+        def rect(x, y, w, h, col):
+            x0, y0, x1, y1 = max(0, x), max(8, y), min(W, x + w), min(H, y + h)
+            if x1 > x0 and y1 > y0:
+                d.rectangle((x0, y0, x1 - 1, y1 - 1), fill=col)
+
+        def px(x, y, col):
+            if 0 <= x < W and 8 <= y < H:
+                s.px(x, y, col)
+        for r in range(R):
+            for c in range(C):
+                x, y = c * T - camx, 8 + r * T - camy
+                if x <= -T or x >= W or y <= 8 - T or y >= H:
+                    continue
+                if maze[r][c] == '#':
+                    rect(x, y, T, T, top)
+                    if not wall(r - 1, c):
+                        rect(x, y, T, 1, WALLC)
+                    if not wall(r, c - 1):
+                        rect(x, y, 1, T, WALLC)
+                    if not wall(r + 1, c):
+                        rect(x, y + T - T // 3, T, T // 3, front)
+                elif dots.get((r, c)) == 1:
+                    rect(x + T // 2 - 1, y + T // 2 - 1, 2, 2, (230, 200, 140))
+                elif dots.get((r, c)) == 2 and f & 8:
+                    rect(x + T // 2 - 2, y + T // 2 - 2, 4, 4, PAL['w'])
+        rect(15 * T - camx, 8 + 10 * T + T // 2 - camy, T, 1, PAL['o'])
+        spike = (0x15, 0x0E, 0x1F, 0x0E, 0x15)
+        cols = ((170, 70, 255), (255, 140, 0), (170, 230, 40), (230, 230, 230))
+        for i, e in enumerate(en):
+            col = ((40, 90, 255) if not (fright < 60 and f & 4) else PAL['w']) if fright and not e['wait'] else cols[i]
+            h = int(height(e['j']))
+            x, y = int(e['x']) - camx - 2, int(e['y']) + 8 - camy - 2
+            if h:
+                for k in range(5):
+                    px(x + k, y + 4, shadow)
+            y -= h
+            for rr in range(5):
+                for cc in range(5):
+                    if spike[rr] & (0x10 >> cc):
+                        px(x + cc, y + rr, col)
+            if not fright or e['wait']:
+                px(x + 1, y + 2, PAL['w']); px(x + 3, y + 2, PAL['w'])
+        h = int(height(p['j']))  # sauterelle
+        cx, cy = int(p['x']) - camx, int(p['y']) + 8 - camy
+        if h:
+            for k in range(-2, 3):
+                px(cx + k, cy + 2, shadow)
+        cy -= h
+        g, dk, eye = (60, 220, 60), (20, 110, 30), (255, 230, 0)
+        dx, dy = p['dx'], p['dy']
+        if not dx and not dy:
+            dx = 1
+        up = 1 if (h > 0 or (f // 4) & 1) else 0
+        if dx:
+            rect(cx - 2, cy - 1, 5, 2, g)
+            px(cx + 2 * dx, cy - 1, eye)
+            px(cx - 2 * dx, cy - 2, dk); px(cx - dx, cy - 3 + (1 - up), dk); px(cx, cy - 2, dk)
+            px(cx + dx, cy + 1, dk); px(cx - dx, cy + 1 + up, dk)
+            px(cx + 3 * dx, cy - 2, dk)
+        else:
+            rect(cx - 1, cy - 2, 2, 5, g)
+            px(cx - 1, cy + 2 * dy, eye); px(cx, cy + 2 * dy, eye)
+            px(cx - 2, cy - dy, dk); px(cx + 1, cy - dy, dk)
+            px(cx - 2 - up, cy - 2 * dy, dk); px(cx + 1 + up, cy - 2 * dy, dk)
+            px(cx, cy + 3 * dy, dk)
+        for b in booms:
+            boom(s, [int(b[0]) - camx, int(b[1]) + 8 - camy, b[2]])
+        hud(s, score)
+        frames.append(page(led(s.im), 'SAUTERELLE', 'Grand labyrinthe en relief qui defile ; on saute par-dessus les creatures.',
+                           ['Commandes :', 'croix / stick : diriger', 'X ou rond : sauter', '', 'Regles :', 'graine : 10 points',
+                            'en l\'air : on passe', 'au-dessus de tout', 'grosse graine : les', 'creatures fuient',
+                            'stage 2+ : la violette', 'saute aussi !', 'tout mange : stage +1 vie']))
+    save(frames, 'jeu-sauterelle.gif')
+
+
+todo = GIF_ARGS or ['raid', 'course', 'raquettes', 'bulles', 'labyrinthe', 'sauterelle']
 for name in todo:
     globals()[name]()

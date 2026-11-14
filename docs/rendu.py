@@ -33,7 +33,7 @@ SPR_E = SPR_W[0]  # monde 1 (nebuleuse) pour les apercus
 WORLD_NAME = strings(c_block('WORLD_NAME[4]'))
 sh = strings(c_block('SPR_SHIP[4][8]'))
 SPR_SHIP = [sh[i * 8:(i + 1) * 8] for i in range(4)]
-TIER_NAME = strings(c_block('TIER_NAME[4]'))
+TIER_NAME = ['', 'tir rapide', 'double canon', 'triple canon']  # legendes de l'image des vaisseaux (plus affichees en jeu)
 SPR_LIFE = strings(c_block('SPR_LIFE[4]'))
 PAL_CH = re.search(r'G_PAL_CH\[\] = "(\w+)"', SRC).group(1)
 rgbs = [tuple(map(int, t)) for t in re.findall(r'\{\s*(\d+),\s*(\d+),\s*(\d+)\s*\}', c_block('G_PAL_RGB[9][3]'))]
@@ -83,6 +83,17 @@ class Screen:
             x += 6
 
 
+def hud_top(s, w, score, lives=3):
+    """Haut de l'ecran comme hudTop() : SCORE centre sur une ligne, une icone par vie en haut a droite."""
+    num = str(score)
+    lw, nw = len('SCORE') * 4 - 1, len(num) * 4 - 1
+    x = (w - (lw + 4 + nw)) // 2
+    s.tiny(x, 1, 'SCORE', PAL['r'])
+    s.tiny(x + lw + 4, 1, num, (230, 230, 230))
+    for i in range(min(lives, 5)):
+        s.sprite(SPR_LIFE, w - 6 - i * 7, 1)
+
+
 def game_frame(w, h, demo=False, stage=1, banner=False, seed=3):
     """Une image du jeu ; stage : evolution du vaisseau ; banner : annonce du stage (gOverlay)."""
     s = Screen(w, h)
@@ -121,20 +132,11 @@ def game_frame(w, h, demo=False, stage=1, banner=False, seed=3):
             for k in range(3):
                 yy = py - 14 - n * 22 + k
                 s.px(shipx + sx + vx * (5 + n * 7), yy, (PAL['w'], PAL['y'], PAL['o'])[k])
-    s.tiny(1, 0, 'SCORE', PAL['r'])
-    s.tiny(1, 6, '0' if demo else str(4250 * stage), (230, 230, 230))
-    rx = w // 2 - 11
-    s.tiny(rx, 0, 'RECORD', PAL['r'])
-    s.tiny(rx, 6, '30800', (230, 230, 230))
-    lives = 3
-    for i in range(lives):  # vies en haut a droite : une petite icone par vie
-        s.sprite(SPR_LIFE, w - 6 - i * 7, 1)
+    hud_top(s, w, 0 if demo else 4250 * stage)
     if banner:  # annonce du stage
         y = h // 2 - 22 if tall else h // 2 - 10
         s.text(y, f'STAGE {stage}', (255, 220, 0))
         s.text(y + 11, f'BONUS {500 * (stage - 1)}', (230, 230, 230))
-        if TIER_NAME[tier]:
-            s.text(y + 22, TIER_NAME[tier], (40, 230, 80))
     if demo:  # textes de la demo (gOverlay)
         s.text(h // 2 + 6, 'APPUIE SUR FEU', (0, 220, 255))
         s.text(h // 2 + 18, '192.168.1.42', (110, 110, 130))

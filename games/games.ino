@@ -29,7 +29,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "3.20"
+#define GAMES_VERSION "3.40"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -116,13 +116,14 @@ void setBrightPct(int p) {  // 0 % : tres faible mais jamais noir (le menu reste
   dma->setBrightness8(bright);
   prefs.putUChar("bright", bright);
 }
+bool gAttractHold = false;         // demo lancee depuis le menu : on attend que les boutons soient relaches
 bool gAttract = false;              // mode demo : menu cache (ligne DEMO, ou 30 s sans toucher la manette)
 #define MENU_IDLE_MS 30000UL        // menu sans activite : passage en mode demo
 bool menuScores = false;            // page des meilleurs scores affichee
-#define N_GAMES 5
-const char *const GAME_NAME[N_GAMES] = { "ESSAIM", "RAID", "COURSE", "RAQUETTES", "BULLES" };
+#define N_GAMES 7
+const char *const GAME_NAME[N_GAMES] = { "ESSAIM", "RAID", "COURSE", "RAQUETTES", "BULLES", "LABYRINTHE", "SAUTERELLE" };
 uint8_t gGame = 0;                  // jeu choisi dans le menu (gauche / droite sur la ligne JOUER)
-const char *topKey() { static const char *const K[N_GAMES] = { "top", "top1", "top2", "top3", "top4" }; return K[gGame % N_GAMES]; }
+const char *topKey() { static const char *const K[N_GAMES] = { "top", "top1", "top2", "top3", "top4", "top5", "top6" }; return K[gGame % N_GAMES]; }
 #define TOP_N 5
 HiScore gBest[TOP_N];                // meilleurs scores (gardes en memoire)
 uint8_t gLastRank = 0;              // place obtenue a la derniere partie (0 : hors tableau)
@@ -264,7 +265,10 @@ const Note JINGLE_OVER[] = { { 523, 200 }, { 392, 200 }, { 330, 200 }, { 262, 45
 const Note JINGLE_ARME[] = { { 784, 70 }, { 988, 70 }, { 1175, 70 }, { 1568, 200 } };
 void sfxShot() { sndPlay(1600, 420, 60, 0.30f, false, 1); }                               // piou
 void sfxBoom() { sndPlay(3200, 260, 320, 0.9f, true, 2); }                                // pschhh
-void sfxHit() { sndPlay(2400, 120, 700, 1.0f, true, 3); sndPlay(300, 55, 600, 0.6f, false, 3); }  // gros boum + grondement
+void sfxHit() {  // ton vaisseau explose : long grondement grave + sirene qui chute (bien distinct d'un ennemi)
+  sndPlay(1600, 40, 1200, 1.0f, true, 3);
+  sndPlay(1000, 70, 950, 0.85f, false, 3);
+}
 void sfxDive() { sndPlay(1200, 380, 450, 0.22f, false, 1); }                              // piqué qui descend
 
 void sndTimerStart(void *) {  // cree l'interruption depuis le coeur 0 (elle y reste)
@@ -292,7 +296,7 @@ void audioBegin() {
 
 // ---------------------------------------------------------------- jeu : shoot'em up d'arcade (repris du VU-metre)
 // Sprites originaux multicolores (9x7), formation qui oscille, ennemis qui piquent en courbe,
-// ecran d'arcade : SCORE et RECORD en haut, vies et vague en bas (128x128).
+// ecran d'arcade : SCORE centre et vies en haut (le record est au menu et sur la page des scores).
 // Sans joueur, un pilote automatique joue (demo). Les ennemis pulsent doucement.
 // Dessin sans scintillement : seuls les rectangles dessines a l'image precedente sont effaces.
 #define G_MAXE 100
@@ -368,7 +372,6 @@ const char *const SPR_SHIP[4][8] = {
   { "..c...c..", "..c.c.c..", ".cc.w.cc.", ".cbcwcbc.", "bbbcccbbb", "bybcbcbyb", "b.o...o.b", "..o...o.." },
   { "c...c...c", "c..ccc..c", "cc.cwc.cc", "rbbcwcbbr", "rbbcccbbr", "bbcbcbcbb", "b.oy.yo.b", "..o...o.." }
 };
-const char *const TIER_NAME[4] = { "", "TIR RAPIDE", "DOUBLE CANON", "TRIPLE CANON" };
 int gStageT = 0;
 bool gLifeUp = false;     // vie gagnee a la fin du stage (affichee avec l'annonce)          // images restantes de l'annonce "STAGE n"
 uint32_t gBonus = 0;      // bonus de fin de stage affiche avec l'annonce
@@ -728,6 +731,28 @@ void gameStep() {
   }
   if (gStageT > 0) gStageT--;
 }
+// haut de l'ecran (tous les jeux) : SCORE sur une ligne, centre ; vies en haut a droite.
+// Plus de RECORD pendant le jeu (il est au menu et sur la page des scores).
+// Vies : une petite icone par vie jusqu'a 5 ; au-dela, une icone et le nombre (X7), pour ne jamais toucher le score.
+void hudTop(uint16_t *palFull) {
+  char num[12];
+  snprintf(num, sizeof(num), "%lu", (unsigned long)gScore);
+  int lw = tinyWidth("SCORE"), nw = tinyWidth(num), tw = lw + 4 + nw;
+  int x = (W - tw) / 2;
+  tinyText(*gfx, x, 1, "SCORE", rgb(255, 40, 40));
+  tinyText(*gfx, x + lw + 4, 1, num, rgb(230, 230, 230));
+  gMark(x, 1, tw, 5);
+  int lives = max(0, gLives);
+  if (lives <= 5) {
+    for (int i = 0; i < lives; i++) gSprite(SPR_LIFE, 5, 4, W - 6 - i * 7, 1, palFull, 0, 0);
+  } else {
+    snprintf(num, sizeof(num), "X%d", lives);
+    int vw = tinyWidth(num), vx = W - 1 - vw;
+    tinyText(*gfx, vx, 1, num, rgb(230, 230, 230));
+    gMark(vx, 1, vw, 5);
+    gSprite(SPR_LIFE, 5, 4, vx - 7, 1, palFull, 0, 0);
+  }
+}
 void gameDraw() {
   if (gOverflow) {  // des zones n'ont pas ete notees : on efface tout (plus de restes, ex. icones de vies)
     gOverflow = false;
@@ -771,20 +796,7 @@ void gameDraw() {
     if (b.t < 6) gPix(b.x, b.y, palFull[0]);
   }
   if (gDead == 0) gSprite(SPR_SHIP[gTier()], 9, 8, (int)gPx, gPY, palFull, 0, 0);
-  // ecran d'arcade : SCORE a gauche, RECORD au centre
-  char sc[12];
-  uint16_t red = rgb(255, 40, 40), white = rgb(230, 230, 230);
-  tinyText(*gfx, 1, 0, "SCORE", red);
-  snprintf(sc, sizeof(sc), "%lu", (unsigned long)gScore);
-  tinyText(*gfx, 1, 6, sc, white);
-  gMark(1, 6, tinyWidth(sc), 5);
-  int rx = W >= 96 ? W / 2 - 11 : W - 24;
-  tinyText(*gfx, rx, 0, "RECORD", red);
-  snprintf(sc, sizeof(sc), "%lu", (unsigned long)gHi);
-  tinyText(*gfx, rx, 6, sc, white);
-  gMark(rx, 6, tinyWidth(sc), 5);
-  // vies en haut a droite : une petite icone par vie (6 au plus a l'ecran)
-  for (int i = 0; i < gLives && i < 6; i++) gSprite(SPR_LIFE, 5, 4, W - 6 - i * 7, 1, palFull, 0, 0);
+  hudTop(palFull);  // score centre et vies
 }
 
 // joueur : deplacement aux touches, tir tant que FEU est appuye (3 tirs a l'ecran au plus)
@@ -870,7 +882,8 @@ void gOverlay() {
     gText(y + (tall ? 13 : 11), tall ? "OPTIONS : REPRENDRE" : "OPTIONS: REPRENDRE", rgb(0, 160, 200));
     gText(y + (tall ? 24 : 21), "ROND : MENU", rgb(0, 160, 200));
   }
-  if (gStageT > 0 && gLives > 0) {  // annonce du stage, bonus et nouvelle arme
+  bool stageMsg = gStageT > 0 && gLives > 0;
+  if (stageMsg) {  // annonce du stage, bonus et nouvelle arme
     char b[20];
     int y = H >= 128 ? H / 2 - 22 : H / 2 - 10;
     snprintf(b, sizeof(b), "STAGE %d", gWave);
@@ -880,10 +893,10 @@ void gOverlay() {
     gText(y + 11, b, rgb(255, 60, 200));
     int yy = y + 22;
     if (gBonus && H >= 128) { snprintf(b, sizeof(b), "BONUS %lu", (unsigned long)gBonus); gText(yy, b, rgb(230, 230, 230)); yy += 11; }
-    if (gGame == 0 && gWave <= 4 && TIER_NAME[gTier()][0]) { gText(yy, TIER_NAME[gTier()], rgb(40, 230, 80)); yy += 11; }
     if (gLifeUp) gText(yy, "VIE +1", rgb(0, 220, 255));
   }
   if (!gDemo) return;
+  if (stageMsg) return;  // demo : pendant l'annonce du stage, pas de texte DEMO (ils se chevauchaient)
   if (PS4.isConnected() && !gAttract) return;  // manette la : le menu a son propre ecran (menuScreen)
   if (PS4.isConnected()) {  // mode demo : le menu revient au premier appui
     if ((gFrame / 40) & 1) gText(H / 2 + 6, "DEMO", rgb(255, 220, 0));
@@ -934,24 +947,7 @@ void altBackground(float speed, uint16_t *palFull) {
     gPix(s.x, (int)s.y, rgb(g, g, g));
   }
 }
-void altHud(uint16_t *palFull) {
-  char sc[12];
-  uint16_t red = rgb(255, 40, 40), white = rgb(230, 230, 230);
-  tinyText(*gfx, 1, 0, "SCORE", red);
-  snprintf(sc, sizeof(sc), "%lu", (unsigned long)gScore);
-  tinyText(*gfx, 1, 6, sc, white);
-  gMark(1, 0, 24, 11);
-  int rx = W >= 96 ? W / 2 - 11 : W - 24;
-  tinyText(*gfx, rx, 0, "RECORD", red);
-  snprintf(sc, sizeof(sc), "%lu", (unsigned long)gHi);
-  tinyText(*gfx, rx, 6, sc, white);
-  gMark(rx, 0, 26, 11);
-  snprintf(sc, sizeof(sc), "X%d", max(0, gLives));
-  int lw = tinyWidth(sc), lx = W - 1 - lw;
-  tinyText(*gfx, lx, 1, sc, white);
-  gMark(lx, 1, lw, 5);
-  gSprite(SPR_LIFE, 5, 4, lx - 7, 1, palFull, 0, 0);
-}
+void altHud(uint16_t *palFull) { hudTop(palFull); }
 // une vie perdue (commun) : vibration, son, explosion, fin de partie eventuelle
 void altLoseLife(int x, int y) {
   if (!gDemo) rumbleReq = true;  // vibration seulement pendant une partie
@@ -2085,10 +2081,660 @@ void bDraw() {
   altHud(palFull);
 }
 
+// ---------------------------------------------------------------- LABYRINTHE
+// Un petit scarabee vert (original) ramasse les graines d'un labyrinthe (plan original) en evitant
+// 4 creatures piquantes qui le poursuivent chacune a sa facon. Une grosse graine lumineuse rend les
+// creatures vulnerables quelques secondes (bleues, elles fuient) : les attraper rapporte de plus en plus.
+// Le couloir du milieu est ouvert sur les cotes : on ressort de l'autre cote.
+#define L_COLS 21
+#define L_ROWS 19
+const char *const L_MAZE[L_ROWS] = {
+  "#####################",
+  "#o.......#.#.......o#",
+  "#.###.##.#.#.##.###.#",
+  "#.....#.......#.....#",
+  "###.#.#.#####.#.#.###",
+  "#...#.....#.....#...#",
+  "#.#####.#.#.#.#####.#",
+  "#.......#...#.......#",
+  "###.###.## ##.###.###",
+  "   .#...#E E#...#.   ",
+  "###.#.#.#####.#.#.###",
+  "#.....#...P...#.....#",
+  "#.###.###.#.###.###.#",
+  "#o..#.....#.....#..o#",
+  "###.#.#.#####.#.#.###",
+  "#.....#...#...#.....#",
+  "#.#######.#.#######.#",
+  "#...................#",
+  "#####################"
+};
+uint8_t lDot[L_ROWS][L_COLS];  // 0 rien, 1 graine, 2 grosse graine
+LMob lP, lE[4];
+int lTile = 6, lOX = 0, lOY = 12, lDots = 0, lFright = 0, lChain = 0;
+int8_t lWantDx = 0, lWantDy = 0;
+float lcx(int c) { return lOX + c * lTile + lTile / 2.0f; }
+float lcy(int r) { return lOY + r * lTile + lTile / 2.0f; }
+bool lOpen(int c, int r, bool player) {
+  if (r < 0 || r >= L_ROWS) return false;
+  if (c < 0 || c >= L_COLS) return r == 9;  // couloir du milieu ouvert sur les cotes
+  char t = L_MAZE[r][c];
+  if (t == '#') return false;
+  if (player && ((r == 8 && c == 10) || (r == 9 && c >= 9 && c <= 11))) return false;  // la maison des creatures
+  return true;
+}
+void lPlace(LMob &m, int c, int r) { m.c = c; m.r = r; m.x = lcx(c); m.y = lcy(r); m.dx = m.dy = 0; }
+void lPositions() {  // scarabee au depart, creatures a la maison (sorties echelonnees)
+  lPlace(lP, 10, 11);
+  lWantDx = -1; lWantDy = 0;
+  static const int8_t HC[4] = { 10, 9, 10, 11 }, HR[4] = { 7, 9, 9, 9 };
+  for (int i = 0; i < 4; i++) {
+    lPlace(lE[i], HC[i], HR[i]);
+    lE[i].state = i == 0 ? 0 : 2;
+    lE[i].t = 40 + i * 90;
+    lE[i].fr = false;
+  }
+  lFright = 0;
+}
+void lNewMaze() {
+  lDots = 0;
+  for (int r = 0; r < L_ROWS; r++)
+    for (int c = 0; c < L_COLS; c++) {
+      char t = L_MAZE[r][c];
+      lDot[r][c] = t == '.' ? 1 : t == 'o' ? 2 : 0;
+      lDots += lDot[r][c] != 0;
+    }
+  lPositions();
+}
+void lReset() {
+  gLives = (!gDemo && gDiff == 0) ? 5 : 3;
+  gPaused = false;
+  gScore = 0; gWave = 1; gDead = 0; gBonus = 0; gLifeUp = false;
+  gStageT = 100;
+  sndMelody(JINGLE_STAGE, 4);
+  for (auto &b : gBoom) b.t = 0;
+  lTile = max(2, min(W / L_COLS, (H - 8) / L_ROWS));
+  lOX = (W - L_COLS * lTile) / 2;
+  lOY = 8 + ((H - 8) - L_ROWS * lTile) / 2;
+  lNewMaze();
+}
+// choix de la direction en arrivant au centre d'une case
+void lChoose(LMob &m, int who, int8_t &ndx, int8_t &ndy) {
+  ndx = ndy = 0;
+  if (who < 0) {  // scarabee : direction voulue, sinon tout droit, sinon arret
+    if ((lWantDx || lWantDy) && lOpen(m.c + lWantDx, m.r + lWantDy, true)) { ndx = lWantDx; ndy = lWantDy; }
+    else if ((m.dx || m.dy) && lOpen(m.c + m.dx, m.r + m.dy, true)) { ndx = m.dx; ndy = m.dy; }
+    return;
+  }
+  // creature : cible selon son caractere (pas de demi-tour, sauf impasse)
+  int tc = lP.c, tr = lP.r;
+  if (m.state == 3) { tc = 10; tr = 7; }  // sortie de la maison
+  else if (who == 1) { tc = lP.c + lP.dx * 4; tr = lP.r + lP.dy * 4; }           // vise devant le scarabee
+  else if (who == 2) { tc = 2 * lP.c - lE[0].c; tr = 2 * lP.r - lE[0].r; }       // prend en tenaille
+  else if (who == 3 && abs(m.c - lP.c) + abs(m.r - lP.r) < 7) { tc = 1; tr = 17; }  // timide : repart dans son coin
+  static const int8_t DX[4] = { 0, -1, 0, 1 }, DY[4] = { -1, 0, 1, 0 };
+  int best = -1;
+  long bestD = 0x7fffffff;
+  int opts[4], nOpts = 0;
+  for (int k = 0; k < 4; k++) {
+    if (DX[k] == -m.dx && DY[k] == -m.dy && (m.dx || m.dy)) continue;
+    if (!lOpen(m.c + DX[k], m.r + DY[k], false)) continue;
+    if (m.state == 0 && m.r == 7 && m.c == 10 && DY[k] == 1) continue;  // ne rentre pas dans la maison
+    opts[nOpts++] = k;
+    long dx = m.c + DX[k] - tc, dy = m.r + DY[k] - tr, d = dx * dx + dy * dy;
+    if (d < bestD) { bestD = d; best = k; }
+  }
+  if (!nOpts) { ndx = -m.dx; ndy = -m.dy; return; }  // impasse : demi-tour
+  int rnd = gEffDiff() == 0 ? 35 : gEffDiff() == 1 ? 18 : 6;  // facile : creatures plus hesitantes
+  if (m.fr || random(100) < rnd) best = opts[random(nOpts)];  // effrayee : au hasard
+  ndx = DX[best]; ndy = DY[best];
+}
+void lArrive(LMob &m, int who) {
+  if (who >= 0) {
+    if (m.state == 3 && m.c == 10 && m.r == 7) m.state = 0;  // sortie de la maison
+    return;
+  }
+  uint8_t &d = lDot[m.r][m.c];  // le scarabee mange la graine
+  if (!d) return;
+  if (d == 2) {  // grosse graine : creatures vulnerables
+    gScore += 50;
+    lFright = max(90, 260 - 20 * gWave);
+    lChain = 0;
+    for (auto &e : lE) if (e.state != 2) { e.fr = true; e.dx = -e.dx; e.dy = -e.dy; }
+    sfxDive();
+  } else {
+    gScore += 10;
+    if ((lDots & 1) == 0) sfxMenu();
+  }
+  d = 0;
+  lDots--;
+}
+void lMove(LMob &m, float sp, int who) {
+  for (int guard = 0; sp > 0.001f && guard < 8; guard++) {
+    float tx = lcx(m.c), ty = lcy(m.r);
+    float d = fabsf(tx - m.x) + fabsf(ty - m.y);
+    if (d < 0.01f) {  // centre de la case atteint : on choisit la suite
+      m.x = tx; m.y = ty;
+      lArrive(m, who);
+      int8_t ndx, ndy;
+      lChoose(m, who, ndx, ndy);
+      if (!ndx && !ndy) { m.dx = m.dy = 0; return; }
+      m.dx = ndx; m.dy = ndy;
+      int nc = m.c + ndx;
+      if (nc < 0) { nc = L_COLS - 1; m.x += L_COLS * lTile; }  // couloir du milieu : on ressort de l'autre cote
+      if (nc >= L_COLS) { nc = 0; m.x -= L_COLS * lTile; }
+      m.c = nc; m.r += ndy;
+      continue;
+    }
+    float step = min(sp, d);
+    m.x += (tx > m.x ? step : tx < m.x ? -step : 0);
+    m.y += (ty > m.y ? step : ty < m.y ? -step : 0);
+    sp -= step;
+  }
+}
+// pilote automatique (demo) : plus court chemin vers la graine la plus proche, en evitant les creatures
+uint8_t lAuto() {
+  static uint8_t from[L_ROWS][L_COLS];
+  static int16_t q[L_ROWS * L_COLS];
+  memset(from, 0xFF, sizeof(from));
+  int head = 0, tail = 0;
+  q[tail++] = lP.r * L_COLS + lP.c;
+  from[lP.r][lP.c] = 4;
+  static const int8_t DX[4] = { 0, -1, 0, 1 }, DY[4] = { -1, 0, 1, 0 };
+  int found = -1;
+  while (head < tail) {
+    int cur = q[head++], r = cur / L_COLS, c = cur % L_COLS;
+    if (lDot[r][c] && !(r == lP.r && c == lP.c)) { found = cur; break; }
+    for (int k = 0; k < 4; k++) {
+      int nr = r + DY[k], nc = (c + DX[k] + L_COLS) % L_COLS;
+      if (!lOpen(c + DX[k], nr, true) || from[nr][nc] != 0xFF) continue;
+      bool danger = false;
+      for (auto &e : lE) if (!e.fr && e.state != 2 && abs(e.c - nc) + abs(e.r - nr) <= 2) danger = true;
+      if (danger) continue;
+      from[nr][nc] = k;
+      q[tail++] = nr * L_COLS + nc;
+    }
+  }
+  if (found < 0) return 0;
+  int r = found / L_COLS, c = found % L_COLS, k = 4;
+  while (!(r == lP.r && c == lP.c)) {  // remonte jusqu'au premier pas
+    k = from[r][c];
+    int pr = r - DY[k], pc = (c - DX[k] + L_COLS) % L_COLS;
+    if (pr == lP.r && pc == lP.c) break;
+    r = pr; c = pc;
+  }
+  static const uint8_t KEY[4] = { 8, 1, 16, 2 };
+  return k < 4 ? KEY[k] : 0;
+}
+void lStep() {
+  gFrame++;
+  uint8_t k = gDemo ? lAuto() : keysPs4;
+  if (gDead > 0) {
+    if (--gDead == 0) {
+      if (gLives <= 0) {
+        if (gDemo) lReset();
+        else if (gLastRank) startNameEntry();
+        else toDemo();
+        return;
+      }
+      lPositions();
+    }
+    return;
+  }
+  if (gStageT > 0) { gStageT--; return; }  // annonce : tout le monde attend
+  if (k & 1) { lWantDx = -1; lWantDy = 0; }
+  if (k & 2) { lWantDx = 1; lWantDy = 0; }
+  if (k & 8) { lWantDx = 0; lWantDy = -1; }
+  if (k & 16) { lWantDx = 0; lWantDy = 1; }
+  if ((lWantDx || lWantDy) && lWantDx == -lP.dx && lWantDy == -lP.dy) {  // demi-tour immediat
+    lP.c -= lP.dx; lP.r -= lP.dy;
+    if (lP.c < 0) { lP.c += L_COLS; lP.x += L_COLS * lTile; }
+    if (lP.c >= L_COLS) { lP.c -= L_COLS; lP.x -= L_COLS * lTile; }
+    lP.dx = lWantDx; lP.dy = lWantDy;
+  }
+  float unit = lTile / 6.0f;
+  lMove(lP, 0.95f * unit, -1);
+  if (lFright > 0 && --lFright == 0)
+    for (auto &e : lE) e.fr = false;
+  float es = (0.82f + 0.04f * min(gWave, 8) + 0.08f * (gEffDiff() - 1)) * unit;
+  for (int i = 0; i < 4; i++) {
+    LMob &e = lE[i];
+    if (e.state == 2) { if (--e.t <= 0) e.state = 3; continue; }  // attend a la maison
+    lMove(e, e.fr ? 0.5f * unit : es, i);
+    if (fabsf(e.x - lP.x) + fabsf(e.y - lP.y) < lTile * 0.8f) {
+      if (e.fr) {  // attrapee : points (200, 400, 800, 1600), retour a la maison
+        lChain = min(lChain + 1, 4);
+        gScore += 100UL << lChain;
+        gBoomAt(e.x, e.y);
+        sfxBoom();
+        e.fr = false;
+        lPlace(e, 10, 9);
+        e.state = 2; e.t = 120;
+      } else {
+        altLoseLife(lP.x, lP.y);
+        return;
+      }
+    }
+  }
+  if (!gDemo && gScore > gHi) gHi = gScore;
+  if (lDots <= 0) {  // labyrinthe vide : stage suivant (creatures plus rapides), une vie en plus
+    gWave++;
+    gStageT = 100;
+    altStageClear(1000UL * gWave);
+    sndMelody(JINGLE_STAGE, 4);
+    lNewMaze();
+  }
+}
+void lDraw() {
+  eraseOld();
+  uint16_t palFull[9];
+  for (int i = 0; i < 9; i++) palFull[i] = rgb(G_PAL_RGB[i][0], G_PAL_RGB[i][1], G_PAL_RGB[i][2]);
+  static const uint8_t WC[4][3] = { { 40, 60, 200 }, { 150, 40, 170 }, { 30, 140, 90 }, { 190, 90, 20 } };
+  const uint8_t *wc = WC[(gWave - 1) % 4];
+  uint16_t wall = rgb(wc[0], wc[1], wc[2]), inner = rgb(wc[0] / 4, wc[1] / 4, wc[2] / 4);
+  int t = lTile;
+  for (int r = 0; r < L_ROWS; r++)  // murs (redessines a chaque image : textes et sprites ne les effacent pas)
+    for (int c = 0; c < L_COLS; c++) {
+      int x = lOX + c * t, y = lOY + r * t;
+      if (L_MAZE[r][c] == '#') {
+        gfx->fillRect(x, y, t, t, wall);
+        if (t >= 5) gfx->fillRect(x + 1, y + 1, t - 2, t - 2, inner);
+      } else if (lDot[r][c] == 1) {
+        if (t >= 5) gfx->fillRect(x + t / 2 - 1, y + t / 2 - 1, 2, 2, rgb(230, 200, 140));
+        else gfx->drawPixel(x + t / 2, y + t / 2, rgb(230, 200, 140));
+      } else if (lDot[r][c] == 2 && (gFrame & 8)) {
+        gfx->fillRect(x + t / 2 - 2, y + t / 2 - 2, 4, 4, palFull[0]);
+      }
+    }
+  gfx->drawFastHLine(lOX + 10 * t, lOY + 8 * t + t / 2, t, palFull[7]);  // porte de la maison
+  // creatures piquantes (5x5) : violet, orange, vert-jaune, blanc ; bleues quand elles sont vulnerables
+  static const uint8_t EC[4][3] = { { 170, 70, 255 }, { 255, 140, 0 }, { 170, 230, 40 }, { 230, 230, 230 } };
+  static const uint8_t SPIKE[5] = { 0x15, 0x0E, 0x1F, 0x0E, 0x15 };
+  for (int i = 0; i < 4; i++) {
+    LMob &e = lE[i];
+    uint16_t col = rgb(EC[i][0], EC[i][1], EC[i][2]);
+    if (e.fr) col = (lFright < 60 && (gFrame & 4)) ? palFull[0] : rgb(40, 90, 255);
+    int x = (int)e.x - 2, y = (int)e.y - 2;
+    for (int r = 0; r < 5; r++)
+      for (int c = 0; c < 5; c++)
+        if (SPIKE[r] & (0x10 >> c)) gfx->drawPixel(x + c, y + r, col);
+    if (!e.fr) { gfx->drawPixel(x + 1, y + 2, palFull[0]); gfx->drawPixel(x + 3, y + 2, palFull[0]); }  // yeux
+    gMark(x, y, 5, 5);
+  }
+  if (gDead == 0) {  // scarabee vert, yeux du cote ou il va, pattes qui bougent
+    int x = (int)lP.x - 2, y = (int)lP.y - 2;
+    uint16_t g = palFull[5], dk = rgb(10, 90, 30);
+    gfx->fillRect(x + 1, y, 3, 5, g);
+    gfx->fillRect(x, y + 1, 5, 3, g);
+    gfx->drawFastVLine(x + 2, y + 1, 3, dk);  // separation des elytres
+    int ex = x + 2 + lP.dx * 2, ey = y + 2 + lP.dy * 2;
+    if (lP.dx) { gfx->drawPixel(ex, ey - 1, palFull[0]); gfx->drawPixel(ex, ey + 1, palFull[0]); }
+    else if (lP.dy) { gfx->drawPixel(ex - 1, ey, palFull[0]); gfx->drawPixel(ex + 1, ey, palFull[0]); }
+    else { gfx->drawPixel(x + 1, y + 1, palFull[0]); gfx->drawPixel(x + 3, y + 1, palFull[0]); }
+    if ((gFrame / 4) & 1) { gfx->drawPixel(x - 1, y + 1, dk); gfx->drawPixel(x + 5, y + 3, dk); }
+    else { gfx->drawPixel(x - 1, y + 3, dk); gfx->drawPixel(x + 5, y + 1, dk); }
+    gMark(x - 1, y, 7, 5);
+  }
+  altBooms(palFull);
+  altHud(palFull);
+}
+
+// ---------------------------------------------------------------- SAUTERELLE
+// Grand labyrinthe en relief (plan original) qui defile pour suivre une sauterelle verte. Elle ramasse les
+// graines et peut SAUTER (croix ou rond) par-dessus les creatures piquantes. Grosse graine : creatures
+// vulnerables. A partir du stage 2, la creature violette saute aussi quand la sauterelle saute pres d'elle.
+#define J_COLS 31
+#define J_ROWS 23
+#define J_JUMP 26  // duree d'un saut (images)
+const char *const J_MAZE[J_ROWS] = {
+  "###############################",
+  "#o...........................o#",
+  "#.###.#.#####.#.#.#####.#.###.#",
+  "#...#.#.......#.#.......#.#...#",
+  "#.#.#.#########.#########.#.#.#",
+  "#.#.#.....#.........#.....#.#.#",
+  "#.#.###.#.#.###.###.#.#.###.#.#",
+  "#.#.....#...#.....#...#.....#.#",
+  "#.###########.#.#.###########.#",
+  "#.............................#",
+  "#.#######.##.##-##.##.#######.#",
+  " ............#E E#............ ",
+  "#.#.###.####.#####.####.###.#.#",
+  "#.......#.............#.......#",
+  "#.#####.#.#.###.###.#.#.#####.#",
+  "#.#...#...#.........#...#...#.#",
+  "#.#.#.#########.#########.#.#.#",
+  "#...#.#.......#.#.......#.#...#",
+  "#.###.#.#####.#.#.#####.#.###.#",
+  "#...#.#.#...#.....#...#.#.#...#",
+  "#.#.#.#.#.#.###.###.#.#.#.#.#.#",
+  "#o..#.....#.........#.....#..o#",
+  "###############################"
+};
+uint8_t jDot[J_ROWS][J_COLS];
+LMob jP, jE[4];
+int jT = 6, jDots = 0, jFright = 0, jChain = 0, jCamX = 0, jCamY = 0;
+int jJump = 0, jEJump[4];  // sauts en cours (0 = au sol)
+int8_t jWantDx = 0, jWantDy = 0;
+bool jPrevJump = false;
+float jcx(int c) { return c * jT + jT / 2.0f; }  // coordonnees dans le labyrinthe (pas a l'ecran)
+float jcy(int r) { return r * jT + jT / 2.0f; }
+float jHeight(int t) { return t > 0 ? sinf(3.14159f * (J_JUMP - t) / J_JUMP) * (jT + 1) : 0; }
+bool jAir(int t) { return jHeight(t) > 2.0f; }
+bool jOpen(int c, int r, bool player) {
+  if (r < 0 || r >= J_ROWS) return false;
+  if (c < 0 || c >= J_COLS) return r == 11;  // couloir du milieu ouvert sur les cotes
+  char t = J_MAZE[r][c];
+  if (t == '#') return false;
+  if (player && ((r == 10 && c == 15) || (r == 11 && c >= 14 && c <= 16))) return false;  // maison des creatures
+  return true;
+}
+void jPlace(LMob &m, int c, int r) { m.c = c; m.r = r; m.x = jcx(c); m.y = jcy(r); m.dx = m.dy = 0; }
+void jPositions() {
+  jPlace(jP, 15, 15);
+  jWantDx = -1; jWantDy = 0;
+  jJump = 0;
+  static const int8_t HC[4] = { 15, 14, 15, 16 }, HR[4] = { 9, 11, 11, 11 };
+  for (int i = 0; i < 4; i++) {
+    jPlace(jE[i], HC[i], HR[i]);
+    jE[i].state = i == 0 ? 0 : 2;
+    jE[i].t = 40 + i * 90;
+    jE[i].fr = false;
+    jEJump[i] = 0;
+  }
+  jFright = 0;
+}
+void jNewMaze() {
+  jDots = 0;
+  for (int r = 0; r < J_ROWS; r++)
+    for (int c = 0; c < J_COLS; c++) {
+      char t = J_MAZE[r][c];
+      jDot[r][c] = t == '.' ? 1 : t == 'o' ? 2 : 0;
+      jDots += jDot[r][c] != 0;
+    }
+  jPositions();
+}
+void jReset() {
+  gLives = (!gDemo && gDiff == 0) ? 5 : 3;
+  gPaused = false;
+  gScore = 0; gWave = 1; gDead = 0; gBonus = 0; gLifeUp = false;
+  gStageT = 100;
+  sndMelody(JINGLE_STAGE, 4);
+  for (auto &b : gBoom) b.t = 0;
+  jT = H >= 128 ? 8 : 6;
+  jNewMaze();
+}
+void jChoose(LMob &m, int who, int8_t &ndx, int8_t &ndy) {
+  ndx = ndy = 0;
+  if (who < 0) {
+    if ((jWantDx || jWantDy) && jOpen(m.c + jWantDx, m.r + jWantDy, true)) { ndx = jWantDx; ndy = jWantDy; }
+    else if ((m.dx || m.dy) && jOpen(m.c + m.dx, m.r + m.dy, true)) { ndx = m.dx; ndy = m.dy; }
+    return;
+  }
+  int tc = jP.c, tr = jP.r;
+  if (m.state == 3) { tc = 15; tr = 9; }
+  else if (who == 1) { tc = jP.c + jP.dx * 4; tr = jP.r + jP.dy * 4; }
+  else if (who == 2) { tc = 2 * jP.c - jE[0].c; tr = 2 * jP.r - jE[0].r; }
+  else if (who == 3 && abs(m.c - jP.c) + abs(m.r - jP.r) < 8) { tc = 1; tr = 21; }
+  static const int8_t DX[4] = { 0, -1, 0, 1 }, DY[4] = { -1, 0, 1, 0 };
+  int best = -1;
+  long bestD = 0x7fffffff;
+  int opts[4], nOpts = 0;
+  for (int k = 0; k < 4; k++) {
+    if (DX[k] == -m.dx && DY[k] == -m.dy && (m.dx || m.dy)) continue;
+    if (!jOpen(m.c + DX[k], m.r + DY[k], false)) continue;
+    if (m.state == 0 && m.r == 9 && m.c == 15 && DY[k] == 1) continue;  // ne rentre pas dans la maison
+    opts[nOpts++] = k;
+    long dx = m.c + DX[k] - tc, dy = m.r + DY[k] - tr, d = dx * dx + dy * dy;
+    if (d < bestD) { bestD = d; best = k; }
+  }
+  if (!nOpts) { ndx = -m.dx; ndy = -m.dy; return; }
+  int rnd = gEffDiff() == 0 ? 35 : gEffDiff() == 1 ? 18 : 6;
+  if (m.fr || random(100) < rnd) best = opts[random(nOpts)];
+  ndx = DX[best]; ndy = DY[best];
+}
+void jArrive(LMob &m, int who) {
+  if (who >= 0) {
+    if (m.state == 3 && m.c == 15 && m.r == 9) m.state = 0;
+    return;
+  }
+  if (jAir(jJump)) return;  // en l'air : on passe au-dessus des graines
+  uint8_t &d = jDot[m.r][m.c];
+  if (!d) return;
+  if (d == 2) {
+    gScore += 50;
+    jFright = max(90, 260 - 20 * gWave);
+    jChain = 0;
+    for (auto &e : jE) if (e.state != 2) { e.fr = true; e.dx = -e.dx; e.dy = -e.dy; }
+    sfxDive();
+  } else {
+    gScore += 10;
+    if ((jDots & 1) == 0) sfxMenu();
+  }
+  d = 0;
+  jDots--;
+}
+void jMove(LMob &m, float sp, int who) {
+  for (int guard = 0; sp > 0.001f && guard < 8; guard++) {
+    float tx = jcx(m.c), ty = jcy(m.r);
+    float d = fabsf(tx - m.x) + fabsf(ty - m.y);
+    if (d < 0.01f) {
+      m.x = tx; m.y = ty;
+      jArrive(m, who);
+      int8_t ndx, ndy;
+      jChoose(m, who, ndx, ndy);
+      if (!ndx && !ndy) { m.dx = m.dy = 0; return; }
+      m.dx = ndx; m.dy = ndy;
+      int nc = m.c + ndx;
+      if (nc < 0) { nc = J_COLS - 1; m.x += J_COLS * jT; }
+      if (nc >= J_COLS) { nc = 0; m.x -= J_COLS * jT; }
+      m.c = nc; m.r += ndy;
+      continue;
+    }
+    float step = min(sp, d);
+    m.x += (tx > m.x ? step : tx < m.x ? -step : 0);
+    m.y += (ty > m.y ? step : ty < m.y ? -step : 0);
+    sp -= step;
+  }
+}
+// pilote automatique (demo) : plus court chemin vers la graine la plus proche ; saute si une creature arrive
+uint8_t jAuto() {
+  static uint8_t from[J_ROWS][J_COLS];
+  static int16_t q[J_ROWS * J_COLS];
+  memset(from, 0xFF, sizeof(from));
+  int head = 0, tail = 0;
+  q[tail++] = jP.r * J_COLS + jP.c;
+  from[jP.r][jP.c] = 4;
+  static const int8_t DX[4] = { 0, -1, 0, 1 }, DY[4] = { -1, 0, 1, 0 };
+  int found = -1;
+  while (head < tail) {
+    int cur = q[head++], r = cur / J_COLS, c = cur % J_COLS;
+    if (jDot[r][c] && !(r == jP.r && c == jP.c)) { found = cur; break; }
+    for (int k = 0; k < 4; k++) {
+      int nr = r + DY[k], nc = (c + DX[k] + J_COLS) % J_COLS;
+      if (!jOpen(c + DX[k], nr, true) || from[nr][nc] != 0xFF) continue;
+      bool danger = false;
+      for (auto &e : jE) if (!e.fr && e.state != 2 && abs(e.c - nc) + abs(e.r - nr) <= 1) danger = true;
+      if (danger && head > 1) continue;
+      from[nr][nc] = k;
+      q[tail++] = nr * J_COLS + nc;
+    }
+  }
+  uint8_t key = 0;
+  for (auto &e : jE)  // creature tout pres : on saute
+    if (!e.fr && e.state != 2 && fabsf(e.x - jP.x) + fabsf(e.y - jP.y) < jT * 1.6f) key |= 4;
+  if (found < 0) return key;
+  int r = found / J_COLS, c = found % J_COLS, k = 4;
+  while (!(r == jP.r && c == jP.c)) {
+    k = from[r][c];
+    int pr = r - DY[k], pc = (c - DX[k] + J_COLS) % J_COLS;
+    if (pr == jP.r && pc == jP.c) break;
+    r = pr; c = pc;
+  }
+  static const uint8_t KEY[4] = { 8, 1, 16, 2 };
+  return key | (k < 4 ? KEY[k] : 0);
+}
+void jStep() {
+  gFrame++;
+  uint8_t k = gDemo ? jAuto() : keysPs4;
+  if (gDead > 0) {
+    if (--gDead == 0) {
+      if (gLives <= 0) {
+        if (gDemo) jReset();
+        else if (gLastRank) startNameEntry();
+        else toDemo();
+        return;
+      }
+      jPositions();
+    }
+    return;
+  }
+  if (gStageT > 0) { gStageT--; return; }
+  if (k & 1) { jWantDx = -1; jWantDy = 0; }
+  if (k & 2) { jWantDx = 1; jWantDy = 0; }
+  if (k & 8) { jWantDx = 0; jWantDy = -1; }
+  if (k & 16) { jWantDx = 0; jWantDy = 1; }
+  bool jb = k & (4 | 32);
+  if (jb && (!jPrevJump || gDemo) && jJump == 0) {  // saut (a l'appui)
+    jJump = J_JUMP;
+    sndPlay(500, 1400, 160, 0.25f, false, 1);
+    if (gWave >= 2 && jEJump[0] == 0 && !jE[0].fr && jE[0].state != 2 &&
+        abs(jE[0].c - jP.c) + abs(jE[0].r - jP.r) <= 4 && random(100) < 60 + 10 * gEffDiff())
+      jEJump[0] = J_JUMP;  // la creature violette saute aussi !
+  }
+  jPrevJump = jb;
+  if (jJump > 0) jJump--;
+  for (int i = 0; i < 4; i++) if (jEJump[i] > 0) jEJump[i]--;
+  if ((jWantDx || jWantDy) && jWantDx == -jP.dx && jWantDy == -jP.dy) {  // demi-tour immediat
+    jP.c -= jP.dx; jP.r -= jP.dy;
+    if (jP.c < 0) { jP.c += J_COLS; jP.x += J_COLS * jT; }
+    if (jP.c >= J_COLS) { jP.c -= J_COLS; jP.x -= J_COLS * jT; }
+    jP.dx = jWantDx; jP.dy = jWantDy;
+  }
+  float unit = jT / 6.0f;
+  jMove(jP, 0.95f * unit, -1);
+  if (jFright > 0 && --jFright == 0)
+    for (auto &e : jE) e.fr = false;
+  float es = (0.80f + 0.04f * min(gWave, 8) + 0.08f * (gEffDiff() - 1)) * unit;
+  for (int i = 0; i < 4; i++) {
+    LMob &e = jE[i];
+    if (e.state == 2) { if (--e.t <= 0) e.state = 3; continue; }
+    jMove(e, e.fr ? 0.5f * unit : es, i);
+    if (jAir(jJump) != jAir(jEJump[i])) continue;  // l'un en l'air, l'autre au sol : on se croise
+    if (fabsf(e.x - jP.x) + fabsf(e.y - jP.y) < jT * 0.8f) {
+      if (e.fr) {
+        jChain = min(jChain + 1, 4);
+        gScore += 100UL << jChain;
+        gBoomAt(e.x - jCamX, e.y + 8 - jCamY);
+        sfxBoom();
+        e.fr = false;
+        jPlace(e, 15, 11);
+        e.state = 2; e.t = 120;
+      } else {
+        altLoseLife(jP.x - jCamX, jP.y + 8 - jCamY);
+        return;
+      }
+    }
+  }
+  if (!gDemo && gScore > gHi) gHi = gScore;
+  if (jDots <= 0) {
+    gWave++;
+    gStageT = 100;
+    altStageClear(1000UL * gWave);
+    sndMelody(JINGLE_STAGE, 4);
+    jNewMaze();
+  }
+}
+// rectangle limite a la zone de jeu (sous la ligne du score)
+void jRect(int x, int y, int w, int h, uint16_t c) {
+  int x0 = max(0, x), y0 = max(8, y), x1 = min(W, x + w), y1 = min(H, y + h);
+  if (x1 > x0 && y1 > y0) gfx->fillRect(x0, y0, x1 - x0, y1 - y0, c);
+}
+void jPx(int x, int y, uint16_t c) {
+  if (x >= 0 && x < W && y >= 8 && y < H) gfx->drawPixel(x, y, c);
+}
+bool jWall(int r, int c) { return r >= 0 && r < J_ROWS && c >= 0 && c < J_COLS && J_MAZE[r][c] == '#'; }
+void jDraw() {
+  eraseOld();
+  uint16_t palFull[9];
+  for (int i = 0; i < 9; i++) palFull[i] = rgb(G_PAL_RGB[i][0], G_PAL_RGB[i][1], G_PAL_RGB[i][2]);
+  int t = jT, VH = H - 8, mw = J_COLS * t, mh = J_ROWS * t;
+  // camera : suit la sauterelle (centree si le labyrinthe tient dans l'ecran)
+  jCamX = mw <= W ? -(W - mw) / 2 : constrain((int)jP.x - W / 2, 0, mw - W);
+  jCamY = mh <= VH ? -(VH - mh) / 2 : constrain((int)jP.y - VH / 2, 0, mh - VH);
+  static const uint8_t WC[4][3] = { { 60, 90, 255 }, { 200, 60, 220 }, { 40, 190, 120 }, { 240, 130, 30 } };
+  const uint8_t *wc = WC[(gWave - 1) % 4];
+  uint16_t top = rgb(wc[0] * 3 / 5, wc[1] * 3 / 5, wc[2] * 3 / 5), hi = rgb(wc[0], wc[1], wc[2]);
+  uint16_t front = rgb(wc[0] / 4, wc[1] / 4, wc[2] / 4), seed = rgb(230, 200, 140);
+  int fh = t / 3;  // hauteur de la face avant des murs (relief)
+  int c0 = max(0, jCamX / t), c1 = min(J_COLS - 1, (jCamX + W) / t), r0 = max(0, jCamY / t), r1 = min(J_ROWS - 1, (jCamY + VH) / t);
+  // bords hors labyrinthe (si l'ecran est plus grand) : noir
+  if (jCamX < 0) { jRect(0, 8, -jCamX, VH, 0); jRect(-jCamX + mw, 8, W, VH, 0); }
+  if (jCamY < 0) { jRect(0, 8, W, -jCamY, 0); jRect(0, 8 - jCamY + mh, W, VH, 0); }
+  for (int r = r0; r <= r1; r++)  // toutes les cases visibles sont redessinees : le defilement efface tout seul
+    for (int c = c0; c <= c1; c++) {
+      int x = c * t - jCamX, y = 8 + r * t - jCamY;
+      if (J_MAZE[r][c] == '#') {
+        jRect(x, y, t, t, top);
+        if (!jWall(r - 1, c)) jRect(x, y, t, 1, hi);                // arete eclairee
+        if (!jWall(r, c - 1)) jRect(x, y, 1, t, hi);
+        if (!jWall(r + 1, c)) jRect(x, y + t - fh, t, fh, front);  // face avant (ombre)
+      } else {
+        jRect(x, y, t, t, 0);
+        if (jDot[r][c] == 1) jRect(x + t / 2 - 1, y + t / 2 - 1, 2, 2, seed);
+        else if (jDot[r][c] == 2 && (gFrame & 8)) jRect(x + t / 2 - 2, y + t / 2 - 2, 4, 4, palFull[0]);
+      }
+    }
+  jRect(15 * t - jCamX, 8 + 10 * t + t / 2 - jCamY, t, 1, palFull[7]);  // porte de la maison
+  uint16_t shadow = rgb(50, 50, 60);
+  static const uint8_t EC[4][3] = { { 170, 70, 255 }, { 255, 140, 0 }, { 170, 230, 40 }, { 230, 230, 230 } };
+  static const uint8_t SPIKE[5] = { 0x15, 0x0E, 0x1F, 0x0E, 0x15 };
+  for (int i = 0; i < 4; i++) {
+    LMob &e = jE[i];
+    uint16_t col = rgb(EC[i][0], EC[i][1], EC[i][2]);
+    if (e.fr) col = (jFright < 60 && (gFrame & 4)) ? palFull[0] : rgb(40, 90, 255);
+    int h = (int)jHeight(jEJump[i]);
+    int x = (int)e.x - jCamX - 2, y = (int)e.y + 8 - jCamY - 2;
+    if (h) for (int k = 0; k < 5; k++) jPx(x + k, y + 4, shadow);
+    y -= h;
+    for (int r = 0; r < 5; r++)
+      for (int c = 0; c < 5; c++)
+        if (SPIKE[r] & (0x10 >> c)) jPx(x + c, y + r, col);
+    if (!e.fr) { jPx(x + 1, y + 2, palFull[0]); jPx(x + 3, y + 2, palFull[0]); }
+    if (y < 8) gMark(x, y, 5, 5);
+  }
+  if (gDead == 0) {  // sauterelle : corps vert allonge dans le sens de la marche, grandes pattes arriere
+    int h = (int)jHeight(jJump);
+    int cx = (int)jP.x - jCamX, cy = (int)jP.y + 8 - jCamY;
+    if (h) for (int k = -2; k <= 2; k++) jPx(cx + k, cy + 2, shadow);  // ombre au sol pendant le saut
+    cy -= h;
+    uint16_t g = rgb(60, 220, 60), dk = rgb(20, 110, 30), eye = rgb(255, 230, 0);
+    int dx = jP.dx, dy = jP.dy;
+    if (!dx && !dy) dx = 1;
+    bool legUp = h > 0 || ((gFrame / 4) & 1);
+    if (dx) {
+      jRect(cx - 2, cy - 1, 5, 2, g);
+      jPx(cx + 2 * dx, cy - 1, eye);                       // tete et oeil
+      jPx(cx - 2 * dx, cy - 2, dk); jPx(cx - dx, cy - 3 + !legUp, dk); jPx(cx, cy - 2, dk);  // grande patte arriere
+      jPx(cx + dx, cy + 1, dk); jPx(cx - dx, cy + 1 + legUp, dk);
+      jPx(cx + 3 * dx, cy - 2, dk);                         // antenne
+    } else {
+      jRect(cx - 1, cy - 2, 2, 5, g);
+      jPx(cx - 1, cy + 2 * dy, eye); jPx(cx, cy + 2 * dy, eye);
+      jPx(cx - 2, cy - dy, dk); jPx(cx + 1, cy - dy, dk);
+      jPx(cx - 2 - legUp, cy - 2 * dy, dk); jPx(cx + 1 + legUp, cy - 2 * dy, dk);
+      jPx(cx, cy + 3 * dy, dk);
+    }
+    if (cy - 3 < 8) gMark(cx - 4, cy - 4, 9, 8);
+  }
+  altBooms(palFull);
+  altHud(palFull);
+}
+
 // aiguillage selon le jeu choisi
-void altReset() { if (gGame == 1) rReset(); else if (gGame == 2) cReset(); else if (gGame == 3) qReset(); else bReset(); }
-void altStep() { if (gGame == 1) rStep(); else if (gGame == 2) cStep(); else if (gGame == 3) qStep(); else bStep(); }
-void altDraw() { if (gGame == 1) rDraw(); else if (gGame == 2) cDraw(); else if (gGame == 3) qDraw(); else bDraw(); }
+void altReset() { if (gGame == 1) rReset(); else if (gGame == 2) cReset(); else if (gGame == 3) qReset(); else if (gGame == 4) bReset(); else if (gGame == 5) lReset(); else jReset(); }
+void altStep() { if (gGame == 1) rStep(); else if (gGame == 2) cStep(); else if (gGame == 3) qStep(); else if (gGame == 4) bStep(); else if (gGame == 5) lStep(); else jStep(); }
+void altDraw() { if (gGame == 1) rDraw(); else if (gGame == 2) cDraw(); else if (gGame == 3) qDraw(); else if (gGame == 4) bDraw(); else if (gGame == 5) lDraw(); else jDraw(); }
 // remise a zero du jeu choisi (partie ou demo)
 void resetCurrent() { if (gGame == 0) gReset(); else altReset(); }
 
@@ -2367,7 +3013,8 @@ void ps4Poll() {
   if (edge) lastInput = millis();
   if (gNameEntry) nameInput(edge);  // saisie du nom
   else if (gDemo && gAttract) {  // mode demo : n'importe quel bouton ou le stick fait revenir le menu (sans autre effet)
-    if (edge || k) { gAttract = false; lastInput = millis(); sfxMenu(); prevB = 0xFF; }
+    if (gAttractHold) { if (!k && !bt) gAttractHold = false; }  // la croix qui a lance la demo est encore enfoncee
+    else if (edge || k) { gAttract = false; lastInput = millis(); sfxMenu(); prevB = 0xFF; }
   } else if (gDemo) menuInput(edge);
   else if (edge & 64 && gLives > 0) { gPaused = !gPaused; sfxMenu(); }  // OPTIONS : pause / reprise
   else if (gPaused && (edge & 32)) {  // pause + rond : on quitte la partie (score enregistre s'il entre au tableau)
@@ -2449,7 +3096,7 @@ void menuInput(uint8_t edge) {
   if (edge & 16) {
     if (menuSel == 0) startReq = true;
     else if (menuSel == 4) { menuScores = true; sfxMenu(); }
-    else if (menuSel == 5) { menuSel = 0; sfxMenu(); startAttract(); }  // ligne DEMO : demo du jeu choisi
+    else if (menuSel == 5) { menuSel = 0; sfxMenu(); startAttract(); gAttractHold = true; }  // ligne DEMO : demo du jeu choisi
   }
 }
 

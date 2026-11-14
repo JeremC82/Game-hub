@@ -91,8 +91,7 @@ for f in range(560):
     s.sprite(SPR_SHIP[0], W // 2 - 4, H - 15)
     if f < 100:
         s.text(H // 2 - 22, 'STAGE 1', (255, 220, 0))
-    s.tiny(1, 0, 'SCORE', PAL['r'])
-    s.tiny(1, 6, '0', (230, 230, 230))
+    ns['hud_top'](s, W, 0, 3)
     # LED simulees
     P = 4
     out = Image.new('RGB', (W * P + 20, H * P + 50), (12, 12, 16))

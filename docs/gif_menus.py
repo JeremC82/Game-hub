@@ -254,12 +254,7 @@ def mode_demo():
             for dx, dy in ((1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1)):
                 s.px(bx + dx * t // 2, by + dy * t // 2, PAL['w'] if t < 4 else PAL['y'] if t < 7 else PAL['r'])
         s.sprite(SPR_SHIP[0], int(ship_x), H - 10)
-        s.tiny(1, 0, 'SCORE', PAL['r'])
-        s.tiny(1, 6, str(score), WHITE)
-        s.tiny(W // 2 - 11, 0, 'RECORD', PAL['r'])
-        s.tiny(W // 2 - 11, 6, '30800', WHITE)
-        s.tiny(W - 8, 1, 'X3', WHITE)
-        s.sprite(SPR_LIFE, W - 15, 1)
+        ns['hud_top'](s, W, score, 3)
         if (f // 40) & 1:
             s.text(H // 2 + 6, 'DEMO', SEL)
         else:
