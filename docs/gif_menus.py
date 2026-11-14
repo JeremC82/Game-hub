@@ -255,10 +255,6 @@ def mode_demo():
                 s.px(bx + dx * t // 2, by + dy * t // 2, PAL['w'] if t < 4 else PAL['y'] if t < 7 else PAL['r'])
         s.sprite(SPR_SHIP[0], int(ship_x), H - 10)
         ns['hud_top'](s, W, score, 3)
-        if (f // 40) & 1:
-            s.text(H // 2 + 6, 'DEMO', SEL)
-        else:
-            s.text(H // 2 + 6, 'APPUIE : MENU', (0, 220, 255))
         panel = led(s.im, 0.9)
 
         def side(d, x0, y0):

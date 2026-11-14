@@ -140,7 +140,7 @@ Une balle et deux raquettes : la tienne en bas, celle de l'ordinateur en haut.
 
 ## Menu
 
-Sans partie en cours, le jeu tourne tout seul en démo, sans son. **Sans manette connectée**, la démo affiche « DEMO » et une petite indication, « MANETTE : BOUTON PS », avec l'adresse Bluetooth de l'ESP32. Dès que la manette est connectée, le menu s'affiche **sur son propre écran**, sans la démo derrière. On y voit un fond d'étoiles, le titre GAME HUB et le record avec le nom de son détenteur :
+Sans partie en cours, le jeu tourne tout seul en démo, sans son. **Sans manette connectée**, la démo affiche seulement une petite indication, « MANETTE : BOUTON PS », avec l'adresse Bluetooth de l'ESP32. Dès que la manette est connectée, le menu s'affiche **sur son propre écran**, sans la démo derrière. On y voit un fond d'étoiles, le titre GAME HUB et le record avec le nom de son détenteur :
 
 ![Menu, meilleurs scores avec les noms, saisie du nom](docs/rendu-menu.png)
 
@@ -151,7 +151,7 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. **Sans manette
 | **LUMINOSITE** | 0 à 100 % par pas de 10 % (gauche / droite ou ✕), visible tout de suite et gardée en mémoire. À 0 %, les dalles restent très faiblement allumées pour qu'on voie encore le menu. |
 | **VOLUME** | volume du son, 0 à 100 % par pas de 10 % (gauche / droite ou ✕). Un bip fait entendre le niveau. 0 % = muet. C'est le rapport cyclique du PWM : le potentiomètre de l'ampli règle le maximum. |
 | **SCORES** | les 5 meilleurs scores **du jeu choisi** : rang, **nom**, score, niveau (F/N/D) et stage atteint. Chaque jeu a son propre tableau. |
-| **DEMO** | lance **la démo du jeu choisi** : il tourne tout seul avec un pilote automatique. Seuls « DEMO / APPUIE : MENU » s'affichent (cachés pendant l'annonce d'un stage) |
+| **DEMO** | lance **la démo du jeu choisi** : il tourne tout seul avec un pilote automatique, sans texte par-dessus (seules les annonces de stage s'affichent) |
 
 | Réglage du volume | Réglage de la luminosité |
 |---|---|
@@ -198,7 +198,7 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. **Sans manette
 **Connexion, une seule fois.** Une manette PS4 ne se connecte qu'à l'adresse Bluetooth qu'elle a enregistrée. Il y a deux façons de faire.
 
 **Méthode 1 (la plus simple) : écrire l'adresse de l'ESP32 dans la manette.**
-1. Pendant la démo, la dalle affiche l'adresse Bluetooth de l'ESP32 sous « MANETTE: BOUTON PS ». Le moniteur série l'affiche aussi.
+1. Sans manette, la dalle affiche l'adresse Bluetooth de l'ESP32 sous « MANETTE : BOUTON PS ». Le moniteur série l'affiche aussi.
 2. Branche la manette en USB sur le PC et lance **SixaxisPairTool**. Tape l'adresse de l'ESP32 dans « Change Master », puis clique sur Update.
 3. Débranche la manette et appuie sur **PS**.
 
@@ -279,8 +279,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V3.40_complet.bin](firmware/GameHub_V3.40_complet.bin) | 0x0 | `b6de52069df95feca813b5a4ec7e5e24` |
-| [firmware/GameHub_V3.40.bin](firmware/GameHub_V3.40.bin) | 0x10000 | `249538a97f791511e1169a085d8a9c16` |
+| [firmware/GameHub_V3.41_complet.bin](firmware/GameHub_V3.41_complet.bin) | 0x0 | `9b54993e1ff9c52d5806121880ff685d` |
+| [firmware/GameHub_V3.41.bin](firmware/GameHub_V3.41.bin) | 0x10000 | `1a4214f96d2913165624d9fb08a240f5` |
 
 Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB SPIFFS)** dans Outils → Partition Scheme.
 

@@ -137,9 +137,9 @@ def game_frame(w, h, demo=False, stage=1, banner=False, seed=3):
         y = h // 2 - 22 if tall else h // 2 - 10
         s.text(y, f'STAGE {stage}', (255, 220, 0))
         s.text(y + 11, f'BONUS {500 * (stage - 1)}', (230, 230, 230))
-    if demo:  # textes de la demo (gOverlay)
-        s.text(h // 2 + 6, 'APPUIE SUR FEU', (0, 220, 255))
-        s.text(h // 2 + 18, '192.168.1.42', (110, 110, 130))
+    if demo:  # demo sans manette : seulement l'indication pour la connecter (gOverlay)
+        hint = 'MANETTE : BOUTON PS'
+        s.tiny((w - (len(hint) * 4 - 1)) // 2, h // 2 + 20 if h >= 128 else h - 14, hint, (100, 100, 120))
     return s.im
 
 

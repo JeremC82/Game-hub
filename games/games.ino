@@ -29,7 +29,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "3.40"
+#define GAMES_VERSION "3.41"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -896,15 +896,10 @@ void gOverlay() {
     if (gLifeUp) gText(yy, "VIE +1", rgb(0, 220, 255));
   }
   if (!gDemo) return;
-  if (stageMsg) return;  // demo : pendant l'annonce du stage, pas de texte DEMO (ils se chevauchaient)
+  if (stageMsg) return;  // demo : pendant l'annonce du stage, pas d'indication manette (elles se chevauchaient)
   if (PS4.isConnected() && !gAttract) return;  // manette la : le menu a son propre ecran (menuScreen)
-  if (PS4.isConnected()) {  // mode demo : le menu revient au premier appui
-    if ((gFrame / 40) & 1) gText(H / 2 + 6, "DEMO", rgb(255, 220, 0));
-    else gText(H / 2 + 6, "APPUIE : MENU", rgb(0, 220, 255));
-    return;
-  }
-  // pas de manette : demo, avec une petite indication pour la connecter (mini-police) et l'adresse Bluetooth
-  if ((gFrame / 40) & 1) gText(H / 2 + 6, "DEMO", rgb(255, 220, 0));
+  if (PS4.isConnected()) return;  // mode demo : aucun texte (le menu revient au premier appui)
+  // pas de manette : petite indication pour la connecter (mini-police) et l'adresse Bluetooth
   const char *hint = "MANETTE : BOUTON PS";
   int hy = H >= 128 ? H / 2 + 20 : H - 14;
   uint16_t grey = rgb(100, 100, 120);
@@ -2665,8 +2660,9 @@ void jDraw() {
   static const uint8_t WC[4][3] = { { 60, 90, 255 }, { 200, 60, 220 }, { 40, 190, 120 }, { 240, 130, 30 } };
   const uint8_t *wc = WC[(gWave - 1) % 4];
   uint16_t top = rgb(wc[0] * 3 / 5, wc[1] * 3 / 5, wc[2] * 3 / 5), hi = rgb(wc[0], wc[1], wc[2]);
-  uint16_t front = rgb(wc[0] / 4, wc[1] / 4, wc[2] / 4), seed = rgb(230, 200, 140);
-  int fh = t / 3;  // hauteur de la face avant des murs (relief)
+  uint16_t front = rgb(wc[0] / 3, wc[1] / 3, wc[2] / 3), base = rgb(wc[0] / 6, wc[1] / 6, wc[2] / 6);
+  uint16_t side = rgb(wc[0] * 2 / 5, wc[1] * 2 / 5, wc[2] * 2 / 5), seed = rgb(230, 200, 140);
+  int fh = t / 2;  // hauteur de la face avant des murs (relief bien marque)
   int c0 = max(0, jCamX / t), c1 = min(J_COLS - 1, (jCamX + W) / t), r0 = max(0, jCamY / t), r1 = min(J_ROWS - 1, (jCamY + VH) / t);
   // bords hors labyrinthe (si l'ecran est plus grand) : noir
   if (jCamX < 0) { jRect(0, 8, -jCamX, VH, 0); jRect(-jCamX + mw, 8, W, VH, 0); }
@@ -2676,9 +2672,14 @@ void jDraw() {
       int x = c * t - jCamX, y = 8 + r * t - jCamY;
       if (J_MAZE[r][c] == '#') {
         jRect(x, y, t, t, top);
+        if (!jWall(r, c + 1)) jRect(x + t - 1, y, 1, t, side);       // flanc droit dans l'ombre
         if (!jWall(r - 1, c)) jRect(x, y, t, 1, hi);                // arete eclairee
         if (!jWall(r, c - 1)) jRect(x, y, 1, t, hi);
-        if (!jWall(r + 1, c)) jRect(x, y + t - fh, t, fh, front);  // face avant (ombre)
+        if (!jWall(r + 1, c)) {                                     // face avant : mur vu de biais
+          jRect(x, y + t - fh, t, fh, front);
+          jRect(x, y + t - fh, t, 1, hi);                           // arete du dessus
+          jRect(x, y + t - 1, t, 1, base);                          // pied du mur
+        }
       } else {
         jRect(x, y, t, t, 0);
         if (jDot[r][c] == 1) jRect(x + t / 2 - 1, y + t / 2 - 1, 2, 2, seed);

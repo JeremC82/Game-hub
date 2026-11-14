@@ -920,7 +920,9 @@ def sauterelle():
         return ch
     WALLC = (60, 90, 255)
     top = tuple(v * 3 // 5 for v in WALLC)
-    front = tuple(v // 4 for v in WALLC)
+    front = tuple(v // 3 for v in WALLC)
+    base = tuple(v // 6 for v in WALLC)
+    side = tuple(v * 2 // 5 for v in WALLC)
     shadow = (50, 50, 60)
     for f in range(560):
         near = any(abs(e['x'] - p['x']) + abs(e['y'] - p['y']) < T * 1.6 for e in en if not fright and not e['wait'])
@@ -978,12 +980,16 @@ def sauterelle():
                     continue
                 if maze[r][c] == '#':
                     rect(x, y, T, T, top)
+                    if not wall(r, c + 1):
+                        rect(x + T - 1, y, 1, T, side)
                     if not wall(r - 1, c):
                         rect(x, y, T, 1, WALLC)
                     if not wall(r, c - 1):
                         rect(x, y, 1, T, WALLC)
                     if not wall(r + 1, c):
-                        rect(x, y + T - T // 3, T, T // 3, front)
+                        rect(x, y + T - T // 2, T, T // 2, front)
+                        rect(x, y + T - T // 2, T, 1, WALLC)
+                        rect(x, y + T - 1, T, 1, base)
                 elif dots.get((r, c)) == 1:
                     rect(x + T // 2 - 1, y + T // 2 - 1, 2, 2, (230, 200, 140))
                 elif dots.get((r, c)) == 2 and f & 8:

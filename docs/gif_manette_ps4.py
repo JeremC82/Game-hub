@@ -165,11 +165,10 @@ for k in range(10):
     im, d = frame(3 if not pressed else 4, 'La dalle attend la manette...' if not pressed else 'Appuie sur le bouton PS',
                   'L\'ESP32 se fait passer pour la console' if not pressed else 'Connectee : la barre lumineuse s\'allume')
     blink = k % 2 == 0
-    texts = [(70, 'MANETTE: BOUTON PS' if not pressed else 'APPUIE SUR X', CYAN)]
-    if not pressed:
-        texts.append((82, MAC, (110, 110, 130)))
-    if (not pressed and blink) or pressed:
-        texts.insert(0, (58, 'DEMO', (255, 220, 0)))
+    if not pressed:  # demo sans manette : juste l'indication et l'adresse Bluetooth
+        texts = [(70, 'MANETTE: BOUTON PS', CYAN), (82, MAC, (110, 110, 130))]
+    else:  # manette connectee : le menu s'affiche
+        texts = [(58, 'GAME HUB', (255, 220, 0)), (70, '> JOUER ESSAIM', CYAN)]
     scr, pos = led_screen(panel_img(texts), 470, 100)
     im.paste(scr, (480, 130))
     controller(d, 230, 340, led=(0, 0, 90) if pressed else None, ps=(k in (5, 6)))
