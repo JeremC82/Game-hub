@@ -8,11 +8,11 @@
 /*  Ou avec la manette ESP32 (dossier manette/) : radio ESP-NOW directe, sans box ni page web.    */
 /*  Sans joueur, le jeu tourne tout seul (demo). FEU lance une partie. Le record est garde.      */
 /*                                                                                                */
-/*  Ecran (choix dans la page web, garde en memoire, redemarre) :                                */
-/*    128x128 : 2 dalles 128x64 chainees, l'une sous l'autre (1re dalle = celle reliee a l'ESP32)  */
-/*    256x64  : 2 dalles 128x64 chainees, l'une a cote de l'autre (1re dalle a gauche)           */
-/*    256x128 : 4 dalles 128x64 chainees, ordre de la chaine : haut gauche, haut droite,          */
-/*              bas gauche, bas droite (toutes dans le meme sens)                                  */
+/*  Ecran (menu Dalles de la page web, garde en memoire, redemarre) : 1 a 4 dalles 128x64        */
+/*  chainees, rangees l'une sous l'autre, cote a cote ou en carre 2x2 (4 dalles). Options :      */
+/*    ecran retourne (180 degres) : 1re dalle en bas / a droite, ou ensemble monte a l'envers    */
+/*    une dalle sur deux retournee : cablage en serpentin (nappes courtes)                       */
+/*  Ex. : 2 dalles l'une sous l'autre = 128x128, 4 l'une sous l'autre = 128x256 (vertical).       */
 /*  Meme brochage que l'horloge ClockV1 et le VU-metre.                                          */
 /*                                                                                                */
 /*  Wifi : essaie d'abord les reseaux de secrets.h (fichier local, jamais publie), puis le        */
@@ -40,7 +40,7 @@
 const char *WIFI_SEED[1][2] = { { "", "" } };
 #endif
 
-#define GAMES_VERSION "1.00"
+#define GAMES_VERSION "1.02"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -63,19 +63,28 @@ Preferences prefs;
 MatrixPanel_I2S_DMA *dma = nullptr;
 // Dalles 128x64 chainees, rangees en grille (cols x rows) : la chaine fait (128 x nombre) x 64,
 // presentee comme un ecran (128 x cols) x (64 x rows). Ordre : ligne du haut de gauche a droite, puis la suivante.
+// flip : tout l'ecran tourne de 180 degres ; serp : une dalle sur deux (2e, 4e) tournee de 180 degres.
 class TiledPanels : public Adafruit_GFX {
  public:
-  TiledPanels(MatrixPanel_I2S_DMA *d, uint8_t cols, uint8_t rows) : Adafruit_GFX(128 * cols, 64 * rows), m(d), nc(cols) {}
+  TiledPanels(MatrixPanel_I2S_DMA *d, uint8_t cols, uint8_t rows, bool flip, bool serp)
+    : Adafruit_GFX(128 * cols, 64 * rows), m(d), nc(cols), fl(flip), sp(serp) {}
   void drawPixel(int16_t x, int16_t y, uint16_t c) override {
     if (x < 0 || x >= _width || y < 0 || y >= _height) return;
-    m->drawPixel(((y >> 6) * nc + (x >> 7)) * 128 + (x & 127), y & 63, c);
+    if (fl) { x = _width - 1 - x; y = _height - 1 - y; }
+    int p = (y >> 6) * nc + (x >> 7), lx = x & 127, ly = y & 63;
+    if (sp && (p & 1)) { lx = 127 - lx; ly = 63 - ly; }
+    m->drawPixel(p * 128 + lx, ly, c);
   }
   void fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t c) override {
     int x0 = max(0, (int)x), x1 = min((int)_width, x + w), y0 = max(0, (int)y), y1 = min((int)_height, y + h);
+    if (x1 <= x0 || y1 <= y0) return;
+    if (fl) { int t = x0; x0 = _width - x1; x1 = _width - t; t = y0; y0 = _height - y1; y1 = _height - t; }
     for (int ty = y0; ty < y1; ty = (ty & ~63) + 64)  // morceau de rectangle sur chaque dalle
       for (int tx = x0; tx < x1; tx = (tx & ~127) + 128) {
         int ex = min(x1, (tx & ~127) + 128), ey = min(y1, (ty & ~63) + 64);
-        m->fillRect(((ty >> 6) * nc + (tx >> 7)) * 128 + (tx & 127), ty & 63, ex - tx, ey - ty, c);
+        int p = (ty >> 6) * nc + (tx >> 7), lx = tx & 127, ly = ty & 63, rw = ex - tx, rh = ey - ty;
+        if (sp && (p & 1)) { lx = 128 - lx - rw; ly = 64 - ly - rh; }
+        m->fillRect(p * 128 + lx, ly, rw, rh, c);
       }
   }
   void drawFastHLine(int16_t x, int16_t y, int16_t w, uint16_t c) override { fillRect(x, y, w, 1, c); }
@@ -84,13 +93,16 @@ class TiledPanels : public Adafruit_GFX {
  private:
   MatrixPanel_I2S_DMA *m;
   uint8_t nc;
+  bool fl, sp;
 };
 Adafruit_GFX *gfx = nullptr;
-#define N_LAYOUTS 3
-const char *LAYOUT_NAME[N_LAYOUTS] = { "128x128", "256x64", "256x128" };
-const uint8_t LAYOUT_COLS[N_LAYOUTS] = { 1, 2, 2 };  // dalles par ligne
-const uint8_t LAYOUT_ROWS[N_LAYOUTS] = { 2, 1, 2 };  // lignes de dalles
-uint8_t layout = 0;
+// configuration des dalles (menu Dalles de la page web)
+uint8_t nPanels = 2;   // 1 a 4 dalles 128x64
+uint8_t arrange = 0;   // 0 l'une sous l'autre, 1 cote a cote, 2 carre 2x2 (4 dalles)
+bool flipAll = false;  // ecran retourne (180 degres)
+bool serpent = false;  // une dalle sur deux retournee
+uint8_t panelCols() { return arrange == 2 && nPanels == 4 ? 2 : arrange == 1 ? nPanels : 1; }
+uint8_t panelRows() { return nPanels / panelCols(); }
 int W = 128, H = 128;
 uint8_t bright = 120;
 uint16_t rgb(uint8_t r, uint8_t g, uint8_t b) { return dma->color565(r, g, b); }
@@ -135,15 +147,15 @@ void tinyText(Adafruit_GFX &g, int x, int y, const char *s, uint16_t col) {
 // Sans joueur, un pilote automatique joue (demo). Les ennemis pulsent doucement.
 // Dessin sans scintillement : seuls les rectangles dessines a l'image precedente sont effaces.
 #define G_MAXE 100
-#define G_SHOTS 3
+#define G_SHOTS 9
 #define G_BOMBS 10
 #define G_BOOMS 10
 #define G_STARS 128
 #define G_RECTS 460
-#define G_MAXROWS 5
+#define G_MAXROWS 7
 const int GW = 9, GH = 7;  // taille des ennemis
 struct GEnemy { float x, y, vx, vy; int16_t t; int8_t row, col, type, hp, dir; uint8_t state; bool alive; };  // state : 0 rang, 1 pique, 2 retour
-struct GDot { float x, y; bool on; };
+struct GDot { float x, y; bool on; float vx; };  // vx : tirs en eventail
 struct GBoom { int16_t x, y; uint8_t t; };
 struct GStar { int16_t x; float y, v; uint8_t hue; };
 struct GRect { int16_t x, y; uint8_t w, h; };
@@ -167,7 +179,17 @@ const char *const SPR_E[3][2][GH] = {
   { { "c.......c", ".c.ggg.c.", "..gwywg..", "cgyyyyygc", "c.ggggg.c", "..g.y.g..", "...g.g..." },
     { "cc.....cc", "..cgggc..", "..gwywg..", ".gyyyyyg.", "..ggggg..", "..g.y.g..", "...g.g..." } }
 };
-const char *const SPR_SHIP[8] = { "....c....", "...ccc...", "...cwc...", "..bcwcb..", ".bbcccbb.", "bbcbcbcbb", "b.o...o.b", "..o...o.." };
+// vaisseau du joueur : il evolue avec les stages (1 base, 2 tir rapide, 3 double canon, 4+ triple canon)
+const char *const SPR_SHIP[4][8] = {
+  { "....c....", "...ccc...", "...cwc...", "..bcwcb..", ".bbcccbb.", "bbcbcbcbb", "b.o...o.b", "..o...o.." },
+  { "....c....", "...ccc...", "...cwc...", "..gcwcg..", ".ggcccgg.", "ggcgcgcgg", "g.o...o.g", "..o...o.." },
+  { "..c...c..", "..c.c.c..", ".cc.w.cc.", ".cbcwcbc.", "bbbcccbbb", "bybcbcbyb", "b.o...o.b", "..o...o.." },
+  { "c...c...c", "c..ccc..c", "cc.cwc.cc", "rbbcwcbbr", "rbbcccbbr", "bbcbcbcbb", "b.oy.yo.b", "..o...o.." }
+};
+const char *const TIER_NAME[4] = { "", "TIR RAPIDE", "DOUBLE CANON", "TRIPLE CANON" };
+int gStageT = 0;          // images restantes de l'annonce "STAGE n"
+uint32_t gBonus = 0;      // bonus de fin de stage affiche avec l'annonce
+int gTier() { return min(gWave, 4) - 1; }
 const char *const SPR_LIFE[4] = { "..c..", ".ccc.", "bcwcb", "b...b" };
 // palette : w blanc, r rouge, y jaune, b bleu, c cyan, g vert, p magenta, o orange, v violet
 const char G_PAL_CH[] = "wrybcgpov";
@@ -218,9 +240,10 @@ void gNewWave() {
       e.state = 2;
     }
   gWave++;
+  gStageT = 100;  // annonce pendant 2,5 s : les ennemis arrivent sans tirer ni piquer
 }
 void gReset() {
-  gLives = 3; gScore = 0; gWave = 0; gDead = 0; gCool = 0;
+  gLives = 3; gScore = 0; gWave = 0; gDead = 0; gCool = 0; gBonus = 0;
   gPx = W / 2 - 4;
   for (auto &s : gShot) s.on = false;
   for (auto &b : gBomb) b.on = false;
@@ -231,9 +254,10 @@ void gameSetup() {
   gfx->fillScreen(0);
   gNOld = 0;
   bool tall = H >= 128;
-  gRows = tall ? 5 : 3;
-  static const int8_t T5[5] = { 0, 1, 1, 2, 2 }, T3[3] = { 0, 1, 2 };
-  for (int r = 0; r < gRows; r++) gRowType[r] = tall ? T5[r] : T3[r];
+  bool huge = H >= 256;  // ecran vertical 128x256 : 7 rangees
+  gRows = huge ? 7 : tall ? 5 : 3;
+  static const int8_t T7[7] = { 0, 0, 1, 1, 1, 2, 2 }, T5[5] = { 0, 1, 1, 2, 2 }, T3[3] = { 0, 1, 2 };
+  for (int r = 0; r < gRows; r++) gRowType[r] = huge ? T7[r] : tall ? T5[r] : T3[r];
   gTop = 13;
   gPY = tall ? H - 15 : H - 8;  // sur 128x128 : la ligne du bas montre vies et vague
   gHi = prefs.getUInt("hiscore", 0);
@@ -241,6 +265,22 @@ void gameSetup() {
   gNStar = min(G_STARS, W * H / 220);
   for (int i = 0; i < gNStar; i++) gStar[i] = { (int16_t)random(W), (float)random(12, H), 0.2f + random(100) / 120.0f, (uint8_t)random(9) };
   gLastStep = millis();
+}
+// tir du vaisseau selon son evolution ; renvoie false si trop de tirs deja a l'ecran
+bool gFire() {
+  static const int8_t N[4] = { 1, 1, 2, 3 }, COOL[4] = { 8, 5, 6, 7 };
+  int t = gTier(), n = N[t], freeShots = 0;
+  for (auto &s : gShot) freeShots += !s.on;
+  if (freeShots < n) return false;
+  for (int k = 0; k < n; k++) {
+    float x = gPx + 4, vx = 0;
+    if (n == 2) x = gPx + (k ? 6 : 2);          // double canon : 2 tirs paralleles
+    if (n == 3) vx = (k - 1) * 0.5f;            // triple canon : eventail
+    for (auto &s : gShot)
+      if (!s.on) { s = { x, (float)gPY - 3, true, vx }; break; }
+  }
+  gCool = COOL[t];
+  return true;
 }
 void gHitPlayer() {
   gBoomAt(gPx + 4, gPY + 3);
@@ -261,7 +301,7 @@ void gameStep() {
   int alive = 0;
   for (int i = 0; i < gNE; i++) alive += gEn[i].alive;
   int diveEvery = max(16, 60 - gWave * 7);
-  if (gDead == 0 && gFrame % diveEvery == 0 && alive) {
+  if (gDead == 0 && gStageT == 0 && gFrame % diveEvery == 0 && alive) {
     int k = random(gNE);
     for (int t = 0; t < gNE; t++, k = (k + 1) % gNE)
       if (gEn[k].alive && gEn[k].state == 0) {
@@ -292,7 +332,7 @@ void gameStep() {
       if (fabsf(dx) < 0.6f && fabsf(dy) < 0.6f) e.state = 0;
     }
     int chance = e.state == 1 ? 18 : 2 + gWave;  // tirs ennemis
-    if (gDead == 0 && e.y > 0 && e.y < H * 0.6f && random(1000) < chance)
+    if (gDead == 0 && gStageT == 0 && e.y > 0 && e.y < H * 0.6f && random(1000) < chance)
       for (auto &b : gBomb)
         if (!b.on) { b = { e.x + 4, e.y + GH, true }; break; }
     if (gDead == 0 && e.state == 1 && e.x + GW - 1 >= gPx && e.x <= gPx + 8 && e.y + GH - 1 >= gPY && e.y <= gPY + 7) {
@@ -324,8 +364,7 @@ void gameStep() {
     if (gCool == 0)  // tir quand un ennemi est au-dessus
       for (int i = 0; i < gNE; i++)
         if (gEn[i].alive && gEn[i].y > 0 && fabsf(gEn[i].x - gPx) < 4) {
-          for (auto &s : gShot)
-            if (!s.on) { s = { gPx + 4, (float)gPY - 3, true }; gCool = 7; break; }
+          gFire();
           break;
         }
   } else if (--gDead == 0 && gLives <= 0) {
@@ -335,7 +374,8 @@ void gameStep() {
   for (auto &s : gShot) {  // tirs du vaisseau
     if (!s.on) continue;
     s.y -= 3;
-    if (s.y < 0) { s.on = false; continue; }
+    s.x += s.vx;
+    if (s.y < 0 || s.x < 0 || s.x >= W) { s.on = false; continue; }
     for (int i = 0; i < gNE; i++) {
       GEnemy &e = gEn[i];
       if (e.alive && s.x >= e.x && s.x <= e.x + GW - 1 && s.y <= e.y + GH - 1 && s.y + 2 >= e.y) {
@@ -360,7 +400,14 @@ void gameStep() {
     if (b.t) b.t = b.t >= 12 ? 0 : b.t + 1;
   bool any = false;
   for (int i = 0; i < gNE; i++) any |= gEn[i].alive;
-  if (!any) gNewWave();
+  if (!any) {  // stage termine : bonus, puis stage suivant
+    gBonus = 500UL * gWave;
+    gScore += gBonus;
+    if (!gDemo && gScore > gHi) gHi = gScore;
+    for (auto &b : gBomb) b.on = false;
+    gNewWave();
+  }
+  if (gStageT > 0) gStageT--;
 }
 void gameDraw() {
   for (int i = 0; i < gNOld; i++) {  // efface l'image precedente
@@ -375,12 +422,11 @@ void gameDraw() {
     gPal[i] = rgb(G_PAL_RGB[i][0] * glow, G_PAL_RGB[i][1] * glow, G_PAL_RGB[i][2] * glow);
     palFull[i] = rgb(G_PAL_RGB[i][0], G_PAL_RGB[i][1], G_PAL_RGB[i][2]);
   }
-  for (int i = 0; i < gNStar; i++) {  // etoiles de couleur qui scintillent
+  for (int i = 0; i < gNStar; i++) {  // etoiles en noir et blanc qui scintillent (plus vives = plus rapides)
     GStar &s = gStar[i];
     if (((gFrame + i * 7) & 31) < 3) continue;
-    const uint8_t *c = G_PAL_RGB[s.hue];
-    float k = 0.15f + s.v * 0.3f;
-    gPix(s.x, (int)s.y, rgb(c[0] * k, c[1] * k, c[2] * k));
+    uint8_t g = 70 + s.v * 120;
+    gPix(s.x, (int)s.y, rgb(g, g, g));
   }
   for (int i = 0; i < gNE; i++) {
     GEnemy &e = gEn[i];
@@ -399,7 +445,7 @@ void gameDraw() {
     for (int k = 0; k < 8; k++) gPix(b.x + DX[k] * b.t / 2, b.y + DY[k] * b.t / 2, c);
     if (b.t < 6) gPix(b.x, b.y, palFull[0]);
   }
-  if (gDead == 0) gSprite(SPR_SHIP, 9, 8, (int)gPx, gPY, palFull, 0, 0);
+  if (gDead == 0) gSprite(SPR_SHIP[gTier()], 9, 8, (int)gPx, gPY, palFull, 0, 0);
   // ecran d'arcade : SCORE a gauche, RECORD au centre
   char sc[12];
   uint16_t red = rgb(255, 40, 40), white = rgb(230, 230, 230);
@@ -434,9 +480,7 @@ void gPlayerControl() {
   if ((k & 2) && !(k & 1)) gPx += sp;
   gPx = constrain(gPx, 0.0f, (float)(W - GW));
   if (gCool > 0) gCool--;
-  if ((k & 4) && gCool == 0)
-    for (auto &s : gShot)
-      if (!s.on) { s = { gPx + 4, (float)gPY - 3, true }; gCool = 8; break; }
+  if ((k & 4) && gCool == 0) gFire();
 }
 
 // texte 6x8 centre, efface a l'image suivante
@@ -451,6 +495,14 @@ void gOverlay() {
   gfx->setFont(NULL);
   gfx->setTextSize(1);
   if (gLives <= 0 && gDead > 0 && !gDemo) gText(H / 2 - 4, "GAME OVER", rgb(255, 40, 40));
+  if (gStageT > 0 && gLives > 0) {  // annonce du stage, bonus et nouvelle arme
+    char b[20];
+    int y = H >= 128 ? H / 2 - 22 : H / 2 - 10;
+    snprintf(b, sizeof(b), "STAGE %d", gWave);
+    if (gStageT > 12 || (gStageT & 2)) gText(y, b, rgb(255, 220, 0));
+    if (gBonus) { snprintf(b, sizeof(b), "BONUS %lu", (unsigned long)gBonus); gText(y + 11, b, rgb(230, 230, 230)); }
+    if (gWave <= 4 && TIER_NAME[gTier()][0]) gText(y + 22, TIER_NAME[gTier()], rgb(40, 230, 80));
+  }
   if (!gDemo) return;
   if ((gFrame / 40) & 1) gText(H / 2 + 6, "DEMO", rgb(255, 220, 0));
   else gText(H / 2 + 6, "APPUIE SUR FEU", rgb(0, 220, 255));
@@ -555,8 +607,15 @@ void onWs(AsyncWebSocket *s, AsyncWebSocketClient *client, AwsEventType type, vo
     if ((nk & 4) && !(keys & 4)) startReq = true;  // FEU : lance une partie (demo ou fin de partie)
     keys = nk;
     lastInput = millis();
-  } else if (b[0] == 'p') {  // ecran 128x128 / 256x128 : enregistre puis redemarre
-    if (v >= 0 && v < N_LAYOUTS && v != layout) { prefs.putUChar("layout", v); restartAt = millis() + 500; }
+  } else if (b[0] == 'c' && len == 5) {  // dalles : c<nombre 1-4><disposition 0-2><retourne 0/1><serpentin 0/1>, redemarre
+    uint8_t n = b[1] - '0', a = b[2] - '0';
+    if (n >= 1 && n <= 4 && a <= 2) {
+      prefs.putUChar("nb", n);
+      prefs.putUChar("arr", a);
+      prefs.putBool("flip", b[3] == '1');
+      prefs.putBool("serp", b[4] == '1');
+      restartAt = millis() + 500;
+    }
   } else if (b[0] == 'v' || b[0] == 'V') {  // luminosite (V = enregistrer)
     bright = constrain(v, 5, 255);
     dma->setBrightness8(bright);
@@ -565,7 +624,7 @@ void onWs(AsyncWebSocket *s, AsyncWebSocketClient *client, AwsEventType type, vo
 }
 
 // etat du jeu envoye aux pages ouvertes :
-// {"m":0 demo/1 partie/2 perdu,"s":score,"h":record,"l":vies,"w":vague,"b":luminosite,"p":ecran}
+// {"m":0 demo/1 partie/2 perdu,"s":score,"h":record,"l":vies,"w":vague,"b":luminosite,"c":"dalles (comme la commande c)"}
 void sendStatus() {
   static uint32_t last = 0;
   static char prev[96] = "";
@@ -575,8 +634,8 @@ void sendStatus() {
   if (!ws.count()) return;
   char js[96];
   int m = gDemo ? 0 : gLives <= 0 ? 2 : 1;
-  snprintf(js, sizeof(js), "{\"m\":%d,\"s\":%lu,\"h\":%lu,\"l\":%d,\"w\":%d,\"b\":%u,\"p\":%u}", m, (unsigned long)gScore, (unsigned long)gHi,
-           max(0, gLives), gWave, bright, layout);
+  snprintf(js, sizeof(js), "{\"m\":%d,\"s\":%lu,\"h\":%lu,\"l\":%d,\"w\":%d,\"b\":%u,\"c\":\"%u%u%u%u\"}", m, (unsigned long)gScore, (unsigned long)gHi,
+           max(0, gLives), gWave, bright, nPanels, arrange, flipAll, serpent);
   static uint32_t lastFull = 0;
   if (strcmp(js, prev) == 0 && millis() - lastFull < 2000) return;  // rien de neuf (rappel toutes les 2 s)
   lastFull = millis();
@@ -638,18 +697,22 @@ void setup() {
   pinMode(BOOT_PIN, INPUT_PULLUP);
   prefs.begin("games", false);
   bright = prefs.getUChar("bright", 120);
-  layout = prefs.getUChar("layout", 0) % N_LAYOUTS;
+  nPanels = constrain(prefs.getUChar("nb", 2), 1, 4);
+  arrange = prefs.getUChar("arr", 0) % 3;
+  flipAll = prefs.getBool("flip", false);
+  serpent = prefs.getBool("serp", false);
 
   HUB75_I2S_CFG::i2s_pins pins = { R1_PIN, G1_PIN, B1_PIN, R2_PIN, G2_PIN, B2_PIN, A_PIN, B_PIN, C_PIN, D_PIN, E_PIN, LAT_PIN, OE_PIN, CLK_PIN };
   // profondeur de couleur la plus haute qui laisse assez de memoire au wifi et au serveur web
   for (int depth = 6; depth >= 3; depth--) {
-    HUB75_I2S_CFG cfg(128, 64, LAYOUT_COLS[layout] * LAYOUT_ROWS[layout], pins);
+    HUB75_I2S_CFG cfg(128, 64, nPanels, pins);
     cfg.setPixelColorDepthBits(depth);
     cfg.clkphase = false;
     dma = new MatrixPanel_I2S_DMA(cfg);
     if (dma->begin()) {
       if (ESP.getFreeHeap() >= 110000 || depth == 3) {
-        Serial.printf("Ecran %s, couleurs %d bits, memoire libre %u\n", LAYOUT_NAME[layout], depth, ESP.getFreeHeap());
+        Serial.printf("Ecran %dx%d (%d dalles), couleurs %d bits, memoire libre %u\n", 128 * panelCols(), 64 * panelRows(), nPanels, depth,
+                      ESP.getFreeHeap());
         break;
       }
       dma->stopDMAoutput();
@@ -657,14 +720,14 @@ void setup() {
     delete dma;
     dma = nullptr;
   }
-  if (!dma) {  // 4 dalles impossibles : retour a 128x128 plutot que rester bloque
+  if (!dma) {  // trop de dalles pour la memoire : retour a 2 dalles plutot que rester bloque
     Serial.println("Memoire insuffisante pour les dalles");
-    if (layout == 2) { prefs.putUChar("layout", 0); delay(50); ESP.restart(); }
+    if (nPanels > 2) { prefs.putUChar("nb", 2); delay(50); ESP.restart(); }
     for (;;) delay(1000);
   }
-  W = 128 * LAYOUT_COLS[layout];
-  H = 64 * LAYOUT_ROWS[layout];
-  gfx = new TiledPanels(dma, LAYOUT_COLS[layout], LAYOUT_ROWS[layout]);
+  W = 128 * panelCols();
+  H = 64 * panelRows();
+  gfx = new TiledPanels(dma, panelCols(), panelRows(), flipAll, serpent);
   dma->setBrightness8(bright);
   gfx->fillScreen(0);
 

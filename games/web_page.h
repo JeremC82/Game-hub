@@ -32,6 +32,9 @@ details{padding:0 12px 10px;color:#9a9ab8;font-size:13px}
 details summary{cursor:pointer;padding:4px 0}
 .row{display:flex;align-items:center;gap:10px;margin:6px 0}
 input[type=range]{flex:1}
+fieldset{border:1px solid #3a3a6a;border-radius:8px;margin:8px 0;padding:6px 10px}
+legend{color:#cfd2ff;padding:0 4px}
+#apply{margin-left:auto;background:#2a4a8a;color:#fff;border:0;border-radius:6px;padding:6px 14px}
 select{background:#1c1c38;color:#e6e6f0;border:1px solid #3a3a6a;border-radius:6px;padding:4px}
 .hint{font-size:12px;color:#6a6a88}
 @media (orientation:landscape) and (max-height:500px){
@@ -51,7 +54,14 @@ select{background:#1c1c38;color:#e6e6f0;border:1px solid #3a3a6a;border-radius:6
 <div id="msg"><span><span id="dot"></span><span id="txt">Connexion...</span></span></div>
 <details><summary>Réglages</summary>
  <div class="row">Luminosité <input id="bri" type="range" min="5" max="255"></div>
- <div class="row">Écran <select id="lay"><option value="0">128x128 (2 dalles l'une sur l'autre)</option><option value="1">256x64 (2 dalles côte à côte)</option><option value="2">256x128 (4 dalles)</option></select></div>
+ <fieldset><legend>Dalles 128x64</legend>
+  <div class="row">Nombre <select id="nb"><option>1</option><option>2</option><option>3</option><option>4</option></select></div>
+  <div class="row">Disposition <select id="arr"><option value="0">l'une sous l'autre</option><option value="1">côte à côte</option><option value="2">carré 2x2 (4 dalles)</option></select></div>
+  <label class="row"><input type="checkbox" id="flip"> Écran retourné (180°)</label>
+  <label class="row"><input type="checkbox" id="serp"> Une dalle sur deux retournée (serpentin)</label>
+  <div class="row"><span id="res" class="hint"></span><button id="apply">Appliquer</button></div>
+  <div class="hint">La 1re dalle est celle reliée à l'ESP32 (en haut à gauche). Retourné : si elle est en bas ou à droite. L'ESP32 redémarre.</div>
+ </fieldset>
  <div class="hint">Clavier : ← → ou Q D, espace pour tirer. Manette de jeu reconnue.</div>
 </details>
 <div class="pad">
@@ -59,7 +69,7 @@ select{background:#1c1c38;color:#e6e6f0;border:1px solid #3a3a6a;border-radius:6
  <button class="k fire" data-b="4">FEU</button>
 </div>
 <script>
-let ws, keys = 0, touch = 0, kb = 0, pad = 0, mode = -1, lay = -1;
+let ws, keys = 0, touch = 0, kb = 0, pad = 0, mode = -1, cfg = '';
 const $ = id => document.getElementById(id);
 function connect() {
   ws = new WebSocket('ws://' + location.host + '/ws');
@@ -70,7 +80,7 @@ function connect() {
     $('s').textContent = d.s; $('h').textContent = d.h;
     $('l').textContent = d.m ? d.l : '-'; $('w').textContent = d.m ? d.w : '-';
     if (document.activeElement !== $('bri')) $('bri').value = d.b;
-    if (d.p !== lay) { lay = d.p; $('lay').value = d.p; }
+    if (d.c !== cfg) { cfg = d.c; showCfg(cfg); }
     if (d.m !== mode) {
       mode = d.m;
       $('msg').className = ['', 'play', 'over'][mode];
@@ -116,8 +126,21 @@ setInterval(() => { if (keys) send(true); }, 1000);  // touches tenues : signale
 // reglages
 $('bri').addEventListener('input', e => ws.readyState === 1 && ws.send('v' + e.target.value));
 $('bri').addEventListener('change', e => ws.readyState === 1 && ws.send('V' + e.target.value));
-$('lay').addEventListener('change', e => {
-  if (confirm("Changer l'écran ? L'ESP32 va redémarrer.")) ws.send('p' + e.target.value); else e.target.value = lay;
+// menu Dalles : resolution affichee, envoi c<nombre><disposition><retourne><serpentin>
+function showCfg(c) {
+  $('nb').value = c[0]; $('arr').value = c[1]; $('flip').checked = c[2] === '1'; $('serp').checked = c[3] === '1'; res();
+}
+function res() {
+  const n = +$('nb').value, a = +$('arr').value, sq = a === 2 && n === 4;
+  if (a === 2 && n !== 4) $('arr').value = '0';
+  const cols = sq ? 2 : a === 1 ? n : 1, rows = n / cols;
+  $('res').textContent = 'Écran ' + 128 * cols + ' x ' + 64 * rows;
+}
+['nb', 'arr'].forEach(id => $(id).addEventListener('change', res));
+$('apply').addEventListener('click', () => {
+  res();
+  const c = $('nb').value + $('arr').value + ($('flip').checked ? 1 : 0) + ($('serp').checked ? 1 : 0);
+  if (c !== cfg && confirm("Appliquer ces dalles ? L'ESP32 va redémarrer.")) ws.send('c' + c);
 });
 connect();
 </script>

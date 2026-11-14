@@ -89,7 +89,7 @@ class Sheet:
 
 
 # ================================================================ jeu : ESP32 -> dalles
-s = Sheet(2000, 1540, 'Game hub - branchement des dalles',
+s = Sheet(2000, 1560, 'Game hub - branchement des dalles',
           'ESP32 DevKit (38 broches) - meme brochage dalle que l\'horloge ClockV1 et le VU-metre')
 LEFT = [('BOOT (bouton carte)', 'boot'), ('5V / VIN', '5v'), ('GND', 'gnd')]
 RIGHT = [('GPIO25', 'R1'), ('GPIO26', 'G1'), ('GPIO27', 'B1'), ('GPIO14', 'R2'), ('GPIO12', 'G2'), ('GPIO13', 'B2'),
@@ -123,7 +123,7 @@ for i, (t, col) in enumerate((('+5 V  ->  borniers d\'alimentation de chaque dal
                               ('+5 V  ->  broche 5 V / VIN de l\'ESP32', RED),
                               ('GND   ->  dalles + ESP32 (masse commune)', INK))):
     s.text(px0 + 30, py0 + 70 + i * 40, t, F, col)
-for i, t in enumerate(('Puissance conseillee :', '   2 dalles (128x128 ou 256x64) : 5 V 8 A', '   4 dalles (256x128) : 5 V 15 A',
+for i, t in enumerate(('Puissance conseillee :', '   2 dalles (128x128 ou 256x64) : 5 V 8 A', '   4 dalles : 5 V 15 A',
                        'Le jeu est surtout noir : il consomme bien moins,', 'mais un ecran blanc demande ~4 A par dalle.',
                        'Fils de 1,5 mm2 pour le 5 V des dalles.')):
     s.text(px0 + 30, py0 + 210 + i * 30, t, FB if i == 0 else FS, GREY if i in (3, 4) else INK)
@@ -139,7 +139,7 @@ s.wire([(px0 + 420, py0 + 482), (740, py0 + 482), (740, by), (bx, by)], GREY, 2)
 
 # chainage : 3 configurations
 cy = 1010
-s.text(40, cy - 30, 'Chainage des dalles 128x64 (choix de l\'ecran dans la page web, Reglages -> Ecran)', FB)
+s.text(40, cy - 30, 'Chainage des dalles 128x64 (choix dans la page web, Reglages -> Dalles)', FB)
 s.text(40, cy, 'Toutes les dalles sont posees dans le meme sens (fleches imprimees au dos dans la meme direction). '
                'Nappe : sortie OUT d\'une dalle -> entree IN de la suivante.', FS, GREY)
 PW, PH = 200, 100
@@ -159,22 +159,25 @@ s.panel(x + PW + 40, y + 40, PW, PH, 'Dalle 2', 'IN')
 s.arrow([(x - 40, y + 90), (x, y + 90)], GREY)
 s.text(x - 40, y + 76, 'ESP32', FS, GREY, 'rb')
 s.arrow([(x + PW, y + 90), (x + PW + 40, y + 90)])
-# 256x128
-x = 1200
-s.text(x, y, '256x128 : 4 dalles (5 V 15 A)', FB, BLUE)
-pos = [(x, y + 40), (x + PW + 40, y + 40), (x, y + 40 + PH + 40), (x + PW + 40, y + 40 + PH + 40)]
-for n, (px, py) in enumerate(pos):
-    s.panel(px, py, PW, PH, f'Dalle {n + 1}', 'IN' if n == 3 else 'IN -> OUT')
-s.arrow([(x - 40, y + 90), (x, y + 90)], GREY)
-s.text(x - 40, y + 76, 'ESP32', FS, GREY, 'rb')
-s.arrow([(x + PW, y + 90), (x + PW + 40, y + 90)])
-p2x, p2y = pos[1]
-p3x, p3y = pos[2]
-s.arrow([(p2x + PW, p2y + 50), (p2x + PW + 30, p2y + 50), (p2x + PW + 30, p2y + PH + 20), (p3x - 30, p2y + PH + 20),
-         (p3x - 30, p3y + 50), (p3x, p3y + 50)])
-s.arrow([(p3x + PW, p3y + 50), (p3x + PW + 40, p3y + 50)])
-s.text(x, y + 40 + 2 * PH + 60, 'Ordre : haut gauche, haut droite, bas gauche, bas droite.', FS)
-s.text(x, y + 40 + 2 * PH + 84, 'Nappe longue (~60 cm) entre la dalle 2 et la dalle 3.', FS, GREY)
+# 128x256 : 4 dalles l'une sous l'autre (vertical)
+x = 1300
+s.text(x - 60, y, '128x256 : 4 dalles verticales', FB, BLUE)
+VH = 64
+for n in range(4):
+    s.panel(x, y + 40 + n * (VH + 14), PW, VH, f'Dalle {n + 1}', '')
+    if n < 3:
+        yy = y + 40 + n * (VH + 14) + VH // 2
+        s.arrow([(x + PW, yy), (x + PW + 36, yy), (x + PW + 36, yy + VH + 14), (x + PW, yy + VH + 14)])
+s.arrow([(x - 40, y + 40 + VH // 2), (x, y + 40 + VH // 2)], GREY)
+s.text(x - 40, y + 40 + VH // 2 - 14, 'ESP32', FS, GREY, 'rb')
+s.text(x + PW + 60, y + 50, 'Facon borne d\'arcade.', FS)
+s.text(x + PW + 60, y + 76, '5 V 15 A.', FS, RED)
+
+# options du menu Dalles
+oy = y + 40 + 4 * (VH + 14) + 20
+s.text(40, oy, 'Menu Dalles de la page web : 1 a 4 dalles, l\'une sous l\'autre, cote a cote ou carre 2x2 (4 dalles).', FB)
+s.text(40, oy + 32, '- Ecran retourne (180) : la 1re dalle est en bas (ou a droite), ou tout l\'ensemble est monte a l\'envers.', FS)
+s.text(40, oy + 58, '- Une dalle sur deux retournee (serpentin) : les dalles 2 et 4 sont tournees de 180 pour garder des nappes courtes.', FS)
 s.save('branchement-dalles.png')
 
 # ================================================================ manette

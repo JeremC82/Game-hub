@@ -29,7 +29,9 @@ def c_block(name):
 
 e = strings(c_block('SPR_E[3][2][GH]'))
 SPR_E = [[e[(t * 2 + f) * 7:(t * 2 + f + 1) * 7] for f in range(2)] for t in range(3)]
-SPR_SHIP = strings(c_block('SPR_SHIP[8]'))
+sh = strings(c_block('SPR_SHIP[4][8]'))
+SPR_SHIP = [sh[i * 8:(i + 1) * 8] for i in range(4)]
+TIER_NAME = strings(c_block('TIER_NAME[4]'))
 SPR_LIFE = strings(c_block('SPR_LIFE[4]'))
 PAL_CH = re.search(r'G_PAL_CH\[\] = "(\w+)"', SRC).group(1)
 rgbs = [tuple(map(int, t)) for t in re.findall(r'\{\s*(\d+),\s*(\d+),\s*(\d+)\s*\}', c_block('G_PAL_RGB[9][3]'))]
@@ -79,18 +81,18 @@ class Screen:
             x += 6
 
 
-def game_frame(w, h, demo=False, seed=3):
+def game_frame(w, h, demo=False, stage=1, banner=False, seed=3):
+    """Une image du jeu ; stage : evolution du vaisseau ; banner : annonce du stage (gOverlay)."""
     s = Screen(w, h)
     rnd = random.Random(seed)
-    for _ in range(min(128, w * h // 220)):  # etoiles de couleur
-        col = PAL[rnd.choice(PAL_CH)]
-        k = rnd.uniform(.15, .45)
-        s.px(rnd.randrange(w), rnd.randrange(12, h), tuple(int(v * k) for v in col))
+    for _ in range(min(128, w * h // 220)):  # etoiles en noir et blanc
+        g = int(70 + rnd.uniform(.2, 1.0) * 120)
+        s.px(rnd.randrange(w), rnd.randrange(12, h), (g, g, g))
     tall = h >= 128
-    types = [0, 1, 1, 2, 2] if tall else [0, 1, 2]
+    types = [0, 0, 1, 1, 1, 2, 2] if h >= 256 else [0, 1, 1, 2, 2] if tall else [0, 1, 2]
     cols = max(4, min(20, (w - 6) // 11))
     x0 = (w - cols * 11) // 2 + 1 + 2
-    dead = {(r, c) for r in range(5) for c in range(cols) if rnd.random() < 0.18}
+    dead = {(r, c) for r in range(7) for c in range(cols) if rnd.random() < 0.18}
     for r, t in enumerate(types):
         for c in range(cols):
             if (t == 0 and c % 2) or (r, c) in dead:
@@ -98,29 +100,35 @@ def game_frame(w, h, demo=False, seed=3):
             s.sprite(SPR_E[t][(c + r) % 2], x0 + c * 11, 13 + r * 9, ('p', 'o') if (t == 0 and c == 4) else None)
     py = h - 15 if tall else h - 8
     shipx = w // 2 - 6
-    if tall:  # ennemis en pique
-        s.sprite(SPR_E[1][1], w // 4 - 2, 70)
-        s.sprite(SPR_E[2][0], w * 3 // 4 - 8, 84)
-    else:
-        s.sprite(SPR_E[2][0], w // 4, 40)
-    s.sprite(SPR_SHIP, shipx, py)
-    for k, y in enumerate((py - 14, py - 13, py - 12)):  # tir du vaisseau
-        s.px(shipx + 4, y, (PAL['w'], PAL['y'], PAL['o'])[k])
-    for bx, by in ((w * 3 // 4 - 4, py - 30), (w // 4 + 1, py - 20)):  # tirs ennemis
-        for k in range(3):
-            s.px(bx, by + k, PAL['r'] if k < 2 else PAL['w'])
-    for dx, dy in ((1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1)):  # explosion
-        s.px(w // 2 - 14 + dx * 3, (52 if tall else 40) + dy * 3, PAL['y'])
+    if not banner:
+        if tall:  # ennemis en pique
+            s.sprite(SPR_E[1][1], w // 4 - 2, h - 58)
+            s.sprite(SPR_E[2][0], w * 3 // 4 - 8, h - 44)
+        else:
+            s.sprite(SPR_E[2][0], w // 4, 40)
+        for bx, by in ((w * 3 // 4 - 4, py - 30), (w // 4 + 1, py - 20)):  # tirs ennemis
+            for k in range(3):
+                s.px(bx, by + k, PAL['r'] if k < 2 else PAL['w'])
+        for dx, dy in ((1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1)):  # explosion
+            s.px(w // 2 - 14 + dx * 3, (h - 76 if tall else 40) + dy * 3, PAL['y'])
+    tier = min(stage, 4) - 1
+    s.sprite(SPR_SHIP[tier], shipx, py)
+    shots = {0: [(4, 0)], 1: [(4, 0)], 2: [(2, 0), (6, 0)], 3: [(4, -1), (4, 0), (4, 1)]}[tier]
+    for sx, vx in shots:  # tirs du vaisseau (eventail au triple canon)
+        for n in (0, 1):
+            for k in range(3):
+                yy = py - 14 - n * 22 + k
+                s.px(shipx + sx + vx * (5 + n * 7), yy, (PAL['w'], PAL['y'], PAL['o'])[k])
     s.tiny(1, 0, 'SCORE', PAL['r'])
-    s.tiny(1, 6, '0' if demo else '12450', (230, 230, 230))
+    s.tiny(1, 6, '0' if demo else str(4250 * stage), (230, 230, 230))
     rx = w // 2 - 11
     s.tiny(rx, 0, 'RECORD', PAL['r'])
     s.tiny(rx, 6, '30800', (230, 230, 230))
-    lives, wave = 3, 3
-    if tall:  # ligne du bas : vies a gauche, vague a droite
+    lives = 3
+    if tall:  # ligne du bas : vies a gauche, stages a droite
         for i in range(lives - 1):
             s.sprite(SPR_LIFE, 1 + i * 7, h - 5)
-        for i in range(wave):
+        for i in range(stage):
             x = w - 4 - i * 4
             for xx, yy, ch in ((x, h - 5, 'y'), (x + 1, h - 5, 'y'), (x, h - 4, 'r'), (x + 1, h - 4, 'r'),
                                (x, h - 3, 'r'), (x + 1, h - 3, 'r'), (x, h - 2, 'b')):
@@ -128,6 +136,12 @@ def game_frame(w, h, demo=False, seed=3):
     else:  # ecran bas : vies en haut a droite
         for i in range(lives - 1):
             s.sprite(SPR_LIFE, w - 6 - i * 7, 1)
+    if banner:  # annonce du stage
+        y = h // 2 - 22 if tall else h // 2 - 10
+        s.text(y, f'STAGE {stage}', (255, 220, 0))
+        s.text(y + 11, f'BONUS {500 * (stage - 1)}', (230, 230, 230))
+        if TIER_NAME[tier]:
+            s.text(y + 22, TIER_NAME[tier], (40, 230, 80))
     if demo:  # textes de la demo (gOverlay)
         s.text(h // 2 + 6, 'APPUIE SUR FEU', (0, 220, 255))
         s.text(h // 2 + 18, '192.168.1.42', (110, 110, 130))
@@ -174,31 +188,51 @@ def panels(img, cols, rows, title, sub, pitch=5):
     return out
 
 
-CONFIGS = [
-    ('128x128', 1, 2, False, 'Game hub - 128x128 : 2 dalles 128x64 l\'une sous l\'autre',
-     'Chaine : 1 (reliee a l\'ESP32) en haut, puis 2 en bas. 5 rangees d\'ennemis, vies et vague en bas.'),
-    ('256x64', 2, 1, False, 'Game hub - 256x64 : 2 dalles 128x64 cote a cote',
-     'Chaine : 1 (reliee a l\'ESP32) a gauche, puis 2 a droite. 3 rangees d\'ennemis, vies en haut a droite.'),
-    ('256x128', 2, 2, True, 'Game hub - 256x128 : 4 dalles 128x64',
-     'Chaine : 1 haut gauche, 2 haut droite, 3 bas gauche, 4 bas droite (meme sens). Ici en demo, en attente d\'un joueur.'),
+CONFIGS = [  # nom, dalles par ligne, lignes, demo, stage, annonce, titre, legende
+    ('128x128', 1, 2, False, 3, False, 'Game hub - 128x128 : 2 dalles l\'une sous l\'autre',
+     'Chaine : 1 (reliee a l\'ESP32) en haut, puis 2. Stage 3 : double canon.'),
+    ('256x64', 2, 1, False, 2, False, 'Game hub - 256x64 : 2 dalles cote a cote',
+     'Chaine : 1 (reliee a l\'ESP32) a gauche, puis 2. 3 rangees, vies en haut a droite. Stage 2 : tir rapide.'),
+    ('128x256', 1, 4, False, 4, True, 'Game hub - 128x256 : 4 dalles (vertical)',
+     'Chaine : 1 en haut, puis 2, 3, 4. 7 rangees.'),
 ]
 
 imgs = []
-for name, cols, rows, demo, title, sub in CONFIGS:
-    im = panels(game_frame(128 * cols, 64 * rows, demo), cols, rows, title, sub)
+for name, cols, rows, demo, stage, banner, title, sub in CONFIGS:
+    im = panels(game_frame(128 * cols, 64 * rows, demo, stage, banner), cols, rows, title, sub)
     path = os.path.join(DOC, f'rendu-{name}.png')
     im.save(path)
     imgs.append(im)
     print(path)
 
-# planche des 3 configurations
-gap = 20
-W = max(i.width for i in imgs)
-sheet = Image.new('RGB', (W, sum(i.height for i in imgs) + gap * (len(imgs) - 1)), (12, 12, 16))
-y = 0
-for im in imgs:
-    sheet.paste(im, (0, y))
-    y += im.height + gap
+# planche : 128x128 et 256x64 a gauche, l'ecran vertical 128x256 a droite
+gap = 30
+lw = max(imgs[0].width, imgs[1].width)
+sheet = Image.new('RGB', (lw + gap + imgs[2].width, max(imgs[0].height + gap + imgs[1].height, imgs[2].height)), (12, 12, 16))
+sheet.paste(imgs[0], (0, 0))
+sheet.paste(imgs[1], (0, imgs[0].height + gap))
+sheet.paste(imgs[2], (lw + gap, 0))
 path = os.path.join(DOC, 'rendu.png')
 sheet.save(path)
+print(path)
+
+# evolution du vaisseau, en grand
+P = 14
+out = Image.new('RGB', (4 * 200 + 40, 260), (12, 12, 16))
+d = ImageDraw.Draw(out)
+d.text((20, 14), 'Le vaisseau evolue a chaque stage', fill=(235, 235, 245), font=font(22, True))
+for t in range(4):
+    sc = Screen(9, 8)
+    sc.sprite(SPR_SHIP[t], 0, 0)
+    ox, oy = 40 + t * 200, 70
+    for y in range(8):
+        for x in range(9):
+            col = sc.im.getpixel((x, y))
+            if col == (0, 0, 0):
+                col = (26, 26, 32)
+            d.ellipse((ox + x * P + 2, oy + y * P + 2, ox + x * P + P - 2, oy + y * P + P - 2), fill=col)
+    d.text((ox, oy + 8 * P + 14), f'Stage {t + 1}' + ('+' if t == 3 else ''), fill=(255, 220, 0), font=font(16, True))
+    d.text((ox, oy + 8 * P + 36), TIER_NAME[t] or 'base', fill=(170, 170, 190), font=font(14))
+path = os.path.join(DOC, 'rendu-vaisseaux.png')
+out.save(path)
 print(path)

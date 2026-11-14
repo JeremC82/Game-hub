@@ -6,23 +6,30 @@ Le shoot'em up du mode Jeu du VU-mètre, jouable de deux façons :
 
 ![Le jeu sur les 3 configurations de dalles](docs/rendu.png)
 
-*Aperçu simulé (généré par `docs/rendu.py`, mêmes sprites que le jeu). Chaque configuration en grand : [128x128](docs/rendu-128x128.png), [256x64](docs/rendu-256x64.png), [256x128](docs/rendu-256x128.png).*
+*Aperçu simulé (généré par `docs/rendu.py`, mêmes sprites que le jeu). Chaque configuration en grand : [128x128](docs/rendu-128x128.png), [256x64](docs/rendu-256x64.png), [128x256](docs/rendu-128x256.png).*
 
 ## Écrans
 
-Choix dans la page web (Réglages → Écran). Le choix est gardé en mémoire et l'ESP32 redémarre.
+Le menu **Réglages → Dalles** de la page web règle le montage. Le réglage est gardé en mémoire, et l'ESP32 redémarre quand on clique sur Appliquer.
 
-| Écran | Dalles 128x64 | Montage (ordre de la chaîne) |
+- **Nombre :** 1 à 4 dalles 128x64.
+- **Disposition :** l'une sous l'autre, côte à côte, ou carré 2x2 (4 dalles). La page affiche la résolution obtenue.
+- **Écran retourné (180°) :** la 1ʳᵉ dalle, celle reliée à l'ESP32, est en bas ou à droite, ou bien tout l'ensemble est monté à l'envers.
+- **Une dalle sur deux retournée (serpentin) :** les dalles 2 et 4 sont tournées de 180° pour garder des nappes courtes.
+
+| Écran | Dalles | Montage (ordre de la chaîne) |
 |---|---|---|
-| 128x128 | 2 | l'une sous l'autre, la 1ʳᵉ (reliée à l'ESP32) en haut |
+| 128x128 | 2 | l'une sous l'autre, la 1ʳᵉ en haut |
 | 256x64 | 2 | côte à côte, la 1ʳᵉ à gauche |
-| 256x128 | 4 | haut gauche → haut droite → bas gauche → bas droite, toutes dans le même sens |
+| 128x256 | 4 | l'une sous l'autre, écran vertical façon borne d'arcade, avec 7 rangées d'ennemis |
+| 256x128 | 4 | carré 2x2 : haut gauche → haut droite → bas gauche → bas droite |
+| 128x64, 128x192, 384x64, 512x64 | 1, 3 ou 4 | autres combinaisons possibles |
 
 Brochage identique à l'horloge ClockV1 et au VU-mètre.
 
 ![Branchement des dalles](docs/branchement-dalles.png)
 
-La profondeur de couleur est choisie au démarrage : la plus haute qui laisse assez de mémoire au wifi, entre 6 et 3 bits. En 256x128, on aura probablement 3 bits. Si même 3 bits ne passe pas, l'ESP32 revient tout seul en 128x128.
+La profondeur de couleur est choisie au démarrage : la plus haute qui laisse assez de mémoire au wifi, entre 6 et 3 bits. Avec 4 dalles, on aura probablement 3 bits. Si même 3 bits ne passe pas, l'ESP32 revient tout seul à 2 dalles.
 
 ## Jouer
 
@@ -38,9 +45,20 @@ Commandes :
 - **Clavier :** ← → ou Q / D pour bouger, espace pour tirer.
 - **Manette :** une manette branchée au PC ou au téléphone est reconnue par le navigateur.
 
+**Stages :** quand tous les ennemis sont détruits, l'annonce « STAGE n » s'affiche avec un bonus de 500 points × le numéro du stage. La vague suivante arrive alors, plus agressive. À chaque stage, ton vaisseau évolue :
+
+![Évolution du vaisseau](docs/rendu-vaisseaux.png)
+
+| Stage | Vaisseau |
+|---|---|
+| 1 | de base, un tir |
+| 2 | **tir rapide** (ailes vertes) |
+| 3 | **double canon**, deux tirs parallèles |
+| 4 et + | **triple canon**, tirs en éventail |
+
 Sans joueur, le jeu tourne tout seul en démo. Une partie abandonnée repasse en démo après 1 min sans appui. Le record (des joueurs seulement) est gardé en mémoire.
 
-Réglages de la page : luminosité et type d'écran.
+Réglages de la page : luminosité et dalles.
 
 **Bouton BOOT appuyé 5 s :** oublie le wifi et redémarre sur Games-Setup.
 
@@ -75,7 +93,7 @@ Binaires prêts à flasher sur un ESP32 classique, à l'adresse 0x10000 :
 
 | Fichier | Rôle | MD5 |
 |---|---|---|
-| [firmware/Games_V1.00.bin](firmware/Games_V1.00.bin) | le jeu, pour l'ESP32 des dalles | `81553beeffc47d9e5dc4a5f807cdd8ef` |
+| [firmware/Games_V1.02.bin](firmware/Games_V1.02.bin) | le jeu, pour l'ESP32 des dalles | `6bb1ace78a2643a254d26b8d33eea971` |
 | [firmware/Manette_V1.00.bin](firmware/Manette_V1.00.bin) | la manette ESP-NOW | `598ccc714d7c450ee49a337ae10b483b` |
 
 Le jeu publié ne contient aucun réseau wifi. Au premier démarrage, règle le wifi avec le réseau **Games-Setup**. Pour intégrer tes propres réseaux, crée `games/secrets.h` et recompile.
