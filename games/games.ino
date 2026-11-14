@@ -28,7 +28,7 @@
 #include <driver/i2s.h>
 #include "game_types.h"
 
-#define GAMES_VERSION "2.04"
+#define GAMES_VERSION "2.07"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -120,12 +120,18 @@ char ipText[20] = "";  // adresse Bluetooth de l'ESP32, affichee pendant la demo
 const uint8_t TF_DIG[10][5] = { { 7, 5, 5, 5, 7 }, { 2, 6, 2, 2, 7 }, { 7, 1, 7, 4, 7 }, { 7, 1, 7, 1, 7 }, { 5, 5, 7, 1, 1 },
                                 { 7, 4, 7, 1, 7 }, { 7, 4, 7, 5, 7 }, { 7, 1, 1, 1, 1 }, { 7, 5, 7, 5, 7 }, { 7, 5, 7, 1, 7 } };
 const uint8_t TF_R[5] = { 6, 5, 6, 5, 5 }, TF_E[5] = { 7, 4, 6, 4, 7 }, TF_S[5] = { 7, 4, 7, 1, 7 },
-              TF_C[5] = { 7, 4, 4, 4, 7 }, TF_D[5] = { 6, 5, 5, 5, 6 };
+              TF_C[5] = { 7, 4, 4, 4, 7 }, TF_D[5] = { 6, 5, 5, 5, 6 }, TF_A[5] = { 2, 5, 7, 5, 5 },
+              TF_B[5] = { 6, 5, 6, 5, 6 }, TF_F[5] = { 7, 4, 6, 4, 4 }, TF_M[5] = { 5, 7, 7, 5, 5 },
+              TF_N[5] = { 6, 5, 5, 5, 5 }, TF_T[5] = { 7, 2, 2, 2, 2 }, TF_U[5] = { 5, 5, 5, 5, 7 },
+              TF_P[5] = { 6, 5, 6, 4, 4 }, TF_COL[5] = { 0, 2, 0, 2, 0 }, TF_X[5] = { 5, 5, 2, 5, 5 },
+              TF_G[5] = { 7, 4, 5, 5, 7 };
 const uint8_t *tfGlyph(char c) {
   if (c >= '0' && c <= '9') return TF_DIG[c - '0'];
   switch (c) {
     case 'R': return TF_R; case 'E': return TF_E; case 'S': return TF_S; case 'C': return TF_C;
-    case 'O': return TF_DIG[0]; case 'D': return TF_D;
+    case 'O': return TF_DIG[0]; case 'D': return TF_D; case 'A': return TF_A; case 'B': return TF_B;
+    case 'F': return TF_F; case 'M': return TF_M; case 'N': return TF_N; case 'T': return TF_T;
+    case 'U': return TF_U; case 'P': return TF_P; case ':': return TF_COL; case 'X': return TF_X; case 'G': return TF_G;
   }
   return nullptr;
 }
@@ -278,15 +284,47 @@ float gPx = 0, gSway = 0;
 int8_t gRowType[G_MAXROWS];
 
 // sprites : '.' transparent, sinon une lettre de la palette ci-dessous
-// type 0 : meduse (2 tirs), type 1 : scarabee, type 2 : insecte ailé
-const char *const SPR_E[3][2][GH] = {
-  { { "..ppppp..", ".pwpppwp.", "ppppppppp", "p.c.c.c.p", "..c.c.c..", ".c..c..c.", "c...c...c" },
-    { "..ppppp..", ".pwpppwp.", "ppppppppp", "p.c.c.c.p", ".c..c..c.", "..c.c.c..", "...c.c..." } },
-  { { "v...o...v", ".v.ooo.v.", "..oowoo..", "vvooooovv", "v.ooooo.v", "..o.o.o..", ".o.....o." },
-    { ".v..o..v.", "..vooov..", "..oowoo..", ".vooooov.", "v.ooooo.v", ".o..o..o.", "o.......o" } },
-  { { "c.......c", ".c.ggg.c.", "..gwywg..", "cgyyyyygc", "c.ggggg.c", "..g.y.g..", "...g.g..." },
-    { "cc.....cc", "..cgggc..", "..gwywg..", ".gyyyyyg.", "..ggggg..", "..g.y.g..", "...g.g..." } }
+// 4 mondes (un par stage, en boucle) : 3 types d'ennemis x 2 images (9x7), sprites originaux
+// type 0 : rang du haut (2 tirs), types 1 et 2 : rangs suivants
+const char *const SPR_W[4][3][2][GH] = {
+  {  // nebuleuse
+    { { "..ppppp..", ".pwpppwp.", "ppppppppp", "p.c.c.c.p", "..c.c.c..", ".c..c..c.", "c...c...c" },
+      { "..ppppp..", ".pwpppwp.", "ppppppppp", "p.c.c.c.p", ".c..c..c.", "..c.c.c..", "...c.c..." } },
+    { { "v...o...v", ".v.ooo.v.", "..oowoo..", "vvooooovv", "v.ooooo.v", "..o.o.o..", ".o.....o." },
+      { ".v..o..v.", "..vooov..", "..oowoo..", ".vooooov.", "v.ooooo.v", ".o..o..o.", "o.......o" } },
+    { { "c.......c", ".c.ggg.c.", "..gwywg..", "cgyyyyygc", "c.ggggg.c", "..g.y.g..", "...g.g..." },
+      { "cc.....cc", "..cgggc..", "..gwywg..", ".gyyyyyg.", "..ggggg..", "..g.y.g..", "...g.g..." } },
+  },
+  {  // crabes
+    { { "...ooo...", ".oowwwoo.", "ooooooooo", "o.y.y.y.o", ".ooooooo.", "..o...o..", ".o.....o." },
+      { "...ooo...", ".oowwwoo.", "ooooooooo", "o..y.y..o", ".ooooooo.", ".o.....o.", "o.......o" } },
+    { { "r.......r", "r..rrr..r", ".rrwrwrr.", "..rrrrr..", ".rr.r.rr.", "r.r...r.r", "..r...r.." },
+      { ".r.....r.", "r..rrr..r", "rrrwrwrrr", "..rrrrr..", ".rr.r.rr.", ".r.....r.", "r.......r" } },
+    { { "..c...c..", "...ccc...", ".bbcwcbb.", "bbbbbbbbb", ".b.b.b.b.", "..b...b..", "........." },
+      { "c.......c", ".c.ccc.c.", ".bbcwcbb.", "bbbbbbbbb", "b.b.b.b.b", ".b.....b.", "........." } },
+  },
+  {  // cristaux
+    { { "....v....", "...vvv...", "..vvwvv..", ".vvvwvvv.", "..vvvvv..", "...vvv...", "....v...." },
+      { "....v....", "...vwv...", "..vvvvv..", ".vvvvvvv.", "..vvwvv..", "...vvv...", "....v...." } },
+    { { "y.......y", ".y.yyy.y.", "..yywyy..", ".yyyyyyy.", "y.y.y.y.y", "..y.y.y..", "...y.y..." },
+      { ".y.....y.", "y..yyy..y", "..yywyy..", ".yyyyyyy.", ".y.y.y.y.", "..y.y.y..", "...y.y..." } },
+    { { "..ggggg..", ".gwgggwg.", "ggggggggg", "g.g.g.g.g", ".g.g.g.g.", "g.......g", "........." },
+      { "..ggggg..", ".gwgggwg.", "ggggggggg", ".g.g.g.g.", "g.g.g.g.g", ".g.....g.", "........." } },
+  },
+  {  // orbes
+    { { "..rrrrr..", ".rrwwwrr.", "rrwwbwwrr", "rrwbbbwrr", "rrwwbwwrr", ".rrwwwrr.", "..rrrrr.." },
+      { "..rrrrr..", ".rrrrrrr.", "rrwwwwwrr", "rrwbbbwrr", "rrwwwwwrr", ".rrrrrrr.", "..rrrrr.." } },
+    { { "..ppppp..", ".pp.p.pp.", "ppppppppp", "ppwpppwpp", ".p.p.p.p.", "p..p.p..p", ".p.....p." },
+      { "..ppppp..", ".pp.p.pp.", "ppppppppp", "ppwpppwpp", ".p.p.p.p.", ".p.p.p.p.", "p.......p" } },
+    { { "c.......c", ".c.ooo.c.", "..cowoc..", ".ccccccc.", "c.ccccc.c", "..c.c.c..", ".c.....c." },
+      { ".c.....c.", "c..ooo..c", "..cowoc..", "ccccccccc", "..ccccc..", ".c..c..c.", "c.......c" } },
+  },
 };
+const char *const WORLD_NAME[4] = { "NEBULEUSE", "CRABES", "CRISTAUX", "ORBES" };
+const char WORLD_HURT[4][2] = { { 'p', 'o' }, { 'o', 'r' }, { 'v', 'p' }, { 'r', 'y' } };  // couleur changee quand l'ennemi est touche
+int gWorld = 0;  // monde du stage : 0 nebuleuse (piques en boucle), 1 crabes (piques a deux, balancement large),
+                 // 2 cristaux (plus resistants, piques en zigzag), 3 orbes (formation qui descend, tirs vises)
+int gBaseHp(int type) { return (type == 0 ? 2 : 1) + (gWorld == 2 ? 1 : 0); }
 // vaisseau du joueur : il evolue avec les stages (1 base, 2 tir rapide, 3 double canon, 4+ triple canon)
 const char *const SPR_SHIP[4][8] = {
   { "....c....", "...ccc...", "...cwc...", "..bcwcb..", ".bbcccbb.", "bbcbcbcbb", "b.o...o.b", "..o...o.." },
@@ -332,7 +370,8 @@ void gSprite(const char *const *rows, int w, int h, int x, int y, const uint16_t
   gMark(x, y, w, h);
 }
 float gSlotX(int col) { return (W - gCols * 11) / 2 + 1 + col * 11 + gSway; }
-float gSlotY(int row) { return gTop + row * 9; }
+float gDescend = 0;  // monde des orbes : la formation descend et remonte
+float gSlotY(int row) { return gTop + row * 9 + gDescend; }
 void gBoomAt(int x, int y) {
   for (int i = 0; i < G_BOOMS; i++)
     if (gBoom[i].t == 0) { gBoom[i] = { (int16_t)x, (int16_t)y, 1 }; return; }
@@ -365,6 +404,7 @@ bool gPathPos(uint8_t kind, bool mirror, int t, float &x, float &y) {
 }
 
 void gNewWave() {
+  gWorld = gWave % 4;  // gWave vaut encore le stage precedent : stage 1 -> monde 0, stage 2 -> monde 1...
   gCols = constrain((W - 6) / 11, 4, 20);
   gNE = 0;
   for (int r = 0; r < gRows; r++)
@@ -373,7 +413,7 @@ void gNewWave() {
       GEnemy &e = gEn[gNE++];
       e = {};
       e.row = r; e.col = c; e.type = gRowType[r]; e.alive = true;
-      e.hp = e.type == 0 ? 2 : 1;
+      e.hp = gBaseHp(e.type);
       e.x = -50; e.y = -50;  // hors ecran jusqu'a son tour
       e.state = 3;
     }
@@ -383,7 +423,7 @@ void gNewWave() {
     int g = i / gs, pair = g / 2;
     GEnemy &e = gEn[i];
     e.dir = (g & 1) ? 1 : 0;   // miroir
-    e.path = pair & 1;         // trajectoire 0 ou 1, en alternance
+    e.path = (pair + gWorld) & 1;  // trajectoire 0 ou 1, en alternance (ordre change selon le monde)
     e.t = -(pair * 60 + (i % gs) * 6);  // depart decale : la file s'etire sur la trajectoire
   }
   gWave++;
@@ -480,7 +520,8 @@ void gameStep() {
     if (s.y >= H) { s.y = 12; s.x = random(W); }
   }
   // formation et piques
-  gSway = sinf(gFrame * 0.03f) * max(1, min(6, (W - gCols * 11) / 2 - 1));
+  gSway = sinf(gFrame * (gWorld == 1 ? 0.05f : 0.03f)) * max(1, min(gWorld == 1 ? 10 : 6, (W - gCols * 11) / 2 - 1));
+  gDescend = gWorld == 3 ? (1 - cosf(gFrame * 0.012f)) * min(14, H / 9) : 0;
   int alive = 0, entering = 0;
   for (int i = 0; i < gNE; i++) { alive += gEn[i].alive; entering += gEn[i].alive && gEn[i].state == 3; }
   int diveEvery = max(16, 60 - gWave * 7);
@@ -494,6 +535,14 @@ void gameStep() {
         e.state = 1; e.vx = 0; e.vy = -0.6f; e.t = 0;
         sfxDive();
         e.dir = e.x < W / 2 ? -1 : 1;  // part en boucle vers l'exterieur
+        if (gWorld == 1)  // monde des crabes : le voisin pique avec lui
+          for (int n = 0; n < gNE; n++) {
+            GEnemy &o = gEn[n];
+            if (o.alive && o.state == 0 && o.row == e.row && abs(o.col - e.col) == 1) {
+              o.state = 1; o.vx = 0; o.vy = -0.6f; o.t = -6; o.dir = e.dir;
+              break;
+            }
+          }
         break;
       }
   }
@@ -506,7 +555,9 @@ void gameStep() {
       e.x = sx; e.y = sy;
     } else if (e.state == 1) {  // pique en courbe : boucle puis descente en visant le vaisseau
       e.t++;
-      float curve = e.t < 50 ? e.dir * 1.2f * cosf(e.t * 0.063f) : 0;
+      if (e.t < 0) continue;  // depart decale (pique a deux)
+      float curve = gWorld == 2 ? e.dir * 1.6f * sinf(e.t * 0.15f)                   // cristaux : zigzag
+                                : e.t < 50 ? e.dir * 1.2f * cosf(e.t * 0.063f) : 0;  // boucle
       e.vx = constrain(e.vx * 0.96f + curve * 0.06f + (shipC - (e.x + 4)) * (e.t < 50 ? 0.0005f : 0.004f), -1.4f, 1.4f);
       e.vy = min(e.vy + 0.03f, 1.3f + 0.1f * gWave);
       e.x += e.vx + curve; e.y += e.vy;
@@ -527,7 +578,11 @@ void gameStep() {
     else if (gEffDiff() == 2) chance = chance * 8 / 5;
     if (gDead == 0 && gStageT == 0 && e.y > 0 && e.y < H * 0.6f && random(1000) < chance)
       for (auto &b : gBomb)
-        if (!b.on) { b = { e.x + 4, e.y + GH, true }; break; }
+        if (!b.on) {
+          b = { e.x + 4, e.y + GH, true, 0 };
+          if (gWorld == 3) b.vx = constrain((shipC - b.x) / max(20.0f, gPY - b.y) * 1.4f, -0.9f, 0.9f);  // orbes : tir vise
+          break;
+        }
     if (gDead == 0 && e.state == 1 && e.x + GW - 1 >= gPx && e.x <= gPx + 8 && e.y + GH - 1 >= gPY && e.y <= gPY + 7) {
       e.alive = false;  // collision avec le vaisseau
       gBoomAt(e.x + 4, e.y + 3);
@@ -600,7 +655,8 @@ void gameStep() {
   for (auto &b : gBomb) {  // tirs ennemis
     if (!b.on) continue;
     b.y += 1.3f + 0.1f * gWave + (gEffDiff() - 1) * 0.3f;  // tirs plus lents en facile, plus rapides en difficile
-    if (b.y >= H) { b.on = false; continue; }
+    b.x += b.vx;
+    if (b.y >= H || b.x < 0 || b.x >= W) { b.on = false; continue; }
     if (gDead == 0 && b.x >= gPx && b.x <= gPx + 8 && b.y + 2 >= gPY + 2 && b.y <= gPY + 7) { b.on = false; gHitPlayer(); }
   }
   for (auto &b : gBoom)
@@ -646,7 +702,8 @@ void gameDraw() {
     GEnemy &e = gEn[i];
     if (!e.alive) continue;
     int fr = e.state == 1 || e.state == 3 ? (gFrame / 5) & 1 : ((gFrame / 16) + e.col) & 1;  // animation (ailes rapides en vol)
-    gSprite(SPR_E[e.type][fr], GW, GH, (int)e.x, (int)e.y, gPal, 'p', e.hp == 1 && e.type == 0 ? 'o' : 'p');
+    bool hurt = e.hp < gBaseHp(e.type);  // touche mais pas encore detruit : change de couleur
+    gSprite(SPR_W[gWorld][e.type][fr], GW, GH, (int)e.x, (int)e.y, gPal, WORLD_HURT[gWorld][0], hurt ? WORLD_HURT[gWorld][1] : WORLD_HURT[gWorld][0]);
   }
   for (auto &s : gShot)
     if (s.on) { gPix(s.x, s.y, palFull[0]); gPix(s.x, s.y + 1, palFull[2]); gPix(s.x, s.y + 2, palFull[7]); }
@@ -672,17 +729,17 @@ void gameDraw() {
   snprintf(sc, sizeof(sc), "%lu", (unsigned long)gHi);
   tinyText(*gfx, rx, 6, sc, white);
   gMark(rx, 6, tinyWidth(sc), 5);
-  if (H >= 128) {  // ligne du bas : vies a gauche, vague a droite
-    for (int i = 0; i < gLives && i < 9; i++) gSprite(SPR_LIFE, 5, 4, 1 + i * 7, H - 5, palFull, 0, 0);  // une icone par vie
-    for (int i = 0; i < gWave && i < 10; i++) {
-      int x = W - 4 - i * 4;
-      gPix(x, H - 5, palFull[2]); gPix(x + 1, H - 5, palFull[2]);
-      gPix(x, H - 4, palFull[1]); gPix(x + 1, H - 4, palFull[1]);
-      gPix(x, H - 3, palFull[1]); gPix(x + 1, H - 3, palFull[1]);
-      gPix(x, H - 2, palFull[3]);
-    }
-  } else if (W >= 96) {  // ecran bas : vies en haut a droite
-    for (int i = 0; i < gLives && i < 5; i++) gSprite(SPR_LIFE, 5, 4, W - 6 - i * 7, 1, palFull, 0, 0);  // une icone par vie
+  // vies en haut a droite : une icone + le nombre (X3)
+  snprintf(sc, sizeof(sc), "X%d", max(0, gLives));
+  int lw = tinyWidth(sc), lx = W - 1 - lw;
+  tinyText(*gfx, lx, 1, sc, white);
+  gMark(lx, 1, lw, 5);
+  gSprite(SPR_LIFE, 5, 4, lx - 7, 1, palFull, 0, 0);
+  if (H >= 128) {  // stage en bas a droite
+    snprintf(sc, sizeof(sc), "STAGE %d", gWave);
+    int sw = tinyWidth(sc);
+    tinyText(*gfx, W - 1 - sw, H - 6, sc, palFull[2]);
+    gMark(W - 1 - sw, H - 6, sw, 5);
   }
 }
 
@@ -745,7 +802,7 @@ void drawMenu() {
     snprintf(line, sizeof(line), "%s%s", i == menuSel ? "> " : "", t);
     gText(y + i * step, line, i == menuSel ? sel : off);
   }
-  if (tall) gText(y + 4 * step + 4, "START : JOUER", dim);
+  if (tall) gText(y + 4 * step + 4, "OPTIONS : JOUER", dim);
 }
 void gOverlay() {
   gfx->setFont(NULL);
@@ -761,8 +818,10 @@ void gOverlay() {
     int y = H >= 128 ? H / 2 - 22 : H / 2 - 10;
     snprintf(b, sizeof(b), "STAGE %d", gWave);
     if (gStageT > 12 || (gStageT & 2)) gText(y, b, rgb(255, 220, 0));
-    if (gBonus) { snprintf(b, sizeof(b), "BONUS %lu", (unsigned long)gBonus); gText(y + 11, b, rgb(230, 230, 230)); }
+    snprintf(b, sizeof(b), "MONDE %s", WORLD_NAME[gWorld]);
+    gText(y + 11, b, rgb(255, 60, 200));
     int yy = y + 22;
+    if (gBonus && H >= 128) { snprintf(b, sizeof(b), "BONUS %lu", (unsigned long)gBonus); gText(yy, b, rgb(230, 230, 230)); yy += 11; }
     if (gWave <= 4 && TIER_NAME[gTier()][0]) { gText(yy, TIER_NAME[gTier()], rgb(40, 230, 80)); yy += 11; }
     if (gLifeUp) gText(yy, "VIE +1", rgb(0, 220, 255));
   }
@@ -770,12 +829,23 @@ void gOverlay() {
   if (PS4.isConnected() && !gAttract) { drawMenu(); return; }  // manette la : menu par-dessus la demo
   if (PS4.isConnected()) {  // mode demo : le menu revient au premier appui
     if ((gFrame / 40) & 1) gText(H / 2 + 6, "DEMO", rgb(255, 220, 0));
-    else gText(H / 2 + 6, "START : MENU", rgb(0, 220, 255));
+    else gText(H / 2 + 6, "APPUIE : MENU", rgb(0, 220, 255));
     return;
   }
+  // pas de manette : demo, avec une petite indication pour la connecter (mini-police) et l'adresse Bluetooth
   if ((gFrame / 40) & 1) gText(H / 2 + 6, "DEMO", rgb(255, 220, 0));
-  else gText(H / 2 + 6, "MANETTE: BOUTON PS", rgb(0, 220, 255));
-  if (!PS4.isConnected() && ipText[0]) gText(H / 2 + 18, ipText, rgb(110, 110, 130));  // adresse attendue par la manette
+  const char *hint = "MANETTE : BOUTON PS";
+  int hy = H >= 128 ? H / 2 + 20 : H - 14;
+  uint16_t grey = rgb(100, 100, 120);
+  tinyText(*gfx, (W - tinyWidth(hint)) / 2, hy, hint, grey);
+  gMark((W - tinyWidth(hint)) / 2, hy, tinyWidth(hint), 5);
+  if (ipText[0] && H >= 128) {
+    char mac[20];
+    snprintf(mac, sizeof(mac), "%s", ipText);
+    for (char *c = mac; *c; c++) *c = toupper(*c);
+    tinyText(*gfx, (W - tinyWidth(mac)) / 2, hy + 8, mac, grey);
+    gMark((W - tinyWidth(mac)) / 2, hy + 8, tinyWidth(mac), 5);
+  }
 }
 
 void startGame() {
@@ -888,6 +958,13 @@ void ps4Poll() {
                (PS4.Options() && !PS4.Share()) << 6;
   uint8_t edge = bt & ~prevB;
   prevB = bt;
+  if (edge) {  // journal des appuis dans le moniteur serie (verifier que la manette est bien lue)
+    static const char *const NAMES[7] = { "HAUT", "BAS", "GAUCHE", "DROITE", "X", "ROND", "OPTIONS" };
+    Serial.print("Bouton :");
+    for (int i = 0; i < 7; i++)
+      if (edge & (1 << i)) Serial.printf(" %s", NAMES[i]);
+    Serial.printf("  (%s)\n", gDemo ? (gAttract ? "demo" : menuScores ? "scores" : "menu") : gPaused ? "pause" : "partie");
+  }
   if (edge) lastInput = millis();
   if (gDemo && gAttract) {  // mode demo : n'importe quel bouton ou le stick fait revenir le menu (sans autre effet)
     if (edge || k) { gAttract = false; lastInput = millis(); sfxMenu(); prevB = 0xFF; }

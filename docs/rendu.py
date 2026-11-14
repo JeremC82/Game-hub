@@ -27,8 +27,10 @@ def c_block(name):
     return m.group(1)
 
 
-e = strings(c_block('SPR_E[3][2][GH]'))
-SPR_E = [[e[(t * 2 + f) * 7:(t * 2 + f + 1) * 7] for f in range(2)] for t in range(3)]
+e = strings(c_block('SPR_W[4][3][2][GH]'))
+SPR_W = [[[e[((w * 3 + t) * 2 + f) * 7:((w * 3 + t) * 2 + f + 1) * 7] for f in range(2)] for t in range(3)] for w in range(4)]
+SPR_E = SPR_W[0]  # monde 1 (nebuleuse) pour les apercus
+WORLD_NAME = strings(c_block('WORLD_NAME[4]'))
 sh = strings(c_block('SPR_SHIP[4][8]'))
 SPR_SHIP = [sh[i * 8:(i + 1) * 8] for i in range(4)]
 TIER_NAME = strings(c_block('TIER_NAME[4]'))
@@ -125,17 +127,12 @@ def game_frame(w, h, demo=False, stage=1, banner=False, seed=3):
     s.tiny(rx, 0, 'RECORD', PAL['r'])
     s.tiny(rx, 6, '30800', (230, 230, 230))
     lives = 3
-    if tall:  # ligne du bas : vies a gauche, stages a droite
-        for i in range(lives - 1):
-            s.sprite(SPR_LIFE, 1 + i * 7, h - 5)
-        for i in range(stage):
-            x = w - 4 - i * 4
-            for xx, yy, ch in ((x, h - 5, 'y'), (x + 1, h - 5, 'y'), (x, h - 4, 'r'), (x + 1, h - 4, 'r'),
-                               (x, h - 3, 'r'), (x + 1, h - 3, 'r'), (x, h - 2, 'b')):
-                s.px(xx, yy, PAL[ch])
-    else:  # ecran bas : vies en haut a droite
-        for i in range(lives - 1):
-            s.sprite(SPR_LIFE, w - 6 - i * 7, 1)
+    lw = len('X3') * 4 - 1  # vies en haut a droite : icone + nombre
+    s.tiny(w - 1 - lw, 1, 'X3', (230, 230, 230))
+    s.sprite(SPR_LIFE, w - 1 - lw - 7, 1)
+    if tall:  # stage en bas a droite
+        t = f'STAGE {stage}'
+        s.tiny(w - 1 - (len(t) * 4 - 1), h - 6, t, PAL['y'])
     if banner:  # annonce du stage
         y = h // 2 - 22 if tall else h // 2 - 10
         s.text(y, f'STAGE {stage}', (255, 220, 0))
@@ -259,7 +256,7 @@ for page in ('menu', 'scores'):
         box(s, y - 6, y + 4 * 13 + 16)
         for i, t in enumerate(('> JOUER', 'NIVEAU NORMAL', 'SCORES', 'DEMO')):
             text_bg(s, y + i * 13, t, SEL if i == 0 else OFF)
-        text_bg(s, y + 4 * 13 + 4, 'START : JOUER', DIM)
+        text_bg(s, y + 4 * 13 + 4, 'OPTIONS : JOUER', DIM)
     else:
         y = 64 - 36
         box(s, y - 5, y + 6 * 11 + 18)
@@ -269,10 +266,36 @@ for page in ('menu', 'scores'):
             text_bg(s, y + (i + 1) * 11 + 2, t, (230, 230, 230) if i == 0 else OFF)
         text_bg(s, y + 6 * 11 + 6, 'X : RETOUR', DIM)
     pages.append(panels(s.im, 1, 2, 'Menu' if page == 'menu' else 'Meilleurs scores',
-                        'Croix haut / bas, X : valider, START : jouer' if page == 'menu' else 'Rang, score, niveau (F/N/D), stage atteint', pitch=4))
+                        'Croix haut / bas, X : valider, OPTIONS : jouer' if page == 'menu' else 'Rang, score, niveau (F/N/D), stage atteint', pitch=4))
 out = Image.new('RGB', (pages[0].width * 2 + 20, pages[0].height), (12, 12, 16))
 out.paste(pages[0], (0, 0))
 out.paste(pages[1], (pages[0].width + 20, 0))
 path = os.path.join(DOC, 'rendu-menu.png')
+out.save(path)
+print(path)
+
+# les 4 mondes : ennemis en grand, nom et comportement
+BEHAV = [['piques en boucle'], ['piques a deux,', 'balancement large'], ['un tir de plus,', 'piques en zigzag'], ['formation qui', 'descend, tirs vises']]
+P = 9
+out = Image.new('RGB', (4 * 230 + 30, 330), (12, 12, 16))
+d = ImageDraw.Draw(out)
+d.text((20, 12), 'Un nouveau monde a chaque stage (en boucle, de plus en plus dur)', fill=(235, 235, 245), font=font(20, True))
+for w in range(4):
+    ox = 25 + w * 230
+    d.text((ox, 50), f'Stages {w + 1}, {w + 5}, {w + 9}...', fill=(150, 150, 175), font=font(13))
+    d.text((ox, 68), WORLD_NAME[w], fill=(255, 220, 0), font=font(18, True))
+    for t in range(3):
+        sc = Screen(9, 7)
+        sc.sprite(SPR_W[w][t][0], 0, 0)
+        for y in range(7):
+            for x in range(9):
+                col = sc.im.getpixel((x, y))
+                if col == (0, 0, 0):
+                    col = (26, 26, 32)
+                cx, cy = ox + x * P, 100 + t * 72 + y * P
+                d.ellipse((cx + 1, cy + 1, cx + P - 1, cy + P - 1), fill=col)
+    for k, line in enumerate(BEHAV[w]):
+        d.text((ox + 100, 110 + k * 18), line, fill=(170, 170, 190), font=font(13))
+path = os.path.join(DOC, 'rendu-mondes.png')
 out.save(path)
 print(path)

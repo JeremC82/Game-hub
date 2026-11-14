@@ -14,7 +14,7 @@ Premier jeu : un **shoot'em up** original, repris du mode Jeu du VU-mètre. Il a
 
 ## Menu
 
-Sans partie en cours, le jeu tourne tout seul en démo, sans son. Dès que la manette est connectée, un menu s'affiche par-dessus :
+Sans partie en cours, le jeu tourne tout seul en démo, sans son. **Sans manette connectée**, la démo affiche « DEMO » et une petite indication, « MANETTE : BOUTON PS », avec l'adresse Bluetooth de l'ESP32. Dès que la manette est connectée, un menu s'affiche par-dessus :
 
 ![Menu et meilleurs scores](docs/rendu-menu.png)
 
@@ -26,9 +26,9 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. Dès que la ma
 | **DEMO** | cache le menu : le jeu tourne tout seul, avec « DEMO » qui clignote |
 
 - **Navigation :** la croix haut / bas choisit la ligne, ✕ valide.
-- **START** (bouton Options) lance la partie depuis n'importe quelle ligne.
+- **OPTIONS** (le « START » de la manette PS4) lance la partie depuis n'importe quelle ligne.
 - **Mode démo :** au bout de **30 s sans toucher la manette**, le menu se cache et la démo tourne seule. Le premier appui sur un bouton, ou un mouvement du stick, fait revenir le menu, sans autre effet.
-- **En partie, START met en pause**, et un 2ᵉ appui reprend.
+- **En partie, OPTIONS met en pause**, et un 2ᵉ appui reprend.
 - **Fin de partie :** « GAME OVER » s'affiche, avec « NOUVEAU RECORD ! » ou ton rang si tu entres dans le tableau. Le jeu revient ensuite au menu, puis passe en mode démo après 30 s.
 
 | Niveau | Vies au départ | Ennemis |
@@ -39,8 +39,21 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. Dès que la ma
 
 ## Le jeu
 
-- **Vies :** une icône par vie, en bas à gauche. Chaque stage terminé donne **une vie de plus** (9 au maximum).
-- **Stages :** quand tous les ennemis sont détruits, l'annonce « STAGE n » s'affiche avec un bonus de 500 points × le numéro du stage. La vague suivante est plus agressive.
+- **Écran :** score et record en haut ; **vies en haut à droite** (une icône et le nombre, par exemple `X3`) ; stage en cours en bas à droite (`STAGE 5`).
+- **Vies :** Chaque stage terminé donne **une vie de plus** (9 au maximum).
+- **Stages, sans fin :** quand tous les ennemis sont détruits, l'annonce « STAGE n » s'affiche avec le nom du monde et un bonus de 500 points × le numéro du stage.
+  - Les ennemis tirent plus souvent à chaque stage, et leurs tirs vont plus vite.
+  - Leurs piqués sont de plus en plus fréquents, jusqu'au stage 7 environ.
+- **Un nouveau monde à chaque stage**, en boucle : de nouveaux ennemis, avec de nouveaux déplacements ou de nouvelles défenses.
+
+  ![Les 4 mondes](docs/rendu-mondes.png)
+
+  | Stages | Monde | Comportement |
+  |---|---|---|
+  | 1, 5, 9… | Nébuleuse | piqués en boucle |
+  | 2, 6, 10… | Crabes | formation qui balance plus vite et plus large, piqués **à deux** |
+  | 3, 7, 11… | Cristaux | **un tir de plus** pour chaque ennemi, piqués **en zigzag** |
+  | 4, 8, 12… | Orbes | la formation **descend et remonte**, et leurs tirs **visent ton vaisseau** |
 - **Arrivée en vol :** les ennemis arrivent en files, par groupes en miroir. Ils suivent des trajectoires courbes avec des boucles, puis rejoignent leur place. Abattus en vol, ils rapportent **double**.
 
   ![Arrivée des ennemis](docs/arrivee-ennemis.gif)
@@ -67,7 +80,7 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. Dès que la ma
 | stick gauche ou croix gauche / droite | bouger |
 | stick gauche ou croix haut / bas | avancer / reculer (dans le bas de l'écran, environ 45 %) |
 | croix, rond, carré, triangle, R1, L1 ou R2 | tirer |
-| START (Options) | jouer depuis le menu, pause en partie |
+| OPTIONS | jouer depuis le menu, pause en partie |
 | croix haut / bas, au menu | choisir la ligne |
 | Share + croix haut / bas | luminosité (enregistrée) |
 | Share + Options pendant 3 s | redémarrer l'ESP32 |
@@ -154,8 +167,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V2.04_complet.bin](firmware/GameHub_V2.04_complet.bin) | 0x0 | `ad495a4b9aca014fcc9ed5cbecced6a8` |
-| [firmware/GameHub_V2.04.bin](firmware/GameHub_V2.04.bin) | 0x10000 | `5cf0d702a591e28ee497beb7c274c904` |
+| [firmware/GameHub_V2.07_complet.bin](firmware/GameHub_V2.07_complet.bin) | 0x0 | `eeda9af81fa69d23d5ee1e56a0d9e27f` |
+| [firmware/GameHub_V2.07.bin](firmware/GameHub_V2.07.bin) | 0x10000 | `27a17922b9a7036d780b78a86f878f22` |
 
 Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB SPIFFS)** dans Outils → Partition Scheme.
 
