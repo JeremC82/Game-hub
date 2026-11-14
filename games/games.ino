@@ -16,8 +16,8 @@
 /*  Reglages par le moniteur serie (115200 bauds, taper ?) : adresse Bluetooth de la manette,     */
 /*  dalles, nombre de bits de couleur, volume.                                                   */
 /*                                                                                                */
-/*  Son (option) : ampli I2S MAX98357A + haut-parleur 3 W. BCLK GPIO 22, LRC GPIO 21, DIN GPIO 33, */
-/*  VIN 5 V, GND. Bruitages synthetises (tir, explosions, pique, jingles), muets pendant la demo.  */
+/*  Son (option) : GPIO 22 en PWM -> filtre RC -> ampli analogique (docs/branchement-son.png).   */
+/*  Bruitages 8 bits (tir, explosions, pique, jingles, menu), muets pendant la demo.             */
 /**************************************************************************************************/
 #include <Arduino.h>
 #include <Preferences.h>
@@ -25,11 +25,11 @@
 #include <Adafruit_GFX.h>
 #include "src/PS4Controller/PS4Controller.h"  // copie corrigee de PS4Controller 1.1.0 (GPL-3), voir ps4_l2cap.c
 #include <esp_gap_bt_api.h>
-#include <driver/i2s.h>
+#include <esp_timer.h>
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "2.22"
+#define GAMES_VERSION "2.23"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -151,38 +151,71 @@ void tinyText(Adafruit_GFX &g, int x, int y, const char *s, uint16_t col) {
   }
 }
 
-// ---------------------------------------------------------------- son : ampli I2S MAX98357A (option)
-// I2S0 (les dalles utilisent l'I2S1). Synthetiseur 4 voix (carre ou bruit, glissando, decroissance)
-// calcule dans une petite tache ; sans ampli branche, rien ne se passe.
-#define SON_ACTIF 0  // son coupe : avec le canal audio actif, la manette PS4 perd des rapports (V2.17 a V2.20)
-#define SND_BCLK 22
-#define SND_LRC 21
-#define SND_DIN 33
-#define SND_RATE 22050
-#define SND_VOICES 4
-Voice voices[SND_VOICES];
-portMUX_TYPE sndMux = portMUX_INITIALIZER_UNLOCKED;
-uint8_t volume = 6;  // 0 a 10 (moniteur serie : v N)
+// ---------------------------------------------------------------- son : une broche PWM (GPIO 22) vers un ampli analogique
+// Le generateur PWM materiel (LEDC) joue une note carree ; une minuterie de 1 ms (esp_timer) fait varier la
+// frequence (glissandos, bruit des explosions) et le rapport cyclique (decroissance du volume).
+// Pas d'I2S ni de tache son : l'ancien son I2S faisait perdre ses rapports a la manette PS4.
+// Branchement : GPIO 22 -> 1 k -> (10 nF vers la masse) -> 10 uF -> entree de l'ampli (voir docs/branchement-son.png).
+#define SON_ACTIF 1
+#define SND_PIN 22
+#define SND_LEDC 6        // canal LEDC (timer 3) : libre (les dalles n'utilisent pas le LEDC)
+#define SND_BITS 8        // rapport cyclique sur 8 bits : 128 = 50 % (le plus fort)
+uint8_t volume = 6;       // 0 a 10 (moniteur serie : v N)
 const Note *melody = nullptr;  // jingle en cours (notes jouees l'une apres l'autre)
 uint8_t melodyLen = 0, melodyPos = 0;
 uint32_t melodyNext = 0;
+// son en cours (une seule voix ; un son plus important remplace un son mineur)
+volatile float sF0 = 0, sF1 = 0, sVol = 0;
+volatile uint32_t sStart = 0, sDur = 0;
+volatile bool sNoise = false, sOn = false;
+volatile uint8_t sPrio = 0;
+portMUX_TYPE sndMux = portMUX_INITIALIZER_UNLOCKED;
+bool sndReady = false;
 
-// lance un son : freq de depart, freq d'arrivee, duree, volume 0-1, bruit ou carre
-void sndPlay(float f0, float f1, uint16_t ms, float vol, bool noise) {
-  if (!gDemo) sndRaw(f0, f1, ms, vol, noise);  // demo muette
-}
-void sfxMenu() { sndRaw(1200, 1200, 35, 0.15f, false); }
-void sndRaw(float f0, float f1, uint16_t ms, float vol, bool noise) {
-  if (!SON_ACTIF || volume == 0) return;
-  uint32_t n = (uint32_t)SND_RATE * ms / 1000;
+void sndRaw(float f0, float f1, uint16_t ms, float vol, bool noise, uint8_t prio) {
+  if (!SON_ACTIF || !sndReady || volume == 0) return;
+  uint32_t now = millis();
   portENTER_CRITICAL(&sndMux);
-  int best = 0;
-  for (int i = 1; i < SND_VOICES; i++)
-    if (voices[i].left < voices[best].left) best = i;  // voix libre, ou la plus proche de finir
-  static uint32_t nextId = 0;
-  voices[best] = { 0, f0 / SND_RATE, (f1 - f0) / SND_RATE / n, vol, vol / n, n, noise, ++nextId };
+  bool busy = sOn && now - sStart < sDur;
+  if (!busy || prio >= sPrio) {
+    sF0 = f0; sF1 = f1; sDur = ms; sVol = vol; sNoise = noise; sPrio = prio; sStart = now; sOn = true;
+  }
   portEXIT_CRITICAL(&sndMux);
 }
+void sndPlay(float f0, float f1, uint16_t ms, float vol, bool noise, uint8_t prio) {
+  if (!gDemo) sndRaw(f0, f1, ms, vol, noise, prio);  // demo muette
+}
+void sfxMenu() { sndRaw(1200, 1200, 35, 0.4f, false, 1); }
+
+// toutes les ms : frequence et volume du son en cours
+void sndTick(void *) {
+  static bool silent = true;
+  static uint32_t rnd = 12345;
+  float f0, f1, vol;
+  uint32_t start, dur;
+  bool noise, on;
+  portENTER_CRITICAL(&sndMux);
+  f0 = sF0; f1 = sF1; vol = sVol; start = sStart; dur = sDur; noise = sNoise; on = sOn;
+  portEXIT_CRITICAL(&sndMux);
+  uint32_t t = millis() - start;
+  if (!on || t >= dur || volume == 0) {
+    if (!silent) { ledcWrite(SND_LEDC, 0); silent = true; }
+    if (on && t >= dur) sOn = false;
+    return;
+  }
+  float k = (float)t / dur;
+  float f = f0 + (f1 - f0) * k;
+  if (noise) {  // bruit : frequence tiree au hasard autour de la frequence du moment
+    rnd = rnd * 1103515245 + 12345;
+    f *= 0.35f + ((rnd >> 16) & 1023) / 760.0f;
+  }
+  f = constrain(f, 40.0f, 9000.0f);
+  uint32_t duty = (uint32_t)(128 * vol * (volume / 10.0f) * (1 - 0.7f * k));  // decroissance douce
+  ledcChangeFrequency(SND_LEDC, (uint32_t)f, SND_BITS);
+  ledcWrite(SND_LEDC, constrain(duty, 1u, 128u));
+  silent = false;
+}
+
 void sndMelody(const Note *m, uint8_t len) {
   if (gDemo || volume == 0) return;
   melody = m; melodyLen = len; melodyPos = 0; melodyNext = 0;
@@ -191,66 +224,17 @@ void sndUpdate() {  // notes des jingles (appele a chaque tour de boucle)
   if (!melody || millis() < melodyNext) return;
   if (melodyPos >= melodyLen) { melody = nullptr; return; }
   const Note &n = melody[melodyPos++];
-  if (n.hz) sndPlay(n.hz, n.hz, n.ms * 9 / 10, 0.22f, false);
+  if (n.hz) sndPlay(n.hz, n.hz, n.ms * 9 / 10, 0.5f, false, 2);
   melodyNext = millis() + n.ms;
 }
 const Note JINGLE_STAGE[] = { { 523, 90 }, { 659, 90 }, { 784, 90 }, { 1047, 220 } };
 const Note JINGLE_OVER[] = { { 523, 200 }, { 392, 200 }, { 330, 200 }, { 262, 450 } };
 const Note JINGLE_ARME[] = { { 784, 70 }, { 988, 70 }, { 1175, 70 }, { 1568, 200 } };
-void sfxShot() { sndPlay(1400, 500, 70, 0.16f, false); }
-void sfxBoom() { sndPlay(900, 120, 260, 0.35f, true); }
-void sfxHit() { sndPlay(700, 60, 700, 0.5f, true); sndPlay(220, 40, 600, 0.3f, false); }
-void sfxDive() { sndPlay(1100, 350, 450, 0.10f, false); }
+void sfxShot() { sndPlay(1400, 500, 70, 0.35f, false, 1); }
+void sfxBoom() { sndPlay(900, 120, 260, 0.8f, true, 2); }
+void sfxHit() { sndPlay(700, 50, 700, 1.0f, true, 3); }
+void sfxDive() { sndPlay(1100, 350, 450, 0.25f, false, 1); }
 
-// Le son est calcule SANS bloquer les interruptions : on copie l'etat des voix (quelques microsecondes),
-// on calcule le morceau, puis on remet l'etat a jour sauf pour les voix relancees entre-temps.
-// (V2.01 a V2.15 : tout le calcul se faisait interruptions bloquees sur le coeur 1, celui des interruptions
-// Bluetooth -> la manette PS4 perdait la plupart de ses rapports.)
-void audioTask(void *) {
-  static int16_t buf[256 * 2];  // stereo : la meme valeur a gauche et a droite
-  static Voice loc[SND_VOICES];
-  uint32_t rnd = 12345;
-  for (;;) {
-    bool any = false;
-    portENTER_CRITICAL(&sndMux);
-    memcpy(loc, voices, sizeof(loc));
-    portEXIT_CRITICAL(&sndMux);
-    for (auto &v : loc) any |= v.left > 0;
-    if (!any || volume == 0) {  // rien a jouer : silence, sans calcul
-      memset(buf, 0, sizeof(buf));
-    } else {
-      float gain = volume * volume / 100.0f * 9000;  // volume progressif
-      for (int i = 0; i < 256; i++) {
-        float acc = 0;
-        for (auto &v : loc) {
-          if (!v.left) continue;
-          float smp;
-          if (v.noise) {
-            v.ph += v.f;
-            if (v.ph >= 1) { v.ph -= 1; rnd = rnd * 1103515245 + 12345; }
-            smp = (rnd >> 16 & 1) ? 1 : -1;
-          } else {
-            v.ph += v.f;
-            if (v.ph >= 1) v.ph -= 1;
-            smp = v.ph < 0.5f ? 1 : -1;
-          }
-          acc += smp * v.vol;
-          v.f += v.df;
-          v.vol -= v.dv * 0.6f;  // decroissance douce
-          v.left--;
-        }
-        int32_t o = constrain((int32_t)(acc * gain), -32000, 32000);
-        buf[i * 2] = buf[i * 2 + 1] = o;
-      }
-      portENTER_CRITICAL(&sndMux);
-      for (int k = 0; k < SND_VOICES; k++)
-        if (voices[k].id == loc[k].id) voices[k] = loc[k];  // voix pas relancee pendant le calcul
-      portEXIT_CRITICAL(&sndMux);
-    }
-    size_t done;
-    i2s_write(I2S_NUM_0, buf, sizeof(buf), &done, portMAX_DELAY);
-  }
-}
 void audioBegin() {
 #if !SON_ACTIF
   volume = 0;
@@ -258,34 +242,19 @@ void audioBegin() {
   return;
 #endif
   volume = constrain(prefs.getUChar("vol", 6), 0, 10);
-  // le son tourne sur le coeur 0 (pilote I2S installe depuis ce coeur : ses interruptions y restent) ;
-  // le coeur 1 reste au jeu et aux interruptions Bluetooth de la manette
-  xTaskCreatePinnedToCore(audioStart, "son", 4096, NULL, 1, NULL, 0);
-}
-void audioStart(void *) {
-  i2s_config_t cfg = {};
-  cfg.mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX);
-  cfg.sample_rate = SND_RATE;
-  cfg.bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT;
-  cfg.channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT;
-  cfg.communication_format = I2S_COMM_FORMAT_STAND_I2S;
-  cfg.dma_buf_count = 4;
-  cfg.dma_buf_len = 256;
-  cfg.tx_desc_auto_clear = true;  // silence si la tache prend du retard
-  i2s_pin_config_t pins = {};
-  pins.mck_io_num = I2S_PIN_NO_CHANGE;
-  pins.bck_io_num = SND_BCLK;
-  pins.ws_io_num = SND_LRC;
-  pins.data_out_num = SND_DIN;
-  pins.data_in_num = I2S_PIN_NO_CHANGE;
-  if (i2s_driver_install(I2S_NUM_0, &cfg, 0, NULL) != ESP_OK || i2s_set_pin(I2S_NUM_0, &pins) != ESP_OK) {
-    Serial.println("Son : I2S indisponible");
-    vTaskDelete(NULL);
+  ledcSetup(SND_LEDC, 1000, SND_BITS);
+  ledcAttachPin(SND_PIN, SND_LEDC);
+  ledcWrite(SND_LEDC, 0);
+  esp_timer_create_args_t args = {};
+  args.callback = sndTick;
+  args.name = "son";
+  esp_timer_handle_t tm;
+  if (esp_timer_create(&args, &tm) != ESP_OK || esp_timer_start_periodic(tm, 1000) != ESP_OK) {
+    Serial.println("Son : minuterie indisponible");
     return;
   }
-  Serial.printf("Son : ampli I2S (BCLK %d, LRC %d, DIN %d) sur le coeur %d, volume %u/10, memoire libre %u\n", SND_BCLK, SND_LRC, SND_DIN,
-                xPortGetCoreID(), volume, ESP.getFreeHeap());
-  audioTask(NULL);  // ne revient jamais
+  sndReady = true;
+  Serial.printf("Son : PWM sur GPIO %d (ampli analogique), volume %u/10\n", SND_PIN, volume);
 }
 
 // ---------------------------------------------------------------- jeu : shoot'em up d'arcade (repris du VU-metre)

@@ -3,6 +3,7 @@
 #include <Arduino.h>
 
 struct Note { uint16_t hz, ms; };  // note d'un jingle (hz 0 = silence)
+
 struct Voice { float ph, f, df, vol, dv; uint32_t left; bool noise; uint32_t id; };  // voix du synthetiseur (id : son lance)
 struct HiScore { uint32_t score; uint8_t stage, diff; char name[4]; };  // tableau des meilleurs scores (nom : 3 lettres)
 struct HiScoreV1 { uint32_t score; uint8_t stage, diff; };              // ancien format (V2.02 a V2.19), repris au chargement

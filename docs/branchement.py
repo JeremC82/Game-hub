@@ -91,7 +91,7 @@ class Sheet:
 # ================================================================ jeu : ESP32 -> dalles
 s = Sheet(2000, 1560, 'Game hub - branchement des dalles et du son',
           'ESP32 DevKit (38 broches) - meme brochage dalle que l\'horloge ClockV1 et le VU-metre - manette PS4 en Bluetooth (sans fil)')
-LEFT = [('5V / VIN', '5v'), ('GND', 'gnd'), ('GPIO22', 'bclk'), ('GPIO21', 'lrc'), ('GPIO33', 'din')]
+LEFT = [('5V / VIN', '5v'), ('GND', 'gnd'), ('GPIO22', 'snd')]
 RIGHT = [('GPIO25', 'R1'), ('GPIO26', 'G1'), ('GPIO27', 'B1'), ('GPIO14', 'R2'), ('GPIO12', 'G2'), ('GPIO13', 'B2'),
          ('GPIO23', 'A'), ('GPIO19', 'B'), ('GPIO5', 'C'), ('GPIO17', 'D'), ('GPIO32', 'E'), ('GPIO16', 'CLK'),
          ('GPIO4', 'LAT'), ('GPIO15', 'OE'), ('GND', 'GND')]
@@ -132,31 +132,18 @@ vx, vy = lp['5v']
 s.wire([(px0 + 640, py0 + 120), (720, py0 + 120), (720, vy), (vx, vy)], RED, 4)
 gx, gy = lp['gnd']
 s.wire([(px0 + 640, py0 + 160), (700, py0 + 160), (700, gy), (gx, gy)], INK, 4)
-# son : ampli I2S MAX98357A + haut-parleur (option)
+# son (option) : une broche PWM vers un ampli analogique
 ax0, ay0, ax1, ay1 = 40, 600, 680, 940
-s.box(ax0, ay0, ax1, ay1, 'Son (option) : ampli I2S MAX98357A + haut-parleur 3 W', (240, 246, 255))
-AMP = [('VIN', '5v', RED, '5 V'), ('GND', 'gnd', INK, 'masse'), ('BCLK', 'bclk', ORANGE, 'GPIO 22'),
-       ('LRC', 'lrc', ORANGE, 'GPIO 21'), ('DIN', 'din', ORANGE, 'GPIO 33')]
-for i, (pin, key, col, note) in enumerate(AMP):
-    y = ay0 + 70 + i * 38
-    s.d.rectangle((ax1 - 30, y - 10, ax1 - 10, y + 10), outline=INK, width=2, fill=(255, 255, 255))
-    s.text(ax1 - 40, y, pin, FB, col, 'rm')
-    s.text(ax1 - 110, y, note, FS, GREY, 'rm')
-    if key in ('bclk', 'lrc', 'din'):
-        ex, ey = lp[key]
-        mid = 700 + ('bclk', 'lrc', 'din').index(key) * 14
-        s.wire([(ax1 - 10, y), (mid, y), (mid, ey), (ex, ey)], ORANGE, 3)
-        s.dot(ex, ey, ORANGE)
-s.text(ax0 + 30, ay0 + 70, 'VIN et GND : sur le 5 V', FS, RED)
-s.text(ax0 + 30, ay0 + 94, 'de l\'alimentation (comme l\'ESP32).', FS, GREY)
-# haut-parleur
-hx, hy = ax0 + 90, ay0 + 210
-s.d.rectangle((hx - 30, hy - 22, hx - 10, hy + 22), outline=INK, width=3, fill=(220, 220, 230))
-s.d.polygon([(hx - 10, hy - 22), (hx + 25, hy - 48), (hx + 25, hy + 48), (hx - 10, hy + 22)], outline=INK, fill=(200, 200, 215))
-s.text(hx + 40, hy - 10, 'Haut-parleur 4 ou 8 ohms, 3 W', FS)
-s.text(hx + 40, hy + 14, 'sur les bornes + / - du module', FS, GREY)
-s.text(ax0 + 30, ay0 + 290, 'GAIN et SD : non branches (9 dB, voix gauche + droite).', FS, GREY)
-s.text(ax0 + 30, ay0 + 314, 'Volume : commande v 0 a v 10 dans le moniteur serie.', FS, BLUE)
+s.box(ax0, ay0, ax1, ay1, 'Son (option) : GPIO 22 en PWM vers un ampli', (240, 246, 255))
+ex, ey = lp['snd']
+s.wire([(ax1, ay0 + 120), (720, ay0 + 120), (720, ey), (ex, ey)], ORANGE, 4)
+s.dot(ex, ey, ORANGE)
+s.text(ax0 + 30, ay0 + 70, 'GPIO 22 -> 1 kOhm -> (10 nF vers la masse) -> 10 uF', F, ORANGE)
+s.text(ax0 + 30, ay0 + 100, '-> entree de l\'ampli (L et R reliees)', F, ORANGE)
+s.text(ax0 + 30, ay0 + 150, 'Ampli NS4110B / PAM8610 : 7 a 15 V (bloc 12 V ou elevateur)', FS)
+s.text(ax0 + 30, ay0 + 176, 'ou PAM8403 directement en 5 V. Masse commune avec l\'ESP32.', FS)
+s.text(ax0 + 30, ay0 + 226, 'Schema detaille : docs/branchement-son.png', FB, BLUE)
+s.text(ax0 + 30, ay0 + 270, 'Volume : potentiometre de l\'ampli + commande v 0 a v 10.', FS, GREY)
 
 # chainage : 3 configurations
 cy = 1010

@@ -4,7 +4,7 @@ Jeux d'arcade sur 1 à 4 dalles LED 128x64, avec un ESP32 classique et une **man
 
 - **Pas de wifi :** la manette se connecte directement à l'ESP32 des dalles.
 - **Partition unique de 3 Mo :** il reste de la place pour d'autres jeux.
-- **Son en option :** un petit ampli I2S et un haut-parleur. Il est coupé pour l'instant, car il gêne la manette (voir la section Son).
+- **Son en option :** une broche PWM vers un petit ampli et un haut-parleur.
 
 Premier jeu : un **shoot'em up** original, repris du mode Jeu du VU-mètre. Il a un menu, des niveaux de difficulté, des stages, un vaisseau qui évolue, et des ennemis qui arrivent en vol.
 
@@ -112,11 +112,11 @@ Pour rejouer sur la PS4 ensuite, il suffit de rebrancher la manette en USB sur l
 
 La commande `a` seule rend à l'ESP32 son adresse d'origine.
 
-## Son par une broche PWM (prévu)
+## Son (option) : une broche PWM
 
 ![Branchement du son](docs/branchement-son.png)
 
-Le son par l'ampli I2S gêne la manette PS4 (voir plus bas). Le son prévu passe donc par **une seule broche, GPIO 22**. L'ESP32 y sort des notes carrées, façon consoles 8 bits, sans I2S et presque sans travail pour le processeur. Le signal est filtré, puis envoyé à un ampli analogique.
+Le son passe par **une seule broche, GPIO 22** (depuis la V2.23). L'ESP32 y sort des notes carrées, façon consoles 8 bits, sans I2S et presque sans travail pour le processeur. Le signal est filtré, puis envoyé à un ampli analogique.
 
 - **Filtre :** 1 kΩ en série, 10 nF vers la masse, puis 10 µF en série vers l'entrée de l'ampli. Relie l'entrée L à l'entrée R : le son est mono.
 - **Amplis NS4110B ou PAM8610 :** ils demandent **7 à 15 V**, pas le 5 V des dalles. Alimente-les avec un bloc 12 V à part, ou avec un élévateur 5 V → 12 V (MT3608, XL6009).
@@ -124,30 +124,14 @@ Le son par l'ampli I2S gêne la manette PS4 (voir plus bas). Le son prévu passe
 - **Masse commune** obligatoire entre l'ampli et l'ESP32.
 - **Volume :** avec le potentiomètre de l'ampli. Commence au minimum.
 
-> Le schéma est prêt. Le code de ce son n'est **pas encore fait**.
+- **Bruitages :** tir, explosion, vaisseau touché, piqué d'un ennemi, jingles de stage, de nouvelle arme et de fin de partie, bips du menu et de la saisie du nom. La démo reste muette.
+- **Une seule voix :** un son important (vaisseau touché, explosion) passe avant un son mineur (tir, bip).
+- **Volume :** `v 0` (muet) à `v 10` dans le moniteur série, en plus du potentiomètre de l'ampli.
+- **Sans ampli branché :** le jeu marche normalement.
 
-## Son (option)
+## Ancien son I2S (retiré)
 
-> **Son coupé depuis la V2.21** (`#define SON_ACTIF 0` dans games.ino). Avec le canal audio actif, la manette PS4 perd la plupart de ses paquets, et les commandes deviennent lentes. Le code du son reste en place. Pour le réactiver, mets `SON_ACTIF 1` et recompile.
-
-Module **ampli I2S MAX98357A**, par exemple [Adafruit MAX98357A, réf. 3006](https://www.adafruit.com/product/3006). On trouve aussi des modules compatibles en cherchant « MAX98357A I2S ». Il faut y ajouter un **haut-parleur de 3 W, 4 ou 8 Ω** (40 à 50 mm).
-
-| Module MAX98357A | ESP32 |
-|---|---|
-| VIN | 5 V (même alimentation que l'ESP32) |
-| GND | GND |
-| BCLK | GPIO 22 |
-| LRC | GPIO 21 |
-| DIN | GPIO 33 |
-| GAIN, SD | non branchés (gain 9 dB, voies gauche + droite mélangées) |
-| + / − | le haut-parleur |
-
-- **Bruitages synthétisés dans l'ESP32 :** tir, explosion, vaisseau touché, piqué d'un ennemi, jingles de stage, de nouvelle arme et de fin de partie, bips du menu.
-- **Volume :** `v 0` (muet) à `v 10` dans le moniteur série.
-- **Démo :** elle reste muette.
-- **Sans module branché :** le jeu marche normalement.
-- **Mémoire :** le son prend environ 4 Ko et utilise le 2ᵉ canal I2S, car les dalles utilisent l'autre.
-- **Interruptions :** le son est calculé sans bloquer les interruptions, que le Bluetooth de la manette utilise sur le même cœur. Avant la V2.16, il les bloquait, et la manette perdait la plupart de ses paquets.
+De la V2.01 à la V2.22, le son passait par un ampli I2S MAX98357A (GPIO 22, 21, 33). Le canal audio I2S faisait perdre à la manette PS4 la plupart de ses paquets, et les commandes devenaient lentes, même sans ampli branché. Il a été remplacé en V2.23 par le son PWM ci-dessus, qui ne demande presque rien au processeur. L'ancien code reste dans l'historique Git.
 
 ## Branchement
 
@@ -193,8 +177,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V2.22_complet.bin](firmware/GameHub_V2.22_complet.bin) | 0x0 | `c6809c57b57ff21f30efa6d509061ed5` |
-| [firmware/GameHub_V2.22.bin](firmware/GameHub_V2.22.bin) | 0x10000 | `06d119714bef41bb39c8bcd7c340ab0c` |
+| [firmware/GameHub_V2.23_complet.bin](firmware/GameHub_V2.23_complet.bin) | 0x0 | `e7627f2c8d426cf0bfe678bdfe28288c` |
+| [firmware/GameHub_V2.23.bin](firmware/GameHub_V2.23.bin) | 0x10000 | `a8d1cab75930a9e2f5544e7d28d1bc85` |
 
 Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB SPIFFS)** dans Outils → Partition Scheme.
 
