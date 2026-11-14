@@ -107,6 +107,8 @@ La commande `a` seule rend à l'ESP32 son adresse d'origine.
 
 ## Son (option)
 
+> **V2.17 : son désactivé** (`#define SON_ACTIF 0` dans games.ino). C'est un test, pour savoir si la tâche son fait perdre des paquets à la manette.
+
 Module **ampli I2S MAX98357A**, par exemple [Adafruit MAX98357A, réf. 3006](https://www.adafruit.com/product/3006). On trouve aussi des modules compatibles en cherchant « MAX98357A I2S ». Il faut y ajouter un **haut-parleur de 3 W, 4 ou 8 Ω** (40 à 50 mm).
 
 | Module MAX98357A | ESP32 |
@@ -170,8 +172,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V2.16_complet.bin](firmware/GameHub_V2.16_complet.bin) | 0x0 | `9c6aeab0b7b2d2d65c76d7225030a6fd` |
-| [firmware/GameHub_V2.16.bin](firmware/GameHub_V2.16.bin) | 0x10000 | `efeaec59246fd4d33090c3dd98a4cb40` |
+| [firmware/GameHub_V2.17_complet.bin](firmware/GameHub_V2.17_complet.bin) | 0x0 | `06243d6c0bc23f32996165c433fe70a8` |
+| [firmware/GameHub_V2.17.bin](firmware/GameHub_V2.17.bin) | 0x10000 | `fb23bb560acd70a88a9d5a2f18f05ad7` |
 
 Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB SPIFFS)** dans Outils → Partition Scheme.
 

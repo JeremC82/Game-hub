@@ -29,7 +29,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "2.16"
+#define GAMES_VERSION "2.17"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -150,6 +150,7 @@ void tinyText(Adafruit_GFX &g, int x, int y, const char *s, uint16_t col) {
 // ---------------------------------------------------------------- son : ampli I2S MAX98357A (option)
 // I2S0 (les dalles utilisent l'I2S1). Synthetiseur 4 voix (carre ou bruit, glissando, decroissance)
 // calcule dans une petite tache ; sans ampli branche, rien ne se passe.
+#define SON_ACTIF 0  // 0 : son coupe (test : la manette PS4 perd-elle encore des rapports sans la tache son ?)
 #define SND_BCLK 22
 #define SND_LRC 21
 #define SND_DIN 33
@@ -168,7 +169,7 @@ void sndPlay(float f0, float f1, uint16_t ms, float vol, bool noise) {
 }
 void sfxMenu() { sndRaw(1200, 1200, 35, 0.15f, false); }
 void sndRaw(float f0, float f1, uint16_t ms, float vol, bool noise) {
-  if (volume == 0) return;
+  if (!SON_ACTIF || volume == 0) return;
   uint32_t n = (uint32_t)SND_RATE * ms / 1000;
   portENTER_CRITICAL(&sndMux);
   int best = 0;
@@ -247,6 +248,11 @@ void audioTask(void *) {
   }
 }
 void audioBegin() {
+#if !SON_ACTIF
+  volume = 0;
+  Serial.println("Son : desactive (SON_ACTIF 0)");
+  return;
+#endif
   volume = constrain(prefs.getUChar("vol", 6), 0, 10);
   i2s_config_t cfg = {};
   cfg.mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX);
