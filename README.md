@@ -191,6 +191,8 @@ Des bonbons à aligner sur un plateau de 8 × 8. Six sortes, chacune avec sa cou
 
 ## Menu
 
+Au démarrage, la dalle affiche **GAME HUB** et la **version** (par exemple V3.61) pendant 2 s, le temps que le Bluetooth et le son démarrent.
+
 Sans partie en cours, le jeu tourne tout seul en démo, sans son. **Sans manette connectée**, la démo affiche seulement une petite indication, « MANETTE : BOUTON PS », avec l'adresse Bluetooth de l'ESP32. Dès que la manette est connectée, le menu s'affiche **sur son propre écran**, sans la démo derrière. On y voit un fond d'étoiles, le titre GAME HUB et le record avec le nom de son détenteur :
 
 **Batterie de la manette :** en haut à droite du menu, un pourcentage et une petite pile (verte, orange, puis rouge qui clignote quand elle est faible). En charge, la pile est jaune, avec un éclair et une jauge qui se remplit en boucle.
@@ -332,8 +334,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V3.60_complet.bin](firmware/GameHub_V3.60_complet.bin) | 0x0 | `ebb1ca6ecd737e664fcf100c2ec1bd0a` |
-| [firmware/GameHub_V3.60.bin](firmware/GameHub_V3.60.bin) | 0x10000 | `283c9adfea742eefcd06ea01dba36ad0` |
+| [firmware/GameHub_V3.61_complet.bin](firmware/GameHub_V3.61_complet.bin) | 0x0 | `bdd1f76d960825b9daa9565b493460eb` |
+| [firmware/GameHub_V3.61.bin](firmware/GameHub_V3.61.bin) | 0x10000 | `3977bbc91dfe87d206f14c0a0f393d6f` |
 
 Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB SPIFFS)** dans Outils → Partition Scheme.
 

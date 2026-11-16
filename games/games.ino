@@ -29,7 +29,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "3.60"
+#define GAMES_VERSION "3.61"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -4532,12 +4532,25 @@ void setup() {
   gfx = new TiledPanels(dma, panelCols(), panelRows(), flipAll, serpent);
   dma->setBrightness8(bright);
   gfx->fillScreen(0);
+  // ecran de demarrage : GAME HUB et la version, pendant 2 s (le Bluetooth et le son demarrent pendant ce temps)
+  uint32_t bootT0 = millis();
+  {
+    int y = H / 2 - 14;
+    gfx->setFont(NULL);
+    gfx->setTextSize(2);
+    gfx->setTextColor(rgb(255, 220, 0));
+    gfx->setCursor((W - 8 * 12) / 2, y);
+    gfx->print("GAME HUB");
+    gfx->setTextSize(1);
+    gText(y + 22, "V" GAMES_VERSION, rgb(0, 220, 255));
+  }
 
   gDiff = prefs.getUChar("diff", 1) % 3;
   gGame = 0;  // demarrage toujours sur ESSAIM (choix d'un autre jeu : gauche / droite dans le menu)
   ps4Begin();
   audioBegin();
   serialMenu();
+  while (millis() - bootT0 < 2000) delay(10);  // la version reste 2 s a l'ecran
 
   gameSetup();
   resetCurrent();  // demo du jeu choisi au demarrage
