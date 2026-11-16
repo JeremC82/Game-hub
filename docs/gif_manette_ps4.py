@@ -168,7 +168,7 @@ for k in range(10):
     if not pressed:  # demo sans manette : juste l'indication et l'adresse Bluetooth
         texts = [(70, 'MANETTE: BOUTON PS', CYAN), (82, MAC, (110, 110, 130))]
     else:  # manette connectee : le menu s'affiche
-        texts = [(58, 'GAME HUB', (255, 220, 0)), (70, '> <SPACE DEFENDER>', CYAN)]
+        texts = [(58, 'ARCADE GAMES', (255, 220, 0)), (70, '> <SPACE DEFENDER>', CYAN)]
     scr, pos = led_screen(panel_img(texts), 470, 100)
     im.paste(scr, (480, 130))
     controller(d, 230, 340, led=(0, 0, 90) if pressed else None, ps=(k in (5, 6)))

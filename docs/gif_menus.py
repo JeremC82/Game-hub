@@ -59,8 +59,9 @@ def menu_screen(f, sel, bright, vol):
         x, y0, v = rnd.randrange(W), rnd.randrange(H), 0.2 + rnd.random() * 0.8
         g = int(70 + v * 120)
         s.px(x, int(y0 + f * v * 0.5) % H, (g, g, g))
-    text_big(s, (W - 96) // 2, 8, 'GAME HUB', SEL)
-    s.text(26, 'RECORD 30800 JER', (255, 40, 40))
+    text_big(s, (W - 72) // 2, 2, 'ARCADE', SEL)
+    s.text(19, 'GAMES', (0, 220, 255))
+    s.text(29, 'RECORD 30800 JER', (255, 40, 40))
     y, step = H // 2 - 22, 11
     ImageDraw.Draw(s.im).rectangle((4, y - 6, 123, y + 6 * step + 15), fill=(0, 0, 0), outline=(40, 70, 170))
     for i in range(6):

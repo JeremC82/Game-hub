@@ -83,7 +83,7 @@ class Screen:
             x += 6
 
 
-def hud_top(s, w, score, lives=3):
+def hud_top(s, w, score, lives=3, life=None):
     """Haut de l'ecran comme hudTop() : SCORE centre sur une ligne, une icone par vie en haut a droite."""
     num = str(score)
     lw, nw = len('SCORE') * 4 - 1, len(num) * 4 - 1
@@ -91,7 +91,7 @@ def hud_top(s, w, score, lives=3):
     s.tiny(x, 1, 'SCORE', PAL['r'])
     s.tiny(x + lw + 4, 1, num, (230, 230, 230))
     for i in range(min(lives, 5)):
-        s.sprite(SPR_LIFE, w - 6 - i * 7, 1)
+        s.sprite(life or SPR_LIFE, w - 6 - i * 7, 1)
 
 
 def game_frame(w, h, demo=False, stage=1, banner=False, seed=3):
@@ -294,8 +294,9 @@ pages = []
 for page in ('menu', 'scores', 'nom'):
     s = star_screen(11)
     if page == 'menu':  # titre, record avec le nom, puis le menu
-        text_big(s, (128 - 96) // 2, 8, 'GAME HUB', SEL)
-        s.text(26, 'RECORD 30800 JER', (255, 40, 40))
+        text_big(s, (128 - 72) // 2, 2, 'ARCADE', SEL)
+        s.text(19, 'GAMES', (0, 220, 255))
+        s.text(29, 'RECORD 30800 JER', (255, 40, 40))
         y = 64 - 22
         box(s, y - 6, y + 6 * 11 + 16)
         for i, t in enumerate(('> JOUER <RAID>', 'NIVEAU NORMAL', 'LUMINOSITE 60%', 'VOLUME 60%', 'SCORES', 'DEMO')):

@@ -29,7 +29,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "3.61"
+#define GAMES_VERSION "3.62"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -97,6 +97,7 @@ uint8_t colorBits = 0;  // profondeur de couleur obtenue pour les dalles
 uint16_t rgb(uint8_t r, uint8_t g, uint8_t b) { return dma->color565(r, g, b); }
 
 // ---------------------------------------------------------------- commandes (manette -> jeu)
+int8_t padStickX = 0;               // stick gauche horizontal (-127 gauche .. 127 droite), BRIQUES : vitesse proportionnelle
 int8_t padStickY = 0;               // stick gauche vertical (-127 bas .. 127 haut), RAQUETTES : vitesse proportionnelle
 bool padDigital = false;            // la croix numerique est appuyee (ORBITE : gauche / droite = tourner en continu)
 uint8_t keysPs4 = 0;                // touches de la manette PS4 : 1 gauche, 2 droite, 4 feu, 8 haut, 16 bas, 32 rond
@@ -122,10 +123,10 @@ bool gAttractHold = false;         // demo lancee depuis le menu : on attend que
 bool gAttract = false;              // mode demo : menu cache (ligne DEMO, ou 30 s sans toucher la manette)
 #define MENU_IDLE_MS 30000UL        // menu sans activite : passage en mode demo
 bool menuScores = false;            // page des meilleurs scores affichee
-#define N_GAMES 11
-const char *const GAME_NAME[N_GAMES] = { "SPACE DEFENDER", "RAID", "COURSE", "RAQUETTES", "BULLES", "LABYRINTHE", "SAUTERELLE", "ORBITUS", "BRIQUES", "BLOCS", "CRUCH" };
+#define N_GAMES 10
+const char *const GAME_NAME[N_GAMES] = { "SPACE DEFENDER", "RAID", "COURSE", "RAQUETTES", "BULLES", "LABYRINTHE", "ORBITUS", "BRIQUES", "BLOCS", "CRUCH" };
 uint8_t gGame = 0;                  // jeu choisi dans le menu (gauche / droite sur la ligne JOUER)
-const char *topKey() { static const char *const K[N_GAMES] = { "top", "top1", "top2", "top3", "top4", "top5", "top6", "top7", "top8", "top9", "top10" }; return K[gGame % N_GAMES]; }
+const char *topKey() { static const char *const K[N_GAMES] = { "top", "top1", "top2", "top3", "top4", "top5", "top7", "top8", "top9", "top10" }; return K[gGame % N_GAMES]; }  // top6 : ancienne SAUTERELLE (cle libre)
 #define TOP_N 5
 HiScore gBest[TOP_N];                // meilleurs scores (gardes en memoire)
 uint8_t gLastRank = 0;              // place obtenue a la derniere partie (0 : hors tableau)
@@ -328,36 +329,36 @@ int8_t gRowType[G_MAXROWS];
 // sprites : '.' transparent, sinon une lettre de la palette ci-dessous
 // 4 mondes (un par stage, en boucle) : 3 types d'ennemis x 2 images (9x7), sprites originaux
 // type 0 : rang du haut (2 tirs), types 1 et 2 : rangs suivants
-const char *const SPR_W[4][3][2][GH] = {
-  {  // nebuleuse
-    { { "..ppppp..", ".pwpppwp.", "ppppppppp", "p.c.c.c.p", "..c.c.c..", ".c..c..c.", "c...c...c" },
-      { "..ppppp..", ".pwpppwp.", "ppppppppp", "p.c.c.c.p", ".c..c..c.", "..c.c.c..", "...c.c..." } },
-    { { "v...o...v", ".v.ooo.v.", "..oowoo..", "vvooooovv", "v.ooooo.v", "..o.o.o..", ".o.....o." },
-      { ".v..o..v.", "..vooov..", "..oowoo..", ".vooooov.", "v.ooooo.v", ".o..o..o.", "o.......o" } },
-    { { "c.......c", ".c.ggg.c.", "..gwywg..", "cgyyyyygc", "c.ggggg.c", "..g.y.g..", "...g.g..." },
-      { "cc.....cc", "..cgggc..", "..gwywg..", ".gyyyyyg.", "..ggggg..", "..g.y.g..", "...g.g..." } },
+const char *const SPR_W[4][3][2][GH] = {  // sprites originaux (multicolores)
+  {  // nebuleuse : meduse, papillon, guepe
+    { { "..ccccc..", ".cpcwcpc.", "ccccccccc", ".v.v.v.v.", ".v.v.v.v.", "v..v.v..v", "...v.v..." },
+      { "..ccccc..", ".cpcwcpc.", "ccccccccc", ".v.v.v.v.", "v..v.v..v", ".v.v.v.v.", "v.......v" } },
+    { { "..b...b..", "vvv.b.vvv", "vyvvbvvyv", "vvvvcvvvv", ".vv.b.vv.", "..v.p.v..", "........." },
+      { "..b...b..", ".vv.b.vv.", ".vyvbvyv.", "..vvcvv..", "..v.b.v..", "....p....", "........." } },
+    { { "cc.....cc", "ccc.g.ccc", ".cggwggc.", "..gyyyg..", "..ggggg..", "..gyyyg..", "...g.g..." },
+      { ".........", "ccc.g.ccc", "cccgwgccc", "..gyyyg..", "..ggggg..", "..gyyyg..", "..g...g.." } },
   },
-  {  // crabes
-    { { "...ooo...", ".oowwwoo.", "ooooooooo", "o.y.y.y.o", ".ooooooo.", "..o...o..", ".o.....o." },
-      { "...ooo...", ".oowwwoo.", "ooooooooo", "o..y.y..o", ".ooooooo.", ".o.....o.", "o.......o" } },
-    { { "r.......r", "r..rrr..r", ".rrwrwrr.", "..rrrrr..", ".rr.r.rr.", "r.r...r.r", "..r...r.." },
-      { ".r.....r.", "r..rrr..r", "rrrwrwrrr", "..rrrrr..", ".rr.r.rr.", ".r.....r.", "r.......r" } },
-    { { "..c...c..", "...ccc...", ".bbcwcbb.", "bbbbbbbbb", ".b.b.b.b.", "..b...b..", "........." },
-      { "c.......c", ".c.ccc.c.", ".bbcwcbb.", "bbbbbbbbb", "b.b.b.b.b", ".b.....b.", "........." } },
+  {  // crabes : crabe, mante, araignee
+    { { "o.......o", "oo.w.w.oo", ".ooooooo.", "..oyoyo..", ".ooooooo.", "o.o...o.o", "..o...o.." },
+      { "oo.....oo", ".o.w.w.o.", ".ooooooo.", "..oyoyo..", ".ooooooo.", ".o.o.o.o.", "o.......o" } },
+    { { "r.......r", "rr..r..rr", ".rrrrrrr.", "..rcrcr..", "...rrr...", "..y.r.y..", ".y.....y." },
+      { ".r.....r.", "rr..r..rr", "rrrrrrrrr", "..rcrcr..", "...rrr...", "...yry...", "..y...y.." } },
+    { { "o.......o", ".o.bbb.o.", "..bbcbb..", "obbbwbbbo", "..bbbbb..", ".o.b.b.o.", "o.......o" },
+      { ".o.....o.", "o..bbb..o", "..bbcbb..", ".obbwbbo.", "o.bbbbb.o", "..o...o..", "........." } },
   },
-  {  // cristaux
-    { { "....v....", "...vvv...", "..vvwvv..", ".vvvwvvv.", "..vvvvv..", "...vvv...", "....v...." },
-      { "....v....", "...vwv...", "..vvvvv..", ".vvvvvvv.", "..vvwvv..", "...vvv...", "....v...." } },
-    { { "y.......y", ".y.yyy.y.", "..yywyy..", ".yyyyyyy.", "y.y.y.y.y", "..y.y.y..", "...y.y..." },
-      { ".y.....y.", "y..yyy..y", "..yywyy..", ".yyyyyyy.", ".y.y.y.y.", "..y.y.y..", "...y.y..." } },
-    { { "..ggggg..", ".gwgggwg.", "ggggggggg", "g.g.g.g.g", ".g.g.g.g.", "g.......g", "........." },
-      { "..ggggg..", ".gwgggwg.", "ggggggggg", ".g.g.g.g.", "g.g.g.g.g", ".g.....g.", "........." } },
+  {  // cristaux : fleur de cristal, soucoupe, raie
+    { { "....o....", "y..ooo..y", ".oyooooy.", "ooobcbooo", ".oyooooy.", "y..ooo..y", "....o...." },
+      { "y...o...y", ".y.ooo.y.", "..ooooo..", "ooobcbooo", "..ooooo..", ".y.ooo.y.", "y...o...y" } },
+    { { "...ccc...", "..cwccc..", "..ppppp..", "yyyyyyyyy", ".ypppppy.", "..o.o.o..", "........." },
+      { "...ccc...", "..cwccc..", "..ppppp..", "yyyyyyyyy", ".ypppppy.", "...o.o...", "........." } },
+    { { "....b....", "...bbb...", "b.bbybb.b", "bbbbbbbbb", ".bby.ybb.", "..b...b..", "....b...." },
+      { "....b....", "...bbb...", "..bbybb..", "bbbbbbbbb", "b.by.yb.b", "...b.b...", "....b...." } },
   },
-  {  // orbes
+  {  // orbes : orbe, araignee a cornes, insecte
     { { "..rrrrr..", ".rrwwwrr.", "rrwwbwwrr", "rrwbbbwrr", "rrwwbwwrr", ".rrwwwrr.", "..rrrrr.." },
       { "..rrrrr..", ".rrrrrrr.", "rrwwwwwrr", "rrwbbbwrr", "rrwwwwwrr", ".rrrrrrr.", "..rrrrr.." } },
-    { { "..ppppp..", ".pp.p.pp.", "ppppppppp", "ppwpppwpp", ".p.p.p.p.", "p..p.p..p", ".p.....p." },
-      { "..ppppp..", ".pp.p.pp.", "ppppppppp", "ppwpppwpp", ".p.p.p.p.", ".p.p.p.p.", "p.......p" } },
+    { { "v.......v", ".v.ppp.v.", "..ppppp..", ".pcpppcp.", "..ppppp..", ".y.y.y.y.", "y.......y" },
+      { ".v.....v.", "v..ppp..v", "..ppppp..", ".pcpppcp.", "..ppppp..", "y.y...y.y", "........." } },
     { { "c.......c", ".c.ooo.c.", "..cowoc..", ".ccccccc.", "c.ccccc.c", "..c.c.c..", ".c.....c." },
       { ".c.....c.", "c..ooo..c", "..cowoc..", "ccccccccc", "..ccccc..", ".c..c..c.", "c.......c" } },
   },
@@ -370,14 +371,14 @@ bool gBossOn = false, gBossDone = false;  // boss en cours / deja vaincu ce stag
 float gBX = 0, gBY = -12;
 int gBHp = 0, gBHpMax = 1, gBFlash = 0, gBT = 0;
 const char *const WORLD_NAME[4] = { "NEBULEUSE", "CRABES", "CRISTAUX", "ORBES" };
-const char WORLD_HURT[4][2] = { { 'p', 'o' }, { 'o', 'r' }, { 'v', 'p' }, { 'r', 'y' } };  // couleur changee quand l'ennemi est touche
+const char WORLD_HURT[4][2] = { { 'c', 'o' }, { 'o', 'r' }, { 'o', 'p' }, { 'r', 'y' } };  // couleur changee quand l'ennemi est touche
 int gWorld = 0;  // monde du stage : 0 nebuleuse (piques en boucle), 1 crabes (piques a deux, balancement large),
                  // 2 cristaux (plus resistants, piques en zigzag), 3 orbes (formation qui descend, tirs vises)
 int gBaseHp(int type) { return (type == 0 ? 2 : 1) + (gWorld == 2 ? 1 : 0); }
 // vaisseau du joueur : il evolue avec les stages (1 base, 2 tir rapide, 3 double canon, 4+ triple canon)
 const char *const SPR_SHIP[4][8] = {
-  { "....c....", "...ccc...", "...cwc...", "..bcwcb..", ".bbcccbb.", "bbcbcbcbb", "b.o...o.b", "..o...o.." },
-  { "....c....", "...ccc...", "...cwc...", "..gcwcg..", ".ggcccgg.", "ggcgcgcgg", "g.o...o.g", "..o...o.." },
+  { "....w....", "...wbw...", "...wbw...", "..rwwwr..", ".rwwbwwr.", "rwwwwwwwr", "r.ro.or.r", "...o.o..." },
+  { "....w....", "...wbw...", "...wbw...", "..gwwwg..", ".gwwbwwg.", "gwwwwwwwg", "g.go.og.g", "...o.o..." },
   { "..c...c..", "..c.c.c..", ".cc.w.cc.", ".cbcwcbc.", "bbbcccbbb", "bybcbcbyb", "b.o...o.b", "..o...o.." },
   { "c...c...c", "c..ccc..c", "cc.cwc.cc", "rbbcwcbbr", "rbbcccbbr", "bbcbcbcbb", "b.oy.yo.b", "..o...o.." }
 };
@@ -385,6 +386,8 @@ int gStageT = 0;
 bool gLifeUp = false;     // vie gagnee a la fin du stage (affichee avec l'annonce)          // images restantes de l'annonce "STAGE n"
 uint32_t gBonus = 0;      // bonus de fin de stage affiche avec l'annonce
 int gTier() { return min(gWave, 4) - 1; }
+const char *const SPR_LIFE_BEETLE[4] = { ".ggg.", "gwgwg", "ggggg", "g.g.g" };  // LABYRINTHE : le scarabee
+const char *const SPR_LIFE_BLOB[4] = { ".ccc.", "cwcwc", "ccccc", "c.c.c" };    // BULLES : le blob
 const char *const SPR_LIFE[4] = { "..c..", ".ccc.", "bcwcb", "b...b" };
 // palette : w blanc, r rouge, y jaune, b bleu, c cyan, g vert, p magenta, o orange, v violet
 const char G_PAL_CH[] = "wrybcgpov";
@@ -827,15 +830,17 @@ void hudTop(uint16_t *palFull) {
   tinyText(*gfx, x, 1, "SCORE", rgb(255, 40, 40));
   tinyText(*gfx, x + lw + 4, 1, num, rgb(230, 230, 230));
   gMark(x, 1, tw, 5);
+  if (gGame == 3 || gGame == 8) return;  // RAQUETTES et BLOCS : pas de vies affichees
+  const char *const *life = gGame == 5 ? SPR_LIFE_BEETLE : gGame == 4 ? SPR_LIFE_BLOB : SPR_LIFE;
   int lives = max(0, gLives);
   if (lives <= 5) {
-    for (int i = 0; i < lives; i++) gSprite(SPR_LIFE, 5, 4, W - 6 - i * 7, 1, palFull, 0, 0);
+    for (int i = 0; i < lives; i++) gSprite(life, 5, 4, W - 6 - i * 7, 1, palFull, 0, 0);
   } else {
     snprintf(num, sizeof(num), "X%d", lives);
     int vw = tinyWidth(num), vx = W - 1 - vw;
     tinyText(*gfx, vx, 1, num, rgb(230, 230, 230));
     gMark(vx, 1, vw, 5);
-    gSprite(SPR_LIFE, 5, 4, vx - 7, 1, palFull, 0, 0);
+    gSprite(life, 5, 4, vx - 7, 1, palFull, 0, 0);
   }
 }
 void gameDraw() {
@@ -1766,7 +1771,7 @@ void cDraw() {
 // celle de l'ordinateur a droite. L'angle depend de l'endroit ou la balle touche ; elle accelere a chaque echange.
 // Point gagne : des points ; point perdu : une vie. 5 points gagnes : stage suivant (ordinateur plus fort).
 float qBX, qBY, qVX, qVY, qPY, qCY, qTrail[4][2];
-int qWon = 0, qPH = 14, qServe = 0;
+int qWon = 0, qPH = 10, qServe = 0, qStartLives = 3;
 bool qToPlayer = true;
 int qTop() { return 9; }
 int qPX() { return 3; }          // raquette du joueur (gauche)
@@ -1788,7 +1793,8 @@ void qReset() {
   sndMelody(JINGLE_STAGE, 4);
   for (auto &b : gBoom) b.t = 0;
   qWon = 0;
-  qPH = H >= 128 ? 24 : 14;
+  qStartLives = gLives;
+  qPH = H >= 128 ? 16 : 10;
   qPY = qCY = (qTop() + H) / 2 - qPH / 2;
   qToPlayer = true;
   qServeBall();
@@ -1856,7 +1862,7 @@ void qStep() {
       gStageT = 100;
       altStageClear(500UL * gWave);
       sndMelody(JINGLE_STAGE, 4);
-      qPH = max(H >= 128 ? 16 : 10, qPH - 1);
+      qPH = max(H >= 128 ? 11 : 7, qPH - 1);
     }
     qServeBall();
   }
@@ -1887,10 +1893,12 @@ void qDraw() {
     }
     if (qServe == 0 || (gFrame & 4)) { gfx->fillRect((int)qBX, (int)qBY, 2, 2, palFull[0]); gMark((int)qBX, (int)qBY, 2, 2); }
   }
-  char b[6];  // points gagnes dans ce stage (sur 5), pres du filet
+  char b[6];  // tes points (ce stage) a gauche du filet, ceux de l'ordinateur a droite (au 3e, fin de partie)
   snprintf(b, sizeof(b), "%d", qWon);
-  tinyText(*gfx, mid - 6, qTop() + 1, b, rgb(110, 110, 130));
-  gMark(mid - 6, qTop() + 1, 4, 5);
+  tinyText(*gfx, mid - 6, qTop() + 1, b, palFull[4]);
+  snprintf(b, sizeof(b), "%d", max(0, qStartLives - gLives));
+  tinyText(*gfx, mid + 3, qTop() + 1, b, palFull[1]);
+  gMark(mid - 6, qTop() + 1, 13, 5);
   altBooms(palFull);
   altHud(palFull);
 }
@@ -2196,6 +2204,15 @@ void bDraw() {
   altBooms(palFull);
   if (gDead == 0 && !(bInv > 0 && (gFrame & 4))) gSprite(SPR_BLOB[bGround ? (gFrame / 6) & 1 : 0], 8, 8, (int)bX, (int)bY, palFull, 0, 0);
   altHud(palFull);
+}
+
+// rectangle limite a la zone de jeu (sous la ligne du score)
+void jRect(int x, int y, int w, int h, uint16_t c) {
+  int x0 = max(0, x), y0 = max(8, y), x1 = min(W, x + w), y1 = min(H, y + h);
+  if (x1 > x0 && y1 > y0) gfx->fillRect(x0, y0, x1 - x0, y1 - y0, c);
+}
+void jPx(int x, int y, uint16_t c) {
+  if (x >= 0 && x < W && y >= 8 && y < H) gfx->drawPixel(x, y, c);
 }
 
 // ---------------------------------------------------------------- LABYRINTHE
@@ -2529,364 +2546,6 @@ void lDraw() {
   altHud(palFull);
 }
 
-// ---------------------------------------------------------------- SAUTERELLE
-// Grand labyrinthe en relief (plan original) qui defile pour suivre une sauterelle verte. Elle ramasse les
-// graines et peut SAUTER (croix ou rond) par-dessus les creatures piquantes. Grosse graine : creatures
-// vulnerables. A partir du stage 2, la creature violette saute aussi quand la sauterelle saute pres d'elle.
-#define J_COLS 31
-#define J_ROWS 23
-#define J_JUMP 26  // duree d'un saut (images)
-const char *const J_MAZE[J_ROWS] = {
-  "###############################",
-  "#o...........................o#",
-  "#.###.#.#####.#.#.#####.#.###.#",
-  "#...#.#.......#.#.......#.#...#",
-  "#.#.#.#########.#########.#.#.#",
-  "#.#.#.....#.........#.....#.#.#",
-  "#.#.###.#.#.###.###.#.#.###.#.#",
-  "#.#.....#...#.....#...#.....#.#",
-  "#.###########.#.#.###########.#",
-  "#.............................#",
-  "#.#######.##.##-##.##.#######.#",
-  " ............#E E#............ ",
-  "#.#.###.####.#####.####.###.#.#",
-  "#.......#.............#.......#",
-  "#.#####.#.#.###.###.#.#.#####.#",
-  "#.#...#...#.........#...#...#.#",
-  "#.#.#.#########.#########.#.#.#",
-  "#...#.#.......#.#.......#.#...#",
-  "#.###.#.#####.#.#.#####.#.###.#",
-  "#...#.#.#...#.....#...#.#.#...#",
-  "#.#.#.#.#.#.###.###.#.#.#.#.#.#",
-  "#o..#.....#.........#.....#..o#",
-  "###############################"
-};
-uint8_t jDot[J_ROWS][J_COLS];
-LMob jP, jE[4];
-int jT = 6, jDots = 0, jFright = 0, jChain = 0, jCamX = 0, jCamY = 0;
-int jJump = 0, jEJump[4];  // sauts en cours (0 = au sol)
-int8_t jWantDx = 0, jWantDy = 0;
-bool jPrevJump = false;
-float jcx(int c) { return c * jT + jT / 2.0f; }  // coordonnees dans le labyrinthe (pas a l'ecran)
-float jcy(int r) { return r * jT + jT / 2.0f; }
-float jHeight(int t) { return t > 0 ? sinf(3.14159f * (J_JUMP - t) / J_JUMP) * (jT + 1) : 0; }
-bool jAir(int t) { return jHeight(t) > 2.0f; }
-bool jOpen(int c, int r, bool player) {
-  if (r < 0 || r >= J_ROWS) return false;
-  if (c < 0 || c >= J_COLS) return r == 11;  // couloir du milieu ouvert sur les cotes
-  char t = J_MAZE[r][c];
-  if (t == '#') return false;
-  if (player && ((r == 10 && c == 15) || (r == 11 && c >= 14 && c <= 16))) return false;  // maison des creatures
-  return true;
-}
-void jPlace(LMob &m, int c, int r) { m.c = c; m.r = r; m.x = jcx(c); m.y = jcy(r); m.dx = m.dy = 0; }
-void jPositions() {
-  jPlace(jP, 15, 15);
-  jWantDx = -1; jWantDy = 0;
-  jJump = 0;
-  static const int8_t HC[4] = { 15, 14, 15, 16 }, HR[4] = { 9, 11, 11, 11 };
-  for (int i = 0; i < 4; i++) {
-    jPlace(jE[i], HC[i], HR[i]);
-    jE[i].state = i == 0 ? 0 : 2;
-    jE[i].t = 40 + i * 90;
-    jE[i].fr = false;
-    jEJump[i] = 0;
-  }
-  jFright = 0;
-}
-void jNewMaze() {
-  jDots = 0;
-  for (int r = 0; r < J_ROWS; r++)
-    for (int c = 0; c < J_COLS; c++) {
-      char t = J_MAZE[r][c];
-      jDot[r][c] = t == '.' ? 1 : t == 'o' ? 2 : 0;
-      jDots += jDot[r][c] != 0;
-    }
-  jPositions();
-}
-void jReset() {
-  gLives = (!gDemo && gDiff == 0) ? 5 : 3;
-  gPaused = false;
-  gScore = 0; gWave = 1; gDead = 0; gBonus = 0; gLifeUp = false;
-  gStageT = 100;
-  sndMelody(JINGLE_STAGE, 4);
-  for (auto &b : gBoom) b.t = 0;
-  jT = H >= 128 ? 8 : 6;
-  jNewMaze();
-}
-void jChoose(LMob &m, int who, int8_t &ndx, int8_t &ndy) {
-  ndx = ndy = 0;
-  if (who < 0) {
-    if ((jWantDx || jWantDy) && jOpen(m.c + jWantDx, m.r + jWantDy, true)) { ndx = jWantDx; ndy = jWantDy; }
-    else if ((m.dx || m.dy) && jOpen(m.c + m.dx, m.r + m.dy, true)) { ndx = m.dx; ndy = m.dy; }
-    return;
-  }
-  int tc = jP.c, tr = jP.r;
-  if (m.state == 3) { tc = 15; tr = 9; }
-  else if (who == 1) { tc = jP.c + jP.dx * 4; tr = jP.r + jP.dy * 4; }
-  else if (who == 2) { tc = 2 * jP.c - jE[0].c; tr = 2 * jP.r - jE[0].r; }
-  else if (who == 3 && abs(m.c - jP.c) + abs(m.r - jP.r) < 8) { tc = 1; tr = 21; }
-  static const int8_t DX[4] = { 0, -1, 0, 1 }, DY[4] = { -1, 0, 1, 0 };
-  int best = -1;
-  long bestD = 0x7fffffff;
-  int opts[4], nOpts = 0;
-  for (int k = 0; k < 4; k++) {
-    if (DX[k] == -m.dx && DY[k] == -m.dy && (m.dx || m.dy)) continue;
-    if (!jOpen(m.c + DX[k], m.r + DY[k], false)) continue;
-    if (m.state == 0 && m.r == 9 && m.c == 15 && DY[k] == 1) continue;  // ne rentre pas dans la maison
-    opts[nOpts++] = k;
-    long dx = m.c + DX[k] - tc, dy = m.r + DY[k] - tr, d = dx * dx + dy * dy;
-    if (d < bestD) { bestD = d; best = k; }
-  }
-  if (!nOpts) { ndx = -m.dx; ndy = -m.dy; return; }
-  int rnd = gEffDiff() == 0 ? 35 : gEffDiff() == 1 ? 18 : 6;
-  if (m.fr || random(100) < rnd) best = opts[random(nOpts)];
-  ndx = DX[best]; ndy = DY[best];
-}
-void jArrive(LMob &m, int who) {
-  if (who >= 0) {
-    if (m.state == 3 && m.c == 15 && m.r == 9) m.state = 0;
-    return;
-  }
-  if (jAir(jJump)) return;  // en l'air : on passe au-dessus des graines
-  uint8_t &d = jDot[m.r][m.c];
-  if (!d) return;
-  if (d == 2) {
-    gScore += 50;
-    jFright = max(90, 260 - 20 * gWave);
-    jChain = 0;
-    for (auto &e : jE) if (e.state != 2) { e.fr = true; e.dx = -e.dx; e.dy = -e.dy; }
-    sfxDive();
-  } else {
-    gScore += 10;
-    if ((jDots & 1) == 0) sfxMenu();
-  }
-  d = 0;
-  jDots--;
-}
-void jMove(LMob &m, float sp, int who) {
-  for (int guard = 0; sp > 0.001f && guard < 8; guard++) {
-    float tx = jcx(m.c), ty = jcy(m.r);
-    float d = fabsf(tx - m.x) + fabsf(ty - m.y);
-    if (d < 0.01f) {
-      m.x = tx; m.y = ty;
-      jArrive(m, who);
-      int8_t ndx, ndy;
-      jChoose(m, who, ndx, ndy);
-      if (!ndx && !ndy) { m.dx = m.dy = 0; return; }
-      m.dx = ndx; m.dy = ndy;
-      int nc = m.c + ndx;
-      if (nc < 0) { nc = J_COLS - 1; m.x += J_COLS * jT; }
-      if (nc >= J_COLS) { nc = 0; m.x -= J_COLS * jT; }
-      m.c = nc; m.r += ndy;
-      continue;
-    }
-    float step = min(sp, d);
-    m.x += (tx > m.x ? step : tx < m.x ? -step : 0);
-    m.y += (ty > m.y ? step : ty < m.y ? -step : 0);
-    sp -= step;
-  }
-}
-// pilote automatique (demo) : plus court chemin vers la graine la plus proche ; saute si une creature arrive
-uint8_t jAuto() {
-  static uint8_t from[J_ROWS][J_COLS];
-  static int16_t q[J_ROWS * J_COLS];
-  memset(from, 0xFF, sizeof(from));
-  int head = 0, tail = 0;
-  q[tail++] = jP.r * J_COLS + jP.c;
-  from[jP.r][jP.c] = 4;
-  static const int8_t DX[4] = { 0, -1, 0, 1 }, DY[4] = { -1, 0, 1, 0 };
-  int found = -1;
-  while (head < tail) {
-    int cur = q[head++], r = cur / J_COLS, c = cur % J_COLS;
-    if (jDot[r][c] && !(r == jP.r && c == jP.c)) { found = cur; break; }
-    for (int k = 0; k < 4; k++) {
-      int nr = r + DY[k], nc = (c + DX[k] + J_COLS) % J_COLS;
-      if (!jOpen(c + DX[k], nr, true) || from[nr][nc] != 0xFF) continue;
-      bool danger = false;
-      for (auto &e : jE) if (!e.fr && e.state != 2 && abs(e.c - nc) + abs(e.r - nr) <= 1) danger = true;
-      if (danger && head > 1) continue;
-      from[nr][nc] = k;
-      q[tail++] = nr * J_COLS + nc;
-    }
-  }
-  uint8_t key = 0;
-  for (auto &e : jE)  // creature tout pres : on saute
-    if (!e.fr && e.state != 2 && fabsf(e.x - jP.x) + fabsf(e.y - jP.y) < jT * 1.6f) key |= 4;
-  if (found < 0) return key;
-  int r = found / J_COLS, c = found % J_COLS, k = 4;
-  while (!(r == jP.r && c == jP.c)) {
-    k = from[r][c];
-    int pr = r - DY[k], pc = (c - DX[k] + J_COLS) % J_COLS;
-    if (pr == jP.r && pc == jP.c) break;
-    r = pr; c = pc;
-  }
-  static const uint8_t KEY[4] = { 8, 1, 16, 2 };
-  return key | (k < 4 ? KEY[k] : 0);
-}
-void jStep() {
-  gFrame++;
-  uint8_t k = gDemo ? jAuto() : keysPs4;
-  if (gDead > 0) {
-    if (--gDead == 0) {
-      if (gLives <= 0) {
-        if (gDemo) jReset();
-        else if (gLastRank) startNameEntry();
-        else toDemo();
-        return;
-      }
-      jPositions();
-    }
-    return;
-  }
-  if (gStageT > 0) { gStageT--; return; }
-  if (k & 1) { jWantDx = -1; jWantDy = 0; }
-  if (k & 2) { jWantDx = 1; jWantDy = 0; }
-  if (k & 8) { jWantDx = 0; jWantDy = -1; }
-  if (k & 16) { jWantDx = 0; jWantDy = 1; }
-  bool jb = k & (4 | 32);
-  if (jb && (!jPrevJump || gDemo) && jJump == 0) {  // saut (a l'appui)
-    jJump = J_JUMP;
-    sndPlay(500, 1400, 160, 0.25f, false, 1);
-    if (gWave >= 2 && jEJump[0] == 0 && !jE[0].fr && jE[0].state != 2 &&
-        abs(jE[0].c - jP.c) + abs(jE[0].r - jP.r) <= 4 && random(100) < 60 + 10 * gEffDiff())
-      jEJump[0] = J_JUMP;  // la creature violette saute aussi !
-  }
-  jPrevJump = jb;
-  if (jJump > 0) jJump--;
-  for (int i = 0; i < 4; i++) if (jEJump[i] > 0) jEJump[i]--;
-  if ((jWantDx || jWantDy) && jWantDx == -jP.dx && jWantDy == -jP.dy) {  // demi-tour immediat
-    jP.c -= jP.dx; jP.r -= jP.dy;
-    if (jP.c < 0) { jP.c += J_COLS; jP.x += J_COLS * jT; }
-    if (jP.c >= J_COLS) { jP.c -= J_COLS; jP.x -= J_COLS * jT; }
-    jP.dx = jWantDx; jP.dy = jWantDy;
-  }
-  float unit = jT / 6.0f;
-  jMove(jP, 0.95f * unit, -1);
-  if (jFright > 0 && --jFright == 0)
-    for (auto &e : jE) e.fr = false;
-  float es = (0.80f + 0.04f * min(gWave, 8) + 0.08f * (gEffDiff() - 1)) * unit;
-  for (int i = 0; i < 4; i++) {
-    LMob &e = jE[i];
-    if (e.state == 2) { if (--e.t <= 0) e.state = 3; continue; }
-    jMove(e, e.fr ? 0.5f * unit : es, i);
-    if (jAir(jJump) != jAir(jEJump[i])) continue;  // l'un en l'air, l'autre au sol : on se croise
-    if (fabsf(e.x - jP.x) + fabsf(e.y - jP.y) < jT * 0.8f) {
-      if (e.fr) {
-        jChain = min(jChain + 1, 4);
-        gScore += 100UL << jChain;
-        gBoomAt(e.x - jCamX, e.y + 8 - jCamY);
-        sfxBoom();
-        e.fr = false;
-        jPlace(e, 15, 11);
-        e.state = 2; e.t = 120;
-      } else {
-        altLoseLife(jP.x - jCamX, jP.y + 8 - jCamY);
-        return;
-      }
-    }
-  }
-  if (!gDemo && gScore > gHi) gHi = gScore;
-  if (jDots <= 0) {
-    gWave++;
-    gStageT = 100;
-    altStageClear(1000UL * gWave);
-    sndMelody(JINGLE_STAGE, 4);
-    jNewMaze();
-  }
-}
-// rectangle limite a la zone de jeu (sous la ligne du score)
-void jRect(int x, int y, int w, int h, uint16_t c) {
-  int x0 = max(0, x), y0 = max(8, y), x1 = min(W, x + w), y1 = min(H, y + h);
-  if (x1 > x0 && y1 > y0) gfx->fillRect(x0, y0, x1 - x0, y1 - y0, c);
-}
-void jPx(int x, int y, uint16_t c) {
-  if (x >= 0 && x < W && y >= 8 && y < H) gfx->drawPixel(x, y, c);
-}
-bool jWall(int r, int c) { return r >= 0 && r < J_ROWS && c >= 0 && c < J_COLS && J_MAZE[r][c] == '#'; }
-void jDraw() {
-  eraseOld();
-  uint16_t palFull[9];
-  for (int i = 0; i < 9; i++) palFull[i] = rgb(G_PAL_RGB[i][0], G_PAL_RGB[i][1], G_PAL_RGB[i][2]);
-  int t = jT, VH = H - 8, mw = J_COLS * t, mh = J_ROWS * t;
-  // camera : suit la sauterelle (centree si le labyrinthe tient dans l'ecran)
-  jCamX = mw <= W ? -(W - mw) / 2 : constrain((int)jP.x - W / 2, 0, mw - W);
-  jCamY = mh <= VH ? -(VH - mh) / 2 : constrain((int)jP.y - VH / 2, 0, mh - VH);
-  static const uint8_t WC[4][3] = { { 60, 90, 255 }, { 200, 60, 220 }, { 40, 190, 120 }, { 240, 130, 30 } };
-  const uint8_t *wc = WC[(gWave - 1) % 4];
-  uint16_t top = rgb(wc[0] * 3 / 5, wc[1] * 3 / 5, wc[2] * 3 / 5), hi = rgb(wc[0], wc[1], wc[2]);
-  uint16_t front = rgb(wc[0] / 3, wc[1] / 3, wc[2] / 3), base = rgb(wc[0] / 6, wc[1] / 6, wc[2] / 6);
-  uint16_t side = rgb(wc[0] * 2 / 5, wc[1] * 2 / 5, wc[2] * 2 / 5), seed = rgb(230, 200, 140);
-  int fh = t / 2;  // hauteur de la face avant des murs (relief bien marque)
-  int c0 = max(0, jCamX / t), c1 = min(J_COLS - 1, (jCamX + W) / t), r0 = max(0, jCamY / t), r1 = min(J_ROWS - 1, (jCamY + VH) / t);
-  // bords hors labyrinthe (si l'ecran est plus grand) : noir
-  if (jCamX < 0) { jRect(0, 8, -jCamX, VH, 0); jRect(-jCamX + mw, 8, W, VH, 0); }
-  if (jCamY < 0) { jRect(0, 8, W, -jCamY, 0); jRect(0, 8 - jCamY + mh, W, VH, 0); }
-  for (int r = r0; r <= r1; r++)  // toutes les cases visibles sont redessinees : le defilement efface tout seul
-    for (int c = c0; c <= c1; c++) {
-      int x = c * t - jCamX, y = 8 + r * t - jCamY;
-      if (J_MAZE[r][c] == '#') {
-        jRect(x, y, t, t, top);
-        if (!jWall(r, c + 1)) jRect(x + t - 1, y, 1, t, side);       // flanc droit dans l'ombre
-        if (!jWall(r - 1, c)) jRect(x, y, t, 1, hi);                // arete eclairee
-        if (!jWall(r, c - 1)) jRect(x, y, 1, t, hi);
-        if (!jWall(r + 1, c)) {                                     // face avant : mur vu de biais
-          jRect(x, y + t - fh, t, fh, front);
-          jRect(x, y + t - fh, t, 1, hi);                           // arete du dessus
-          jRect(x, y + t - 1, t, 1, base);                          // pied du mur
-        }
-      } else {
-        jRect(x, y, t, t, 0);
-        if (jDot[r][c] == 1) jRect(x + t / 2 - 1, y + t / 2 - 1, 2, 2, seed);
-        else if (jDot[r][c] == 2 && (gFrame & 8)) jRect(x + t / 2 - 2, y + t / 2 - 2, 4, 4, palFull[0]);
-      }
-    }
-  jRect(15 * t - jCamX, 8 + 10 * t + t / 2 - jCamY, t, 1, palFull[7]);  // porte de la maison
-  uint16_t shadow = rgb(50, 50, 60);
-  static const uint8_t EC[4][3] = { { 170, 70, 255 }, { 255, 140, 0 }, { 170, 230, 40 }, { 230, 230, 230 } };
-  static const uint8_t SPIKE[5] = { 0x15, 0x0E, 0x1F, 0x0E, 0x15 };
-  for (int i = 0; i < 4; i++) {
-    LMob &e = jE[i];
-    uint16_t col = rgb(EC[i][0], EC[i][1], EC[i][2]);
-    if (e.fr) col = (jFright < 60 && (gFrame & 4)) ? palFull[0] : rgb(40, 90, 255);
-    int h = (int)jHeight(jEJump[i]);
-    int x = (int)e.x - jCamX - 2, y = (int)e.y + 8 - jCamY - 2;
-    if (h) for (int k = 0; k < 5; k++) jPx(x + k, y + 4, shadow);
-    y -= h;
-    for (int r = 0; r < 5; r++)
-      for (int c = 0; c < 5; c++)
-        if (SPIKE[r] & (0x10 >> c)) jPx(x + c, y + r, col);
-    if (!e.fr) { jPx(x + 1, y + 2, palFull[0]); jPx(x + 3, y + 2, palFull[0]); }
-    if (y < 8) gMark(x, y, 5, 5);
-  }
-  if (gDead == 0) {  // sauterelle : corps vert allonge dans le sens de la marche, grandes pattes arriere
-    int h = (int)jHeight(jJump);
-    int cx = (int)jP.x - jCamX, cy = (int)jP.y + 8 - jCamY;
-    if (h) for (int k = -2; k <= 2; k++) jPx(cx + k, cy + 2, shadow);  // ombre au sol pendant le saut
-    cy -= h;
-    uint16_t g = rgb(60, 220, 60), dk = rgb(20, 110, 30), eye = rgb(255, 230, 0);
-    int dx = jP.dx, dy = jP.dy;
-    if (!dx && !dy) dx = 1;
-    bool legUp = h > 0 || ((gFrame / 4) & 1);
-    if (dx) {
-      jRect(cx - 2, cy - 1, 5, 2, g);
-      jPx(cx + 2 * dx, cy - 1, eye);                       // tete et oeil
-      jPx(cx - 2 * dx, cy - 2, dk); jPx(cx - dx, cy - 3 + !legUp, dk); jPx(cx, cy - 2, dk);  // grande patte arriere
-      jPx(cx + dx, cy + 1, dk); jPx(cx - dx, cy + 1 + legUp, dk);
-      jPx(cx + 3 * dx, cy - 2, dk);                         // antenne
-    } else {
-      jRect(cx - 1, cy - 2, 2, 5, g);
-      jPx(cx - 1, cy + 2 * dy, eye); jPx(cx, cy + 2 * dy, eye);
-      jPx(cx - 2, cy - dy, dk); jPx(cx + 1, cy - dy, dk);
-      jPx(cx - 2 - legUp, cy - 2 * dy, dk); jPx(cx + 1 + legUp, cy - 2 * dy, dk);
-      jPx(cx, cy + 3 * dy, dk);
-    }
-    if (cy - 3 < 8) gMark(cx - 4, cy - 4, 9, 8);
-  }
-  altBooms(palFull);
-  altHud(palFull);
-}
-
 // ---------------------------------------------------------------- ORBITE
 // Le vaisseau tourne sur le bord de l'ecran (une ellipse) et tire vers le centre. Les etoiles jaillissent du
 // centre (profondeur) ; les ennemis en sortent en spirale, se rangent en anneau puis plongent vers toi en
@@ -2912,6 +2571,17 @@ float oAngDiff(float a, float b) {  // ecart d'angle ramene entre -pi et pi
   if (d < -3.1416f) d += 6.2832f;
   return d;
 }
+// sprites d'ORBITUS (originaux) : meduse, soucoupe, papillon en 2 images, satellite porteur de la capsule
+const char *const O_SPR[3][2][7] = {
+  { { "..ppp..", ".ppwpp.", "pppvppp", ".ppppp.", "v.v.v.v", ".v.v.v.", "v.....v" },
+    { "..ppp..", ".ppwpp.", "pppvppp", ".ppppp.", ".v.v.v.", "v.v.v.v", ".v...v." } },
+  { { "..ccc..", ".cwwcc.", "bbbbbbb", "wbybybw", ".bbbbb.", "..c.c..", ".c...c." },
+    { "..ccc..", ".cwwcc.", "bbbbbbb", "ybwbwby", ".bbbbb.", "..c.c..", "..c.c.." } },
+  { { "o.....o", "oy.r.yo", "oyyryyo", ".oywyo.", "oyyryyo", "oy...yo", "o.....o" },
+    { ".......", ".o.r.o.", "oyyryyo", "yoywyoy", "oyyryyo", ".o...o.", "......." } }
+};
+const char *const O_SAT[2][7] = { { "...w...", "..wcw..", "b.wrw.b", "bwwwwwb", "b.wrw.b", "..wcw..", "...w..." },
+                                  { "...w...", "..wrw..", "b.wcw.b", "bwwwwwb", "b.wcw.b", "..wrw..", "...w..." } };
 void oNewStage() {
   int waves = min(7, 4 + gWave / 2);     // 4 vagues de 8 au stage 1, puis une de plus tous les 2 stages (7 au plus)
   for (int i = 0; i < O_EN; i++) {
@@ -3117,14 +2787,25 @@ void oDraw() {
     { { 0x0E, 0x11, 0x15, 0x11, 0x0E }, { 0x0E, 0x1B, 0x11, 0x1B, 0x0E } },  // disque
     { { 0x11, 0x1B, 0x0E, 0x1B, 0x11 }, { 0x0A, 0x1B, 0x0E, 0x1B, 0x0A } }   // papillon
   };
-  static const uint8_t EC[3][3] = { { 255, 60, 200 }, { 0, 220, 255 }, { 255, 200, 0 } };
+  // couleurs differentes a chaque stage (4 jeux de couleurs qui reviennent en boucle)
+  static const uint8_t EC4[4][3][3] = { { { 255, 60, 200 }, { 0, 220, 255 }, { 255, 200, 0 } },
+                                        { { 40, 230, 80 }, { 255, 140, 0 }, { 40, 120, 255 } },
+                                        { { 255, 220, 0 }, { 170, 70, 255 }, { 255, 50, 60 } },
+                                        { { 0, 220, 255 }, { 255, 60, 200 }, { 40, 230, 80 } } };
+  static const char MAINC[3] = { 'p', 'c', 'y' }, SWC[4][3] = { { 'p', 'c', 'y' }, { 'g', 'o', 'b' }, { 'y', 'v', 'r' }, { 'c', 'p', 'g' } };
+  int st = (gWave - 1) & 3;
   for (auto &e : oEn) {
     if (!e.on || e.state == 0) continue;
     int x = oX(e.a, e.r), y = oY(e.a, e.r);
-    uint16_t c = e.carrier ? ((gFrame & 8) ? palFull[0] : rgb(150, 150, 150)) : rgb(EC[e.type][0], EC[e.type][1], EC[e.type][2]);
+    const uint8_t *ec = EC4[st][e.type];
+    uint16_t c = e.carrier ? ((gFrame & 8) ? palFull[0] : rgb(150, 150, 150)) : rgb(ec[0], ec[1], ec[2]);
+    int fr = (gFrame / 8) & 1;
     if (e.r < 0.18f) gPix(x, y, c);
-    else if (e.r < 0.4f) { gPix(x, y, c); gPix(x - 1, y, c); gPix(x + 1, y, c); gPix(x, y - 1, c); gPix(x, y + 1, c); }
-    else {
+    else if (e.r < 0.36f) { gPix(x, y, palFull[0]); gPix(x - 1, y, c); gPix(x + 1, y, c); gPix(x, y - 1, c); gPix(x, y + 1, c); }
+    else if (e.r >= 0.55f) {  // de pres : sprite 7x7 en couleurs (la couleur principale change avec le stage)
+      if (e.carrier) gSprite(O_SAT[fr], 7, 7, x - 3, y - 3, palFull, 0, 0);
+      else gSprite(O_SPR[e.type][fr], 7, 7, x - 3, y - 3, palFull, MAINC[e.type], SWC[st][e.type]);
+    } else {
       const uint8_t *sp = SPR[e.type][(gFrame / 8) & 1];
       for (int r = 0; r < 5; r++)
         for (int cc = 0; cc < 5; cc++)
@@ -3155,13 +2836,15 @@ void oDraw() {
     float vx = -uy, vy = ux;
     int nx = px + 3 * ux, ny = py + 3 * uy;
     int lx = px - 2 * ux + 3 * vx, ly = py - 2 * uy + 3 * vy, rx = px - 2 * ux - 3 * vx, ry = py - 2 * uy - 3 * vy;
-    uint16_t body = oPower ? palFull[4] : rgb(60, 140, 255);
-    gfx->drawLine(nx, ny, lx, ly, body);
-    gfx->drawLine(nx, ny, rx, ry, body);
-    gfx->drawLine(lx, ly, (int)px, (int)py, body);
-    gfx->drawLine(rx, ry, (int)px, (int)py, body);
+    uint16_t edge = oPower ? palFull[5] : palFull[4], back = oPower ? rgb(20, 120, 40) : rgb(60, 110, 255);
+    gfx->drawLine(nx, ny, lx, ly, edge);   // bords avant cyan (verts avec le double tir)
+    gfx->drawLine(nx, ny, rx, ry, edge);
+    gfx->drawLine(lx, ly, (int)px, (int)py, back);
+    gfx->drawLine(rx, ry, (int)px, (int)py, back);
+    gfx->drawPixel(lx, ly, palFull[1]);    // feux rouges au bout des ailes
+    gfx->drawPixel(rx, ry, palFull[1]);
     gfx->drawPixel(px + ux, py + uy, palFull[0]);       // cockpit
-    gfx->drawPixel(px - 3 * ux, py - 3 * uy, palFull[7]);  // reacteur
+    gfx->drawPixel(px - 3 * ux, py - 3 * uy, (gFrame & 2) ? palFull[2] : palFull[7]);  // reacteur qui scintille
     gMark((int)px - 5, (int)py - 5, 11, 11);
   }
   altBooms(palFull);
@@ -3284,8 +2967,11 @@ void kStep() {
   }
   if (gStageT > 0) { gStageT--; return; }
   float sp = W > 128 ? 3.4f : 2.6f;
-  if (k & 1) kPX -= sp;
-  if (k & 2) kPX += sp;
+  if (!gDemo && padStickX) kPX += sp * 1.3f * padStickX / 127.0f;  // stick : vitesse selon l'inclinaison
+  else {
+    if (k & 1) kPX -= sp;
+    if (k & 2) kPX += sp;
+  }
   kPW = (W >= 256 ? 26 : 18) + (kWide ? 10 : 0);
   kPX = constrain(kPX, 0.0f, W - kPW);
   if (kWide > 0) kWide--;
@@ -3479,7 +3165,7 @@ void tSpawn() {
 }
 void tClearBoard() { memset(tB, 0, sizeof(tB)); }
 void tReset() {
-  gLives = (!gDemo && gDiff == 0) ? 5 : 3;
+  gLives = 1;  // une seule partie : la pile en haut termine la partie
   gPaused = false;
   gScore = 0; gWave = 1; gDead = 0; gBonus = 0; gLifeUp = false;
   gStageT = 80;
@@ -4003,9 +3689,9 @@ void yDraw() {
 }
 
 // aiguillage selon le jeu choisi
-void altReset() { if (gGame == 1) rReset(); else if (gGame == 2) cReset(); else if (gGame == 3) qReset(); else if (gGame == 4) bReset(); else if (gGame == 5) lReset(); else if (gGame == 6) jReset(); else if (gGame == 7) oReset(); else if (gGame == 8) kReset(); else if (gGame == 9) tReset(); else yReset(); }
-void altStep() { if (gGame == 1) rStep(); else if (gGame == 2) cStep(); else if (gGame == 3) qStep(); else if (gGame == 4) bStep(); else if (gGame == 5) lStep(); else if (gGame == 6) jStep(); else if (gGame == 7) oStep(); else if (gGame == 8) kStep(); else if (gGame == 9) tStep(); else yStep(); }
-void altDraw() { if (gGame == 1) rDraw(); else if (gGame == 2) cDraw(); else if (gGame == 3) qDraw(); else if (gGame == 4) bDraw(); else if (gGame == 5) lDraw(); else if (gGame == 6) jDraw(); else if (gGame == 7) oDraw(); else if (gGame == 8) kDraw(); else if (gGame == 9) tDraw(); else yDraw(); }
+void altReset() { if (gGame == 1) rReset(); else if (gGame == 2) cReset(); else if (gGame == 3) qReset(); else if (gGame == 4) bReset(); else if (gGame == 5) lReset(); else if (gGame == 6) oReset(); else if (gGame == 7) kReset(); else if (gGame == 8) tReset(); else yReset(); }
+void altStep() { if (gGame == 1) rStep(); else if (gGame == 2) cStep(); else if (gGame == 3) qStep(); else if (gGame == 4) bStep(); else if (gGame == 5) lStep(); else if (gGame == 6) oStep(); else if (gGame == 7) kStep(); else if (gGame == 8) tStep(); else yStep(); }
+void altDraw() { if (gGame == 1) rDraw(); else if (gGame == 2) cDraw(); else if (gGame == 3) qDraw(); else if (gGame == 4) bDraw(); else if (gGame == 5) lDraw(); else if (gGame == 6) oDraw(); else if (gGame == 7) kDraw(); else if (gGame == 8) tDraw(); else yDraw(); }
 // remise a zero du jeu choisi (partie ou demo)
 void resetCurrent() { if (gGame == 0) gReset(); else altReset(); }
 
@@ -4033,7 +3719,7 @@ void toDemo() {
   resetCurrent();
 }
 
-// Ecran du menu : fond d'etoiles qui defile, titre GAME HUB, record, puis le menu.
+// Ecran du menu : fond d'etoiles qui defile, titre ARCADE GAMES, record, puis le menu.
 // La demo ne tourne plus derriere (sprites, annonces et scores de la demo melanges au menu).
 // batterie de la manette, en haut a droite du menu : pourcentage + petite pile (verte, orange, rouge qui clignote) ;
 // en charge : la jauge se remplit en boucle en jaune, avec un eclair. Niveau envoye par la manette : 0 a 10 (11 = pleine, en charge).
@@ -4084,17 +3770,18 @@ void menuScreen() {
   }
   gfx->setFont(NULL);
   if (H >= 128 && !menuScores && !gNameEntry) {  // titre et record au-dessus du menu
-    int ty = H / 2 - 56;  // titre et record au-dessus du cadre du menu (qui commence a H/2 - 28)
+    int ty = H / 2 - 62;  // titre ARCADE GAMES et record au-dessus du cadre du menu (qui commence a H/2 - 28)
     gfx->setTextSize(2);
     gfx->setTextColor(rgb(255, 220, 0));
-    int tw = 8 * 12;
+    int tw = 6 * 12;
     gfx->setCursor((W - tw) / 2, ty);
-    gfx->print("GAME HUB");
+    gfx->print("ARCADE");
     gMark((W - tw) / 2, ty, tw, 16);
     gfx->setTextSize(1);
+    gText(ty + 17, "GAMES", rgb(0, 220, 255));
     char b[24];
     snprintf(b, sizeof(b), "RECORD %lu %s", (unsigned long)gHi, gBest[0].score ? gBest[0].name : "");
-    gText(ty + 18, b, rgb(255, 40, 40));
+    gText(ty + 27, b, rgb(255, 40, 40));
   }
   gfx->setTextSize(1);
   if (gNameEntry) drawNameEntry();
@@ -4199,6 +3886,26 @@ void gameUpdate() {
     gfx->fillScreen(0);
     gNOld = 0;
   }
+  // demo : un autre jeu au hasard toutes les 40 s ; au retour au menu, le jeu choisi est remis
+  static uint32_t demoSince = 0;
+  static int8_t menuGame = -1;
+  if (screen == 1) {
+    if (!demoSince) demoSince = now;
+    if (now - demoSince > 40000UL) {
+      if (menuGame < 0) menuGame = gGame;
+      int ng = random(N_GAMES - 1);
+      if (ng >= gGame) ng++;
+      gGame = ng;
+      topLoad();
+      gfx->fillScreen(0);
+      gNOld = 0;
+      resetCurrent();
+      demoSince = now;
+    }
+  } else {
+    demoSince = 0;
+    if (menuGame >= 0 && screen == 0) { gGame = menuGame; menuGame = -1; topLoad(); resetCurrent(); }
+  }
   if (menuMode) { menuScreen(); return; }
   if (gGame) { altStep(); altDraw(); }
   else { gameStep(); gameDraw(); }
@@ -4302,6 +4009,7 @@ void ps4Poll() {
   if (PS4.Circle()) k |= 32;  // rond : action speciale (bombe dans RAID)
   if (k) lastInput = millis();
   { int sy2 = PS4.LStickY(); padStickY = abs(sy2) > 18 ? constrain(sy2, -127, 127) : 0; }
+  { int sx2 = PS4.LStickX(); padStickX = abs(sx2) > 18 ? constrain(sx2, -127, 127) : 0; }
   padDigital = PS4.Left() || PS4.Right() || PS4.Up() || PS4.Down() || PS4.UpLeft() || PS4.UpRight() || PS4.DownLeft() || PS4.DownRight();
   keysPs4 = gPaused ? 0 : k;
   // boutons du menu et START (Options) : on agit a l'appui
@@ -4532,17 +4240,18 @@ void setup() {
   gfx = new TiledPanels(dma, panelCols(), panelRows(), flipAll, serpent);
   dma->setBrightness8(bright);
   gfx->fillScreen(0);
-  // ecran de demarrage : GAME HUB et la version, pendant 2 s (le Bluetooth et le son demarrent pendant ce temps)
+  // ecran de demarrage : ARCADE GAMES et la version, pendant 2 s (le Bluetooth et le son demarrent pendant ce temps)
   uint32_t bootT0 = millis();
   {
-    int y = H / 2 - 14;
+    int y = H / 2 - 18;
     gfx->setFont(NULL);
     gfx->setTextSize(2);
     gfx->setTextColor(rgb(255, 220, 0));
-    gfx->setCursor((W - 8 * 12) / 2, y);
-    gfx->print("GAME HUB");
+    gfx->setCursor((W - 6 * 12) / 2, y);
+    gfx->print("ARCADE");
     gfx->setTextSize(1);
-    gText(y + 22, "V" GAMES_VERSION, rgb(0, 220, 255));
+    gText(y + 18, "GAMES", rgb(0, 220, 255));
+    gText(y + 28, "V" GAMES_VERSION, rgb(150, 150, 170));
   }
 
   gDiff = prefs.getUChar("diff", 1) % 3;

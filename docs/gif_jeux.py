@@ -1,7 +1,7 @@
-"""GIF des jeux (apercus simules, comme les demos du jeu) : RAID, COURSE, RAQUETTES, BULLES, LABYRINTHE, SAUTERELLE, ORBITE.
+"""GIF des jeux (apercus simules, comme les demos du jeu) : RAID, COURSE, RAQUETTES, BULLES, LABYRINTHE, ORBITUS, BRIQUES, BLOCS, CRUCH.
 
-Sorties : docs/jeu-raid.gif, docs/jeu-course.gif, docs/jeu-raquettes.gif, docs/jeu-bulles.gif, docs/jeu-labyrinthe.gif, docs/jeu-sauterelle.gif, docs/jeu-orbite.gif
-Usage : python docs/gif_jeux.py [raid course raquettes bulles labyrinthe sauterelle orbite]
+Sorties : docs/jeu-raid.gif, docs/jeu-course.gif, docs/jeu-raquettes.gif, docs/jeu-bulles.gif, docs/jeu-labyrinthe.gif, docs/jeu-orbite.gif
+Usage : python docs/gif_jeux.py [raid course raquettes bulles labyrinthe orbite briques blocs cruch]
 Memes sprites, regles et pilotes automatiques que games.ino (version simplifiee pour l'apercu).
 """
 import math
@@ -54,8 +54,8 @@ def led64(img):  # une seule dalle 128x64
     return out
 
 
-def hud(s, score, lives=3):  # score centre sur une ligne, vies en icones (comme le jeu)
-    ns['hud_top'](s, W, score, lives)
+def hud(s, score, lives=3, life=None):  # score centre sur une ligne, vies en icones (comme le jeu)
+    ns['hud_top'](s, W, score, lives, life)
 
 
 def char6(s, x, y, ch, col):  # une lettre de la police 6x8 du jeu
@@ -813,7 +813,7 @@ def labyrinthe():
             px8(lx, ly, dk)
         for b in booms:
             boom(s, [b[0], b[1] - cam, b[2]])
-        hud(s, score)
+        hud(s, score, 3, ['.ggg.', 'gwgwg', 'ggggg', 'g.g.g'])  # vies : le scarabee
         frames.append(page(led64(s.im), 'LABYRINTHE', 'Une dalle 128x64 : le labyrinthe defile pour suivre le scarabee.',
                            ['Commandes :', 'croix / stick : diriger', '', 'Regles :', 'graine : 10 points',
                             'grosse graine : les', 'creatures deviennent', 'bleues et fuient', 'en attraper une :',
@@ -1044,6 +1044,16 @@ def sauterelle():
 
 
 # ================================================================ ORBITE
+def _orows(name, n):
+    return re.findall(r'"([.wrybcgpov]{%d})"' % n, re.search(re.escape(name) + r'[^=]*=\s*\{(.*?)\};', SRC, re.S).group(1))
+
+
+_o = _orows('O_SPR[3][2][7]', 7)
+O_SPR = [[_o[(t * 2 + k) * 7:(t * 2 + k + 1) * 7] for k in range(2)] for t in range(3)]
+_t = _orows('O_SAT[2][7]', 7)
+O_SAT = [_t[:7], _t[7:]]
+
+
 def orbite():
     rnd = random.Random(11)
     cx, cy, rx, ry = W / 2, 8 + (H - 8) / 2, W / 2 - 6, (H - 8) / 2 - 4
@@ -1170,9 +1180,17 @@ def orbite():
                 continue
             x, y = int(X(e['a'], e['r'])), int(Y(e['a'], e['r']))
             c = ((255, 255, 255) if f & 8 else (150, 150, 150)) if e['carrier'] else EC[e['type']]
+            fr8 = (f // 8) & 1
+            if e['r'] >= 0.55:  # de pres : sprite 7x7 en couleurs (comme oDraw)
+                rows = O_SAT[fr8] if e['carrier'] else O_SPR[e['type']][fr8]
+                for r_, line in enumerate(rows):
+                    for c_, ch in enumerate(line):
+                        if ch != '.':
+                            s.px(x - 3 + c_, y - 3 + r_, PAL[ch])
+                continue
             if e['r'] < 0.18:
                 s.px(x, y, c)
-            elif e['r'] < 0.4:
+            elif e['r'] < 0.36:
                 for dx, dy in ((0, 0), (-1, 0), (1, 0), (0, -1), (0, 1)):
                     s.px(x + dx, y + dy, c)
             else:
@@ -1229,7 +1247,8 @@ def raquettes():
     rnd = random.Random(6)
     HS = 64
     st = [[rnd.randrange(W), rnd.uniform(12, HS), rnd.uniform(.2, 1)] for _ in range(20)]
-    top, ph = 9, 14
+    top, ph = 9, 10
+    lost = 0
     bx, by, vx, vy = W / 2, 36.0, -1.2, 0.7
     ppy = cpy = (top + HS) / 2 - ph / 2
     trail, booms, score, won, frames, serve = [], [], 0, 0, [], 20
@@ -1262,6 +1281,7 @@ def raquettes():
                 booms.append([W - 3, int(by), 1])
                 bx, by, vx, vy, serve = W / 2, 36.0, 1.2, rnd.choice((-0.6, 0.6)), 30
             elif bx < -2:
+                lost += 1
                 bx, by, vx, vy, serve = W / 2, 36.0, -1.2, rnd.choice((-0.6, 0.6)), 30
         for b in booms:
             b[2] += 1
@@ -1285,10 +1305,11 @@ def raquettes():
             d.rectangle((int(tx_), int(ty_), int(tx_) + 1, int(ty_) + 1), fill=(v, v, v))
         if not serve or f & 4:
             d.rectangle((int(bx), int(by), int(bx) + 1, int(by) + 1), fill=PAL['w'])
-        s.tiny(W // 2 - 6, top + 1, str(won % 5), (110, 110, 130))
+        s.tiny(W // 2 - 6, top + 1, str(won % 5), PAL['c'])
+        s.tiny(W // 2 + 3, top + 1, str(lost % 3), PAL['r'])
         for b in booms:
             boom(s, b)
-        hud(s, score)
+        hud(s, score, 0)  # pas de vies affichees
         frames.append(page(led64(s.im), 'RAQUETTES', "A l'horizontale : ta raquette a gauche, l'ordinateur a droite.",
                            ['Commandes :', 'haut / bas : bouger', 'stick : vitesse selon', "  l'inclinaison", '', 'Regles :',
                             "angle selon le point", "d'impact sur la raquette", 'point gagne : 100 x stage', 'point perdu : -1 vie',
@@ -1562,7 +1583,7 @@ def blocs():
             for c in range(4):
                 if cell(nextp, 0, r, c):
                     cdraw(nx + c * 2, ly + 8 + r * 2, 2, nextp + 1)
-        hud(s, score)
+        hud(s, score, 0)  # pas de vies affichees
         frames.append(page(led64(s.im), 'BLOCS', 'Blocs qui tombent : complete des lignes, elles disparaissent.',
                            ['Commandes :', 'gauche / droite : bouger', 'bas : descendre vite', "haut : tomber d'un coup",
                             'X / rond : tourner', '', 'Regles :', '1 a 4 lignes : 100, 300,', '  500, 800 x niveau',
@@ -1733,6 +1754,6 @@ def cruch():
     save(frames, 'jeu-cruch.gif')
 
 
-todo = GIF_ARGS or ['raid', 'course', 'raquettes', 'bulles', 'labyrinthe', 'sauterelle', 'orbite', 'briques', 'blocs', 'cruch']
+todo = GIF_ARGS or ['raid', 'course', 'raquettes', 'bulles', 'labyrinthe', 'orbite', 'briques', 'blocs', 'cruch']
 for name in todo:
     globals()[name]()
