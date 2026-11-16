@@ -6,16 +6,16 @@ Jeux d'arcade sur 1 à 4 dalles LED 128x64, avec un ESP32 classique et une **man
 - **Partition unique de 3 Mo :** il reste de la place pour d'autres jeux.
 - **Son en option :** une broche PWM vers un petit ampli et un haut-parleur.
 
-**8 jeux originaux**, à choisir dans le menu (gauche / droite sur la ligne JOUER). Au démarrage, c'est toujours **ESSAIM** qui est proposé.
+**11 jeux originaux**, à choisir dans le menu (gauche / droite sur la ligne JOUER). Au démarrage, c'est toujours **SPACE DEFENDER** qui est proposé.
 
-Les 8 jeux ont en commun les niveaux de difficulté, les stages, les vies, les meilleurs scores avec les noms et la démo automatique.
+Les 11 jeux ont en commun les niveaux de difficulté, les stages, les vies, les meilleurs scores avec les noms et la démo automatique.
 
 
-# ESSAIM
+# SPACE DEFENDER
 
 Le jeu principal : un shoot'em up original, repris du mode Jeu du VU-mètre. Une formation d'ennemis arrive en vol, change de monde à chaque stage, et ton vaisseau évolue.
 
-![Mode démo d'ESSAIM](docs/mode-demo.gif)
+![Mode démo de SPACE DEFENDER](docs/mode-demo.gif)
 
 ![Le jeu sur les configurations de dalles](docs/rendu.png)
 
@@ -101,10 +101,11 @@ Un petit bonhomme original (casquette rouge, t-shirt bleu) court tout seul vers 
 ![BULLES](docs/jeu-bulles.gif)
 
 Un petit blob cyan original souffle des bulles, sur un écran de plateformes différent à chaque niveau.
+- **Le décor :** murs de 5 pixels et plateformes épaisses en briques, avec une arête claire et des joints, aux couleurs du niveau.
 - **Commandes :** gauche / droite pour marcher, **haut ou ○ pour sauter**, **✕ pour souffler une bulle**. On traverse les plateformes par-dessous en sautant, et on retombe dessus.
 - **Piéger un ennemi :** une bulle qui touche un ennemi l'**enferme**, puis monte vers le plafond. **Touche la bulle** pour la faire éclater : l'ennemi devient un **cristal** qui tombe, et le ramasser rapporte 500 points. Éclater plusieurs bulles à la suite donne un bonus de chaîne.
 - **Attention :** une bulle qui clignote en rouge va éclater toute seule, et l'ennemi s'échappe, en colère et plus rapide. Au bout de 40 s, tous les ennemis s'énervent.
-- **Les ennemis :** ceux des mondes d'ESSAIM. Certains marchent et sautent d'étage en étage, et à partir du niveau 2, les insectes volent en diagonale.
+- **Les ennemis :** ceux des mondes de SPACE DEFENDER. Certains marchent et sautent d'étage en étage, et à partir du niveau 2, les insectes volent en diagonale.
 - **Niveau gagné :** tous les ennemis sont éliminés. Tu passes à un nouveau plan, avec plus d'ennemis, et tu gagnes une vie en plus.
 
 ### LABYRINTHE
@@ -112,6 +113,8 @@ Un petit blob cyan original souffle des bulles, sur un écran de plateformes dif
 ![LABYRINTHE](docs/jeu-labyrinthe.gif)
 
 Un petit scarabée vert ramasse toutes les graines d'un labyrinthe original, poursuivi par 4 créatures piquantes.
+- **Sur une seule dalle (128x64)**, le labyrinthe garde des cases de 6 pixels et **défile verticalement** pour suivre le scarabée. Il tient en entier à partir de 128x128.
+- **Graphisme :** murs « néon » aux coins arrondis (couleur différente à chaque stage), grosses graines qui pulsent, créatures aux piquants qui tournent et aux yeux qui regardent où elles vont, scarabée avec carapace, reflet, tête et pattes qui bougent.
 - **Commandes :** croix ou stick pour diriger le scarabée. La direction choisie est gardée jusqu'au prochain croisement possible.
 - **Les créatures :** chacune a son caractère.
   - La violette fonce droit sur toi.
@@ -134,26 +137,57 @@ Une sauterelle verte parcourt un **grand labyrinthe en relief** (plan original) 
 - **Couloir du milieu :** ouvert sur les deux côtés.
 - **Stages :** tout manger fait passer au stage suivant. Les créatures sont plus rapides, les murs changent de couleur, et tu gagnes une vie.
 
-### ORBITE
+### ORBITUS
 
-![ORBITE](docs/jeu-orbite.gif)
+![ORBITUS](docs/jeu-orbite.gif)
 
 Ton vaisseau **tourne sur le bord de l'écran** et tire **vers le centre**. Les étoiles jaillissent du centre, ce qui donne de la profondeur.
-- **Commandes :** pousse le stick ou la croix dans une direction, et le vaisseau **glisse sur son orbite** jusque-là. ✕ (ou carré, triangle, R1, L1, R2) pour tirer en continu.
+- **Commandes :** pousse le stick dans une direction, et le vaisseau **glisse sur son orbite** jusque-là. Avec la **croix numérique**, gauche / droite le font **tourner en continu** (tour complet), haut / bas / diagonales l'envoient vers cette direction. ✕ (ou carré, triangle, R1, L1, R2) pour tirer en continu.
 - **Les ennemis :** ils sortent du centre **en spirale**, se rangent en anneau, puis **plongent vers toi** en tirant. Ils grossissent en approchant : un point au loin, une petite croix, puis le sprite.
 - **Points :** 50, 80 ou 100 selon l'ennemi, **doublés s'il est en piqué**.
 - **Ennemi blanc :** il lâche une capsule. Rattrape-la sur ton orbite pour avoir le **double tir**, jusqu'à la prochaine vie perdue.
-- **Stages :** 4 vagues de 8 ennemis. Tout détruire fait passer au stage suivant, avec un **saut en hyperespace** (les étoiles accélèrent). Les ennemis piquent plus souvent, et tu gagnes une vie.
+- **Stages :** 4 vagues de 8 ennemis au stage 1, puis une vague de plus tous les 2 stages (jusqu'à 7 vagues, 56 ennemis). Tout détruire fait passer au stage suivant, avec un **saut en hyperespace** (les étoiles accélèrent). Les ennemis piquent plus souvent, et tu gagnes une vie.
 
 ### RAQUETTES
 
 ![RAQUETTES](docs/jeu-raquettes.gif)
 
-Une balle et deux raquettes : la tienne en bas, celle de l'ordinateur en haut.
-- **Commandes :** gauche / droite pour déplacer ta raquette.
-- **La balle :** son angle dépend de l'endroit où elle touche la raquette, et elle accélère à chaque échange. Elle rebondit sur les bords.
+Une balle et deux raquettes, **à l'horizontale** : la tienne à gauche, celle de l'ordinateur à droite.
+- **Commandes :** haut / bas pour déplacer ta raquette. Avec le **stick analogique**, elle va d'autant plus vite que tu le pousses loin.
+- **La balle :** son angle dépend de l'endroit où elle touche la raquette, et elle accélère à chaque échange. Elle rebondit en haut et en bas.
 - **Points :** un point gagné rapporte 100 × le stage. Un point perdu coûte une vie.
 - **Stages :** 5 points gagnés font passer au stage suivant. L'ordinateur devient plus rapide, les raquettes un peu plus petites, et tu gagnes une vie.
+- **À deux manettes :** pas possible pour l'instant. La bibliothèque de la manette n'en gère qu'une à la fois ; il faudrait passer à une autre bibliothèque (Bluepad32).
+
+### BRIQUES
+
+![BRIQUES](docs/jeu-briques.gif)
+
+Un casse-briques original. Une raquette en bas renvoie la balle vers un mur de briques.
+- **Commandes :** stick ou croix gauche / droite pour la raquette, **✕ pour lancer la balle**.
+- **Briques :** de couleur (1 coup, plus elles sont hautes plus elles rapportent), **d'argent** (2 coups, 3 à partir du stage 6) et **d'or** (incassables, à partir du stage 4). Chaque brique a un reflet et une ombre.
+- **Capsules :** une brique cassée lâche parfois une capsule qui tombe. Cyan : **raquette large**. Orange : **balle lente**. Magenta : **3 balles**. Rouge : **une vie**.
+- **Tableaux :** 6 dessins (mur plein, damier, pyramide, losange, rangées avec argent, motif) qui reviennent en boucle. Tout casser (sauf l'or) fait passer au suivant, avec une balle plus rapide et une vie en plus.
+
+### BLOCS
+
+![BLOCS](docs/jeu-blocs.gif)
+
+Des blocs qui tombent, à empiler pour compléter des lignes.
+- **Commandes :** gauche / droite pour déplacer la pièce (en gardant appuyé, elle glisse), **bas** pour descendre plus vite, **haut** pour la faire tomber d'un coup, **✕** pour la tourner dans un sens, **○** dans l'autre.
+- **À l'écran :** blocs en relief (reflet, ombre), **pièce fantôme** qui montre où la pièce va tomber, pièce suivante à droite, lignes et niveau à gauche.
+- **Points :** 1, 2, 3 ou 4 lignes d'un coup : 100, 300, 500 ou 800 × le niveau. Les lignes complètes clignotent puis disparaissent.
+- **Niveaux :** toutes les 10 lignes, les pièces tombent plus vite et tu gagnes une vie. Si la pile atteint le haut, tu perds une vie et le plateau se vide.
+
+### CRUCH
+
+![CRUCH](docs/jeu-cruch.gif)
+
+Des bonbons à aligner sur un plateau de 8 × 8. Six sortes, chacune avec sa couleur et sa forme (rond, carré, losange, triangle, goutte, étoile), pour bien les distinguer.
+- **Commandes :** croix ou stick pour déplacer le curseur, **✕ pour prendre un bonbon** (le curseur clignote en jaune), puis une **direction pour l'échanger** avec son voisin. ○ annule.
+- **Alignements :** 3 bonbons identiques ou plus disparaissent, ceux du dessus tombent et de nouveaux arrivent par le haut. Les **réactions en chaîne** rapportent de plus en plus. Un échange qui n'aligne rien est annulé.
+- **Bonbons spéciaux :** en aligner **4** laisse un **bonbon rayé**, qui vide toute sa ligne ou sa colonne quand il disparaît. En aligner **5** laisse une **bombe** : échange-la avec un bonbon pour faire disparaître toute sa couleur.
+- **Niveaux :** un score à atteindre (la jauge à droite) en un nombre de **coups** limité. Réussi : niveau suivant, bonus pour les coups restants et une vie en plus. Raté : une vie perdue, on recommence le niveau.
 
 ## Menu
 
@@ -165,7 +199,7 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. **Sans manette
 
 | Ligne | Action |
 |---|---|
-| **JOUER** | **gauche / droite : choix du jeu** (ESSAIM, RAID, COURSE, RAQUETTES, BULLES, LABYRINTHE, SAUTERELLE, ORBITE). Au démarrage : ESSAIM. ✕ ou OPTIONS lance la partie. |
+| **JOUER** | **gauche / droite : choix du jeu** (SPACE DEFENDER, RAID, COURSE, RAQUETTES, BULLES, LABYRINTHE, SAUTERELLE, ORBITUS, BRIQUES, BLOCS, CRUCH). Au démarrage : SPACE DEFENDER. ✕ ou OPTIONS lance la partie. |
 | **NIVEAU** | Facile / Normal / Difficile (gauche / droite ou ✕), choix gardé en mémoire |
 | **LUMINOSITE** | 0 à 100 % par pas de 10 % (gauche / droite ou ✕), visible tout de suite et gardée en mémoire. À 0 %, les dalles restent très faiblement allumées pour qu'on voie encore le menu. |
 | **VOLUME** | volume du son, 0 à 100 % par pas de 10 % (gauche / droite ou ✕). Un bip fait entendre le niveau. 0 % = muet. C'est le rapport cyclique du PWM : le potentiomètre de l'ampli règle le maximum. |
@@ -203,8 +237,8 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. **Sans manette
 |---|---|
 | stick gauche ou croix gauche / droite | bouger |
 | stick gauche ou croix haut / bas | avancer / reculer (dans le bas de l'écran, environ 45 %) |
-| croix, carré, triangle, R1, L1 ou R2 | tirer (ESSAIM, RAID, ORBITE), sauter (COURSE, SAUTERELLE) |
-| ○ (rond) | bombe dans RAID, saut dans BULLES et SAUTERELLE ; dans les menus : retour |
+| croix, carré, triangle, R1, L1 ou R2 | tirer (SPACE DEFENDER, RAID, ORBITUS), sauter (COURSE, SAUTERELLE), lancer la balle (BRIQUES), tourner la pièce (BLOCS), prendre un bonbon (CRUCH) |
+| ○ (rond) | bombe dans RAID, saut dans BULLES et SAUTERELLE, tourner dans l'autre sens (BLOCS), annuler (CRUCH) ; dans les menus : retour |
 | OPTIONS | jouer depuis le menu, pause en partie |
 | ○ (rond), pendant la pause | quitter la partie et revenir au menu |
 | croix haut / bas, au menu | choisir la ligne |
@@ -298,8 +332,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V3.54_complet.bin](firmware/GameHub_V3.54_complet.bin) | 0x0 | `21595dcaa6980001e8c84669d658acd6` |
-| [firmware/GameHub_V3.54.bin](firmware/GameHub_V3.54.bin) | 0x10000 | `342e2252fe0ad5566ba6e6554847b309` |
+| [firmware/GameHub_V3.60_complet.bin](firmware/GameHub_V3.60_complet.bin) | 0x0 | `ebb1ca6ecd737e664fcf100c2ec1bd0a` |
+| [firmware/GameHub_V3.60.bin](firmware/GameHub_V3.60.bin) | 0x10000 | `283c9adfea742eefcd06ea01dba36ad0` |
 
 Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB SPIFFS)** dans Outils → Partition Scheme.
 

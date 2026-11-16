@@ -306,7 +306,7 @@ for page in ('menu', 'scores', 'nom'):
     elif page == 'scores':  # tableau avec les noms (3 lettres)
         y = 64 - 36
         box(s, y - 5, y + 6 * 11 + 18)
-        text_bg(s, y, 'SCORES ESSAIM', SEL)
+        text_bg(s, y, 'SCORES SPACE DEFENDER', SEL)
         rows = ['1 JER  30800 N S6', '2 DEN  21450 D S4', '3 LEA  12750 N S3', '4 MAX   8500 F S2', '5 ---   4200 N S1']
         for i, t in enumerate(rows):
             text_bg(s, y + (i + 1) * 11 + 2, t, (230, 230, 230) if i == 0 else OFF)

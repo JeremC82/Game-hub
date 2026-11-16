@@ -29,7 +29,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "3.54"
+#define GAMES_VERSION "3.60"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -97,6 +97,8 @@ uint8_t colorBits = 0;  // profondeur de couleur obtenue pour les dalles
 uint16_t rgb(uint8_t r, uint8_t g, uint8_t b) { return dma->color565(r, g, b); }
 
 // ---------------------------------------------------------------- commandes (manette -> jeu)
+int8_t padStickY = 0;               // stick gauche vertical (-127 bas .. 127 haut), RAQUETTES : vitesse proportionnelle
+bool padDigital = false;            // la croix numerique est appuyee (ORBITE : gauche / droite = tourner en continu)
 uint8_t keysPs4 = 0;                // touches de la manette PS4 : 1 gauche, 2 droite, 4 feu, 8 haut, 16 bas, 32 rond
 int gPYBase = 0;                    // hauteur de depart du vaisseau (en bas) ; il peut monter jusqu'a gPYMin
 int gPYMin = 0;
@@ -120,10 +122,10 @@ bool gAttractHold = false;         // demo lancee depuis le menu : on attend que
 bool gAttract = false;              // mode demo : menu cache (ligne DEMO, ou 30 s sans toucher la manette)
 #define MENU_IDLE_MS 30000UL        // menu sans activite : passage en mode demo
 bool menuScores = false;            // page des meilleurs scores affichee
-#define N_GAMES 8
-const char *const GAME_NAME[N_GAMES] = { "ESSAIM", "RAID", "COURSE", "RAQUETTES", "BULLES", "LABYRINTHE", "SAUTERELLE", "ORBITE" };
+#define N_GAMES 11
+const char *const GAME_NAME[N_GAMES] = { "SPACE DEFENDER", "RAID", "COURSE", "RAQUETTES", "BULLES", "LABYRINTHE", "SAUTERELLE", "ORBITUS", "BRIQUES", "BLOCS", "CRUCH" };
 uint8_t gGame = 0;                  // jeu choisi dans le menu (gauche / droite sur la ligne JOUER)
-const char *topKey() { static const char *const K[N_GAMES] = { "top", "top1", "top2", "top3", "top4", "top5", "top6", "top7" }; return K[gGame % N_GAMES]; }
+const char *topKey() { static const char *const K[N_GAMES] = { "top", "top1", "top2", "top3", "top4", "top5", "top6", "top7", "top8", "top9", "top10" }; return K[gGame % N_GAMES]; }
 #define TOP_N 5
 HiScore gBest[TOP_N];                // meilleurs scores (gardes en memoire)
 uint8_t gLastRank = 0;              // place obtenue a la derniere partie (0 : hors tableau)
@@ -142,14 +144,14 @@ const uint8_t TF_R[5] = { 6, 5, 6, 5, 5 }, TF_E[5] = { 7, 4, 6, 4, 7 }, TF_S[5] 
               TF_B[5] = { 6, 5, 6, 5, 6 }, TF_F[5] = { 7, 4, 6, 4, 4 }, TF_M[5] = { 5, 7, 7, 5, 5 },
               TF_N[5] = { 6, 5, 5, 5, 5 }, TF_T[5] = { 7, 2, 2, 2, 2 }, TF_U[5] = { 5, 5, 5, 5, 7 },
               TF_P[5] = { 6, 5, 6, 4, 4 }, TF_COL[5] = { 0, 2, 0, 2, 0 }, TF_X[5] = { 5, 5, 2, 5, 5 },
-              TF_G[5] = { 7, 4, 5, 5, 7 }, TF_PCT[5] = { 5, 1, 2, 4, 5 };
+              TF_G[5] = { 7, 4, 5, 5, 7 }, TF_PCT[5] = { 5, 1, 2, 4, 5 }, TF_L[5] = { 4, 4, 4, 4, 7 }, TF_I[5] = { 7, 2, 2, 2, 7 }, TF_V[5] = { 5, 5, 5, 5, 2 };
 const uint8_t *tfGlyph(char c) {
   if (c >= '0' && c <= '9') return TF_DIG[c - '0'];
   switch (c) {
     case 'R': return TF_R; case 'E': return TF_E; case 'S': return TF_S; case 'C': return TF_C;
     case 'O': return TF_DIG[0]; case 'D': return TF_D; case 'A': return TF_A; case 'B': return TF_B;
     case 'F': return TF_F; case 'M': return TF_M; case 'N': return TF_N; case 'T': return TF_T;
-    case 'U': return TF_U; case 'P': return TF_P; case ':': return TF_COL; case 'X': return TF_X; case 'G': return TF_G; case '%': return TF_PCT;
+    case 'U': return TF_U; case 'P': return TF_P; case ':': return TF_COL; case 'X': return TF_X; case 'G': return TF_G; case '%': return TF_PCT; case 'L': return TF_L; case 'I': return TF_I; case 'V': return TF_V;
   }
   return nullptr;
 }
@@ -605,7 +607,7 @@ void gBossKill() {  // explosion geante, gros bonus, et 5 petits vaisseaux qui p
     GEnemy &e = gEn[k];
     e = {};
     e.row = r; e.col = constrain(gCols / 2 - 2 + k, 0, gCols - 1); e.type = gRowType[r];
-    e.alive = true; e.hp = 1;
+    e.alive = true; e.hp = 1; e.path = 9;  // eclat : petit vaisseau qui replonge
     e.x = gBX + 4 + (k - 2) * 3; e.y = gBY + 2;
     e.state = 1; e.vx = (k - 2) * 0.8f; e.vy = -0.8f; e.t = -k * 4;
     e.dir = k < 2 ? -1 : k > 2 ? 1 : (random(2) ? 1 : -1);
@@ -864,6 +866,16 @@ void gameDraw() {
     GEnemy &e = gEn[i];
     if (!e.alive) continue;
     int fr = e.state == 1 || e.state == 3 ? (gFrame / 5) & 1 : ((gFrame / 16) + e.col) & 1;  // animation (ailes rapides en vol)
+    if (e.path == 9) {  // eclat (meduse ou boss) : petit vaisseau 5x5 aux couleurs du monde, ailes qui battent
+      static const uint8_t SM[2][5] = { { 0x04, 0x0E, 0x1F, 0x15, 0x11 }, { 0x04, 0x0E, 0x1F, 0x0E, 0x0A } };
+      uint16_t c = gPal[gPalIdx(WORLD_HURT[gWorld][0])];
+      int x = (int)e.x + 2, y = (int)e.y + 1;
+      for (int r = 0; r < 5; r++)
+        for (int cc = 0; cc < 5; cc++)
+          if (SM[fr][r] & (0x10 >> cc)) gfx->drawPixel(x + cc, y + r, r == 2 && cc == 2 ? gPal[0] : c);
+      gMark(x, y, 5, 5);
+      continue;
+    }
     bool hurt = e.hp < gBaseHp(e.type);  // touche mais pas encore detruit : change de couleur
     gSprite(SPR_W[gWorld][e.type][fr], GW, GH, (int)e.x, (int)e.y, gPal, WORLD_HURT[gWorld][0], hurt ? WORLD_HURT[gWorld][1] : WORLD_HURT[gWorld][0]);
   }
@@ -946,7 +958,7 @@ void drawMenu() {
   const char *items[MENU_N] = { nullptr, nullptr, nullptr, nullptr, "SCORES", "DEMO" };
   for (int i = 0; i < MENU_N; i++) {
     const char *t = items[i];
-    if (i == 0) { snprintf(b, sizeof(b), "JOUER %s%s%s", i == menuSel ? "<" : "", GAME_NAME[gGame], i == menuSel ? ">" : ""); t = b; }
+    if (i == 0) { snprintf(b, sizeof(b), "%s%s%s%s", strlen(GAME_NAME[gGame]) > 10 ? "" : "JOUER ", i == menuSel ? "<" : "", GAME_NAME[gGame], i == menuSel ? ">" : ""); t = b; }  // nom long : sans JOUER
     if (i == 1) { snprintf(b, sizeof(b), "NIVEAU %s%s%s", i == menuSel ? "<" : "", DIFF_NAME[gDiff], i == menuSel ? ">" : ""); t = b; }
     if (i == 2) { snprintf(b, sizeof(b), "LUMINOSITE %s%d%%%s", i == menuSel ? "<" : "", brightPct(), i == menuSel ? ">" : ""); t = b; }
     if (i == 3) { snprintf(b, sizeof(b), "VOLUME %s%d%%%s", i == menuSel ? "<" : "", volume * 10, i == menuSel ? ">" : ""); t = b; }
@@ -1750,21 +1762,23 @@ void cDraw() {
 }
 
 // ---------------------------------------------------------------- RAQUETTES
-// Une balle, deux raquettes : la tienne en bas (gauche / droite), celle de l'ordinateur en haut.
-// L'angle depend de l'endroit ou la balle touche la raquette ; elle accelere a chaque echange.
+// A l'horizontale : ta raquette a gauche (haut / bas, ou le stick : plus tu le pousses, plus elle va vite),
+// celle de l'ordinateur a droite. L'angle depend de l'endroit ou la balle touche ; elle accelere a chaque echange.
 // Point gagne : des points ; point perdu : une vie. 5 points gagnes : stage suivant (ordinateur plus fort).
-float qBX, qBY, qVX, qVY, qPX, qCX, qTrail[4][2];
-int qWon = 0, qPW = 22, qServe = 0;
+float qBX, qBY, qVX, qVY, qPY, qCY, qTrail[4][2];
+int qWon = 0, qPH = 14, qServe = 0;
 bool qToPlayer = true;
-int qTop() { return 13; }
+int qTop() { return 9; }
+int qPX() { return 3; }          // raquette du joueur (gauche)
+int qCX() { return W - 5; }      // raquette de l'ordinateur (droite)
 void qServeBall() {
   qBX = W / 2; qBY = (qTop() + H) / 2;
-  float sp = 1.1f + 0.12f * gWave + 0.15f * (gEffDiff() - 1);
-  float a = (random(2) ? 1 : -1) * (0.35f + random(30) / 100.0f);
-  qVX = sinf(a) * sp;
-  qVY = (qToPlayer ? 1 : -1) * cosf(a) * sp;
+  float sp = 1.2f + 0.12f * gWave + 0.15f * (gEffDiff() - 1);
+  float a = (random(2) ? 1 : -1) * (0.25f + random(30) / 100.0f);
+  qVY = sinf(a) * sp;
+  qVX = (qToPlayer ? -1 : 1) * cosf(a) * sp;
   for (auto &t : qTrail) { t[0] = qBX; t[1] = qBY; }
-  qServe = 40;  // la balle attend un instant avant de partir
+  qServe = 40;
 }
 void qReset() {
   gLives = (!gDemo && gDiff == 0) ? 5 : 3;
@@ -1774,14 +1788,14 @@ void qReset() {
   sndMelody(JINGLE_STAGE, 4);
   for (auto &b : gBoom) b.t = 0;
   qWon = 0;
-  qPW = W >= 256 ? 32 : 22;
-  qPX = qCX = W / 2 - qPW / 2;
+  qPH = H >= 128 ? 24 : 14;
+  qPY = qCY = (qTop() + H) / 2 - qPH / 2;
   qToPlayer = true;
   qServeBall();
 }
-uint8_t qAuto() {  // pilote automatique (demo) : suit la balle
-  float c = qPX + qPW / 2.0f, tx = qVY > 0 ? qBX : W / 2;
-  return tx < c - 2 ? 1 : tx > c + 2 ? 2 : 0;
+uint8_t qAuto() {  // demo : suit la balle
+  float c = qPY + qPH / 2.0f, ty = qVX < 0 ? qBY : (qTop() + H) / 2;
+  return ty < c - 2 ? 8 : ty > c + 2 ? 16 : 0;
 }
 void qStep() {
   gFrame++;
@@ -1798,48 +1812,51 @@ void qStep() {
     }
     return;
   }
-  float sp = W > 128 ? 3.2f : 2.4f;
-  if (k & 1) qPX -= sp;
-  if (k & 2) qPX += sp;
-  qPX = constrain(qPX, 0.0f, (float)(W - qPW));
+  float sp = H >= 128 ? 3.2f : 2.2f;
+  if (!gDemo && padStickY) qPY -= sp * 1.3f * padStickY / 127.0f;  // stick : vitesse selon l'inclinaison
+  else {
+    if (k & 8) qPY -= sp;
+    if (k & 16) qPY += sp;
+  }
+  qPY = constrain(qPY, (float)qTop(), (float)(H - qPH));
   // l'ordinateur suit la balle avec un temps de reaction et une vitesse limitee (selon stage et difficulte)
-  float cs = 0.7f + 0.18f * gWave + 0.25f * (gEffDiff() - 1), target = qVY < 0 ? qBX : W / 2;
-  float cc = qCX + qPW / 2.0f;
-  if (fabsf(target - cc) > 3) qCX += constrain(target - cc, -cs, cs);
-  qCX = constrain(qCX, 0.0f, (float)(W - qPW));
+  float cs = 0.6f + 0.15f * gWave + 0.22f * (gEffDiff() - 1), target = qVX > 0 ? qBY : (qTop() + H) / 2;
+  float cc = qCY + qPH / 2.0f;
+  if (fabsf(target - cc) > 2) qCY += constrain(target - cc, -cs, cs);
+  qCY = constrain(qCY, (float)qTop(), (float)(H - qPH));
   if (qServe > 0) { qServe--; if (gStageT > 0) gStageT--; return; }
   for (int i = 3; i > 0; i--) { qTrail[i][0] = qTrail[i - 1][0]; qTrail[i][1] = qTrail[i - 1][1]; }
   qTrail[0][0] = qBX; qTrail[0][1] = qBY;
   qBX += qVX; qBY += qVY;
-  if (qBX < 0) { qBX = 0; qVX = fabsf(qVX); sfxMenu(); }
-  if (qBX > W - 2) { qBX = W - 2; qVX = -fabsf(qVX); sfxMenu(); }
-  int py = H - 5, cy = qTop() + 2;
-  auto bounce = [&](float padX, bool down) {  // rebond : angle selon le point d'impact, balle plus rapide
-    float rel = (qBX + 1 - (padX + qPW / 2.0f)) / (qPW / 2.0f);
+  if (qBY < qTop()) { qBY = qTop(); qVY = fabsf(qVY); sfxMenu(); }
+  if (qBY > H - 2) { qBY = H - 2; qVY = -fabsf(qVY); sfxMenu(); }
+  auto bounce = [&](float padY, bool right) {  // rebond : angle selon le point d'impact, balle plus rapide
+    float rel = (qBY + 1 - (padY + qPH / 2.0f)) / (qPH / 2.0f);
     float speed = min(sqrtf(qVX * qVX + qVY * qVY) * 1.06f, 3.6f);
-    float a = constrain(rel, -1.0f, 1.0f) * 1.0f;
-    qVX = sinf(a) * speed;
-    qVY = (down ? 1 : -1) * max(0.6f, cosf(a)) * speed;
+    float a = constrain(rel, -1.0f, 1.0f) * 0.95f;
+    qVY = sinf(a) * speed;
+    qVX = (right ? 1 : -1) * max(0.7f, cosf(a)) * speed;
     sfxShot();
   };
-  if (qVY > 0 && qBY + 2 >= py && qBY + 2 <= py + 3 && qBX + 2 >= qPX && qBX <= qPX + qPW) { qBY = py - 2; bounce(qPX, false); }
-  if (qVY < 0 && qBY <= cy + 2 && qBY >= cy - 1 && qBX + 2 >= qCX && qBX <= qCX + qPW) { qBY = cy + 2; bounce(qCX, true); }
-  if (qBY > H) {  // point perdu : une vie
-    altLoseLife(qBX, H - 4);
+  int px = qPX(), cx = qCX();
+  if (qVX < 0 && qBX <= px + 2 && qBX >= px - 1 && qBY + 2 >= qPY && qBY <= qPY + qPH) { qBX = px + 2; bounce(qPY, true); }
+  if (qVX > 0 && qBX + 2 >= cx && qBX + 2 <= cx + 3 && qBY + 2 >= qCY && qBY <= qCY + qPH) { qBX = cx - 2; bounce(qCY, false); }
+  if (qBX < -2) {  // point perdu : une vie
+    altLoseLife(2, qBY);
     qToPlayer = true;
-  } else if (qBY < qTop() - 2) {  // point gagne
+  } else if (qBX > W) {  // point gagne
     gScore += 100UL * gWave;
     if (!gDemo && gScore > gHi) gHi = gScore;
-    gBoomAt(qBX, qTop());
+    gBoomAt(W - 3, qBY);
     sfxBoom();
     qToPlayer = false;
-    if (++qWon >= 5) {  // stage suivant : ordinateur plus fort, une vie en plus
+    if (++qWon >= 5) {
       qWon = 0;
       gWave++;
       gStageT = 100;
       altStageClear(500UL * gWave);
       sndMelody(JINGLE_STAGE, 4);
-      qPW = max(W >= 256 ? 20 : 14, qPW - 2);
+      qPH = max(H >= 128 ? 16 : 10, qPH - 1);
     }
     qServeBall();
   }
@@ -1849,14 +1866,19 @@ void qDraw() {
   eraseOld();
   uint16_t palFull[9];
   altBackground(0.05f, palFull);
-  int mid = (qTop() + H) / 2;
-  for (int x = 0; x < W; x += 6) gfx->drawFastHLine(x, mid, 3, rgb(50, 50, 70));  // filet en pointilles
-  gMark(0, mid, W, 1);
-  int py = H - 5, cy = qTop() + 2;
-  gfx->fillRect((int)qPX, py, qPW, 2, palFull[4]);  // ta raquette (cyan)
-  gfx->fillRect((int)qCX, cy, qPW, 2, palFull[1]);  // ordinateur (rouge)
-  gMark((int)qPX, py, qPW, 2);
-  gMark((int)qCX, cy, qPW, 2);
+  int mid = W / 2;
+  for (int y = qTop(); y < H; y += 6) gfx->drawFastVLine(mid, y, 3, rgb(50, 50, 80));  // filet vertical en pointilles
+  gMark(mid, qTop(), 1, H - qTop());
+  int px = qPX(), cx = qCX(), py = (int)qPY, cy = (int)qCY;
+  // raquettes en relief : bord clair, centre de couleur, bouts arrondis
+  gfx->fillRect(px, py + 1, 2, qPH - 2, palFull[4]);
+  gfx->drawFastVLine(px, py + 1, qPH - 2, rgb(180, 255, 255));
+  gfx->drawPixel(px + 1, py, palFull[4]); gfx->drawPixel(px + 1, py + qPH - 1, palFull[4]);
+  gfx->fillRect(cx, cy + 1, 2, qPH - 2, palFull[1]);
+  gfx->drawFastVLine(cx + 1, cy + 1, qPH - 2, rgb(255, 170, 170));
+  gfx->drawPixel(cx, cy, palFull[1]); gfx->drawPixel(cx, cy + qPH - 1, palFull[1]);
+  gMark(px, py, 2, qPH);
+  gMark(cx, cy, 2, qPH);
   if (gDead == 0) {
     for (int i = 3; i >= 1; i--) {  // trainee de la balle
       uint8_t v = 40 + 30 * (3 - i);
@@ -1865,10 +1887,10 @@ void qDraw() {
     }
     if (qServe == 0 || (gFrame & 4)) { gfx->fillRect((int)qBX, (int)qBY, 2, 2, palFull[0]); gMark((int)qBX, (int)qBY, 2, 2); }
   }
-  char b[6];  // points gagnes dans ce stage (sur 5), a gauche du filet
+  char b[6];  // points gagnes dans ce stage (sur 5), pres du filet
   snprintf(b, sizeof(b), "%d", qWon);
-  tinyText(*gfx, 2, mid - 6, b, rgb(110, 110, 130));
-  gMark(2, mid - 6, 4, 5);
+  tinyText(*gfx, mid - 6, qTop() + 1, b, rgb(110, 110, 130));
+  gMark(mid - 6, qTop() + 1, 4, 5);
   altBooms(palFull);
   altHud(palFull);
 }
@@ -1910,20 +1932,20 @@ void bBuildLevel() {
     int half = W / 2;
     if (pattern == 0) {  // deux longues plateformes, trou au centre
       int g = random(10, 22);
-      bPlat[bNPlat++] = { 4, (int16_t)(half - g), (int16_t)y };
-      bPlat[bNPlat++] = { (int16_t)(half + g), (int16_t)(W - 4), (int16_t)y };
+      bPlat[bNPlat++] = { 6, (int16_t)(half - g), (int16_t)y };
+      bPlat[bNPlat++] = { (int16_t)(half + g), (int16_t)(W - 6), (int16_t)y };
     } else if (pattern == 1) {  // une plateforme au centre
       int w = random(W / 4, W / 2);
       bPlat[bNPlat++] = { (int16_t)(half - w / 2), (int16_t)(half + w / 2), (int16_t)y };
     } else if (pattern == 2) {  // trois morceaux
       int w = W / 5;
-      bPlat[bNPlat++] = { 4, (int16_t)(4 + w), (int16_t)y };
+      bPlat[bNPlat++] = { 6, (int16_t)(6 + w), (int16_t)y };
       bPlat[bNPlat++] = { (int16_t)(half - w / 2), (int16_t)(half + w / 2), (int16_t)y };
-      bPlat[bNPlat++] = { (int16_t)(W - 4 - w), (int16_t)(W - 4), (int16_t)y };
+      bPlat[bNPlat++] = { (int16_t)(W - 6 - w), (int16_t)(W - 6), (int16_t)y };
     } else {  // bords seulement
       int w = random(W / 5, W / 3);
-      bPlat[bNPlat++] = { 4, (int16_t)(4 + w), (int16_t)y };
-      bPlat[bNPlat++] = { (int16_t)(W - 4 - w), (int16_t)(W - 4), (int16_t)y };
+      bPlat[bNPlat++] = { 6, (int16_t)(6 + w), (int16_t)y };
+      bPlat[bNPlat++] = { (int16_t)(W - 6 - w), (int16_t)(W - 6), (int16_t)y };
     }
   }
   randomSeed(esp_random());
@@ -2011,7 +2033,7 @@ void bStep() {
   // joueur
   if (k & 1) { bX -= 1.3f; bDir = -1; }
   if (k & 2) { bX += 1.3f; bDir = 1; }
-  bX = constrain(bX, 4.0f, (float)(W - 12));
+  bX = constrain(bX, 6.0f, (float)(W - 14));  // murs de 5 pixels
   bool jumpKey = k & (8 | 32), fireKey = k & 4;
   if (jumpKey && !bPrevJump && bGround) { bVY = -4.2f; bGround = false; sfxDive(); }
   bPrevJump = jumpKey;
@@ -2031,7 +2053,7 @@ void bStep() {
     if (b.t < 14) b.x += b.vx;
     else { b.y -= 0.6f; b.x += sinf(b.t * 0.08f) * 0.3f; }
     if (b.y < 16) b.y = 16;
-    b.x = constrain(b.x, 6.0f, (float)(W - 6));
+    b.x = constrain(b.x, 8.0f, (float)(W - 8));
     if (b.en < 0 && b.t < 14)  // la bulle attrape un ennemi
       for (int i = 0; i < B_EN; i++)
         if (bEn[i].on && fabsf(bEn[i].x + 4 - b.x) < 7 && fabsf(bEn[i].y + 3 - b.y) < 7) {
@@ -2069,11 +2091,11 @@ void bStep() {
     float sp = (e.angry || angryAll) ? 1.6f : 1;
     if (e.fly) {
       e.x += e.vx * sp; e.y += e.vy * sp;
-      if (e.x < 4 || e.x > W - 13) e.vx = -e.vx;
+      if (e.x < 6 || e.x > W - 15) e.vx = -e.vx;
       if (e.y < 14 || e.y > bFloor() - 7) e.vy = -e.vy;
     } else {
       e.x += e.vx * sp;
-      if (e.x < 4 || e.x > W - 13) { e.vx = -e.vx; e.x = constrain(e.x, 4.0f, (float)(W - 13)); }
+      if (e.x < 6 || e.x > W - 15) { e.vx = -e.vx; e.x = constrain(e.x, 6.0f, (float)(W - 15)); }
       e.vy = min(e.vy + 0.3f, 3.0f);
       e.y += e.vy;
       bool g = bLand(e.x, e.y, e.vy, 9, 7);
@@ -2125,16 +2147,26 @@ void bDraw() {
   static const uint8_t PC[4][3] = { { 200, 80, 160 }, { 60, 160, 220 }, { 220, 140, 40 }, { 90, 200, 90 } };
   const uint8_t *c = PC[(gWave - 1) % 4];
   uint16_t plat = rgb(c[0], c[1], c[2]), platD = rgb(c[0] / 3, c[1] / 3, c[2] / 3);
-  for (int i = 0; i < bNPlat; i++) {  // plateformes (briques de la couleur du niveau)
+  uint16_t platH = rgb(min(255, c[0] + 80), min(255, c[1] + 80), min(255, c[2] + 80));
+  for (int i = 0; i < bNPlat; i++) {  // plateformes epaisses en briques : arete claire, joints sombres, ombre dessous
     BPlat &p = bPlat[i];
-    gfx->fillRect(p.x0, p.y, p.x1 - p.x0, 3, plat);
-    for (int x = p.x0 + 3; x < p.x1; x += 6) gfx->drawPixel(x, p.y + 1, platD);
-    gMark(p.x0, p.y, p.x1 - p.x0, 3);
+    int th = min(5, H - p.y), w = p.x1 - p.x0;
+    gfx->fillRect(p.x0, p.y, w, th, plat);
+    gfx->drawFastHLine(p.x0, p.y, w, platH);
+    if (th >= 5) {
+      gfx->drawFastHLine(p.x0, p.y + 2, w, platD);
+      gfx->drawFastHLine(p.x0, p.y + 4, w, platD);
+      for (int x = p.x0 + 4; x < p.x1; x += 8) gfx->drawFastVLine(x, p.y + 1, 1, platD);
+      for (int x = p.x0 + 8; x < p.x1; x += 8) gfx->drawFastVLine(x, p.y + 3, 1, platD);
+    }
   }
-  gfx->fillRect(0, 12, 3, H - 12, plat);  // murs
-  gfx->fillRect(W - 3, 12, 3, H - 12, plat);
-  gMark(0, 12, 3, H - 12);
-  gMark(W - 3, 12, 3, H - 12);
+  for (int side = 0; side < 2; side++) {  // murs de 5 pixels en briques
+    int x = side ? W - 5 : 0;
+    gfx->fillRect(x, 10, 5, H - 10, plat);
+    gfx->drawFastVLine(side ? x : x + 4, 10, H - 10, platH);
+    for (int y = 12; y < H; y += 4) gfx->drawFastHLine(x, y, 5, platD);
+    for (int y = 10; y < H; y += 8) { gfx->drawPixel(x + 2, y, platD); gfx->drawPixel(x + 2, y + 1, platD); }
+  }
   uint16_t white[9], red[9];
   for (int i = 0; i < 9; i++) { white[i] = palFull[0]; red[i] = palFull[1]; }
   int w = (gWave - 1) % 4;
@@ -2196,7 +2228,7 @@ const char *const L_MAZE[L_ROWS] = {
 };
 uint8_t lDot[L_ROWS][L_COLS];  // 0 rien, 1 graine, 2 grosse graine
 LMob lP, lE[4];
-int lTile = 6, lOX = 0, lOY = 12, lDots = 0, lFright = 0, lChain = 0;
+int lTile = 6, lOX = 0, lOY = 12, lDots = 0, lFright = 0, lChain = 0, lCamY = 0;  // lCamY : defilement vertical (une seule dalle)
 int8_t lWantDx = 0, lWantDy = 0;
 float lcx(int c) { return lOX + c * lTile + lTile / 2.0f; }
 float lcy(int r) { return lOY + r * lTile + lTile / 2.0f; }
@@ -2238,9 +2270,12 @@ void lReset() {
   gStageT = 100;
   sndMelody(JINGLE_STAGE, 4);
   for (auto &b : gBoom) b.t = 0;
-  lTile = max(2, min(W / L_COLS, (H - 8) / L_ROWS));
+  // cases d'au moins 5 pixels : si le labyrinthe ne tient pas en hauteur (une dalle 128x64), il defile verticalement
+  lTile = min(W / L_COLS, (H - 8) / L_ROWS);
+  if (lTile < 5) lTile = min(6, W / L_COLS);
   lOX = (W - L_COLS * lTile) / 2;
-  lOY = 8 + ((H - 8) - L_ROWS * lTile) / 2;
+  lOY = 8 + max(0, ((H - 8) - L_ROWS * lTile) / 2);
+  lCamY = 0;
   lNewMaze();
 }
 // choix de la direction en arrivant au centre d'une case
@@ -2390,13 +2425,13 @@ void lStep() {
       if (e.fr) {  // attrapee : points (200, 400, 800, 1600), retour a la maison
         lChain = min(lChain + 1, 4);
         gScore += 100UL << lChain;
-        gBoomAt(e.x, e.y);
+        gBoomAt(e.x, e.y - lCamY);
         sfxBoom();
         e.fr = false;
         lPlace(e, 10, 9);
         e.state = 2; e.t = 120;
       } else {
-        altLoseLife(lP.x, lP.y);
+        altLoseLife(lP.x, lP.y - lCamY);
         return;
       }
     }
@@ -2410,55 +2445,85 @@ void lStep() {
     lNewMaze();
   }
 }
+bool lWall(int r, int c) { return r >= 0 && r < L_ROWS && c >= 0 && c < L_COLS && L_MAZE[r][c] == '#'; }
+bool lFloor(int r, int c) { return r >= 0 && r < L_ROWS && c >= 0 && c < L_COLS && L_MAZE[r][c] != '#'; }
 void lDraw() {
   eraseOld();
   uint16_t palFull[9];
   for (int i = 0; i < 9; i++) palFull[i] = rgb(G_PAL_RGB[i][0], G_PAL_RGB[i][1], G_PAL_RGB[i][2]);
-  static const uint8_t WC[4][3] = { { 40, 60, 200 }, { 150, 40, 170 }, { 30, 140, 90 }, { 190, 90, 20 } };
+  int t = lTile, VH = H - 8, mh = L_ROWS * t;
+  lCamY = mh > VH ? constrain((int)lP.y - 8 - VH / 2, 0, mh - VH) : 0;  // la camera suit le scarabee
+  // murs "neon" : interieur sombre, bord lumineux cote couloir, coins arrondis ; couleur differente a chaque stage
+  static const uint8_t WC[4][3] = { { 40, 120, 255 }, { 220, 60, 220 }, { 30, 210, 120 }, { 255, 140, 30 } };
   const uint8_t *wc = WC[(gWave - 1) % 4];
-  uint16_t wall = rgb(wc[0], wc[1], wc[2]), inner = rgb(wc[0] / 4, wc[1] / 4, wc[2] / 4);
-  int t = lTile;
-  for (int r = 0; r < L_ROWS; r++)  // murs (redessines a chaque image : textes et sprites ne les effacent pas)
+  uint16_t neon = rgb(wc[0], wc[1], wc[2]), inner = rgb(wc[0] / 7, wc[1] / 7, wc[2] / 7);
+  uint16_t seed = rgb(255, 200, 150), glowA = palFull[0], glowB = palFull[2];
+  for (int r = 0; r < L_ROWS; r++) {
+    int y = lOY + r * t - lCamY;
+    if (y + t <= 8 || y >= H) continue;
     for (int c = 0; c < L_COLS; c++) {
-      int x = lOX + c * t, y = lOY + r * t;
+      int x = lOX + c * t;
       if (L_MAZE[r][c] == '#') {
-        gfx->fillRect(x, y, t, t, wall);
-        if (t >= 5) gfx->fillRect(x + 1, y + 1, t - 2, t - 2, inner);
-      } else if (lDot[r][c] == 1) {
-        if (t >= 5) gfx->fillRect(x + t / 2 - 1, y + t / 2 - 1, 2, 2, rgb(230, 200, 140));
-        else gfx->drawPixel(x + t / 2, y + t / 2, rgb(230, 200, 140));
-      } else if (lDot[r][c] == 2 && (gFrame & 8)) {
-        gfx->fillRect(x + t / 2 - 2, y + t / 2 - 2, 4, 4, palFull[0]);
+        jRect(x, y, t, t, inner);
+        bool up = lFloor(r - 1, c), dn = lFloor(r + 1, c), lf = lFloor(r, c - 1), rt = lFloor(r, c + 1);
+        if (up) jRect(x + (lf ? 1 : 0), y, t - (lf ? 1 : 0) - (rt ? 1 : 0), 1, neon);
+        if (dn) jRect(x + (lf ? 1 : 0), y + t - 1, t - (lf ? 1 : 0) - (rt ? 1 : 0), 1, neon);
+        if (lf) jRect(x, y + (up ? 1 : 0), 1, t - (up ? 1 : 0) - (dn ? 1 : 0), neon);
+        if (rt) jRect(x + t - 1, y + (up ? 1 : 0), 1, t - (up ? 1 : 0) - (dn ? 1 : 0), neon);
+        // coin interieur (couloir en diagonale seulement) : un point pour fermer l'angle
+        if (!up && !lf && lFloor(r - 1, c - 1)) jPx(x, y, neon);
+        if (!up && !rt && lFloor(r - 1, c + 1)) jPx(x + t - 1, y, neon);
+        if (!dn && !lf && lFloor(r + 1, c - 1)) jPx(x, y + t - 1, neon);
+        if (!dn && !rt && lFloor(r + 1, c + 1)) jPx(x + t - 1, y + t - 1, neon);
+      } else {
+        jRect(x, y, t, t, 0);
+        if (lDot[r][c] == 1) jRect(x + t / 2 - 1, y + t / 2 - 1, 2, 2, seed);
+        else if (lDot[r][c] == 2) {  // grosse graine : ronde, qui pulse
+          uint16_t gc = (gFrame & 8) ? glowA : glowB;
+          jRect(x + t / 2 - 1, y + t / 2 - 2, 2, 4, gc);
+          jRect(x + t / 2 - 2, y + t / 2 - 1, 4, 2, gc);
+        }
       }
     }
-  gfx->drawFastHLine(lOX + 10 * t, lOY + 8 * t + t / 2, t, palFull[7]);  // porte de la maison
-  // creatures piquantes (5x5) : violet, orange, vert-jaune, blanc ; bleues quand elles sont vulnerables
+  }
+  jRect(0, 8, lOX, VH, 0);  // bandes hors labyrinthe (couloir du milieu) : effacees a chaque image
+  jRect(lOX + L_COLS * t, 8, W, VH, 0);
+  jRect(lOX + 10 * t, lOY + 8 * t + t / 2 - lCamY, t, 1, palFull[7]);  // porte de la maison
+  // creatures piquantes : piquants qui tournent (2 images), yeux qui regardent ou elles vont ; bleues quand elles fuient
   static const uint8_t EC[4][3] = { { 170, 70, 255 }, { 255, 140, 0 }, { 170, 230, 40 }, { 230, 230, 230 } };
-  static const uint8_t SPIKE[5] = { 0x15, 0x0E, 0x1F, 0x0E, 0x15 };
+  static const uint8_t SPK[2][5] = { { 0x15, 0x0E, 0x1F, 0x0E, 0x15 }, { 0x0A, 0x1F, 0x0E, 0x1F, 0x0A } };
   for (int i = 0; i < 4; i++) {
     LMob &e = lE[i];
-    uint16_t col = rgb(EC[i][0], EC[i][1], EC[i][2]);
-    if (e.fr) col = (lFright < 60 && (gFrame & 4)) ? palFull[0] : rgb(40, 90, 255);
-    int x = (int)e.x - 2, y = (int)e.y - 2;
+    uint16_t col = rgb(EC[i][0], EC[i][1], EC[i][2]), core = rgb(EC[i][0] / 2, EC[i][1] / 2, EC[i][2] / 2);
+    if (e.fr) { col = (lFright < 60 && (gFrame & 4)) ? palFull[0] : rgb(40, 90, 255); core = rgb(20, 40, 140); }
+    int x = (int)e.x - 2, y = (int)e.y - 2 - lCamY;
+    const uint8_t *sp = SPK[(gFrame / 6 + i) & 1];
     for (int r = 0; r < 5; r++)
       for (int c = 0; c < 5; c++)
-        if (SPIKE[r] & (0x10 >> c)) gfx->drawPixel(x + c, y + r, col);
-    if (!e.fr) { gfx->drawPixel(x + 1, y + 2, palFull[0]); gfx->drawPixel(x + 3, y + 2, palFull[0]); }  // yeux
-    gMark(x, y, 5, 5);
+        if (sp[r] & (0x10 >> c)) jPx(x + c, y + r, (r >= 1 && r <= 3 && c >= 1 && c <= 3) ? core : col);
+    jPx(x + 2, y + 2, col);
+    if (e.fr) { jPx(x + 1, y + 1, palFull[0]); jPx(x + 3, y + 1, palFull[0]); }  // effrayee : yeux ecarquilles
+    else {
+      int ex = constrain((int)e.dx, -1, 1), ey = constrain((int)e.dy, -1, 1);
+      jPx(x + 1 + (ex > 0), y + 1 + (ey > 0), palFull[0]);
+      jPx(x + 3 - (ex < 0), y + 1 + (ey > 0), palFull[0]);
+    }
   }
-  if (gDead == 0) {  // scarabee vert, yeux du cote ou il va, pattes qui bougent
-    int x = (int)lP.x - 2, y = (int)lP.y - 2;
-    uint16_t g = palFull[5], dk = rgb(10, 90, 30);
-    gfx->fillRect(x + 1, y, 3, 5, g);
-    gfx->fillRect(x, y + 1, 5, 3, g);
-    gfx->drawFastVLine(x + 2, y + 1, 3, dk);  // separation des elytres
-    int ex = x + 2 + lP.dx * 2, ey = y + 2 + lP.dy * 2;
-    if (lP.dx) { gfx->drawPixel(ex, ey - 1, palFull[0]); gfx->drawPixel(ex, ey + 1, palFull[0]); }
-    else if (lP.dy) { gfx->drawPixel(ex - 1, ey, palFull[0]); gfx->drawPixel(ex + 1, ey, palFull[0]); }
-    else { gfx->drawPixel(x + 1, y + 1, palFull[0]); gfx->drawPixel(x + 3, y + 1, palFull[0]); }
-    if ((gFrame / 4) & 1) { gfx->drawPixel(x - 1, y + 1, dk); gfx->drawPixel(x + 5, y + 3, dk); }
-    else { gfx->drawPixel(x - 1, y + 3, dk); gfx->drawPixel(x + 5, y + 1, dk); }
-    gMark(x - 1, y, 7, 5);
+  if (gDead == 0) {  // scarabee : carapace verte avec reflet, tete sombre du cote ou il va, pattes qui bougent
+    int x = (int)lP.x - 2, y = (int)lP.y - 2 - lCamY;
+    uint16_t g = rgb(40, 210, 70), hi = rgb(170, 255, 170), dk = rgb(10, 90, 30), head = rgb(20, 60, 25);
+    jRect(x + 1, y, 3, 5, g);
+    jRect(x, y + 1, 5, 3, g);
+    jRect(x + 2, y + 1, 1, 3, dk);  // separation des elytres
+    jPx(x + 1, y + 1, hi);          // reflet
+    int dx = lP.dx, dy = lP.dy;
+    if (!dx && !dy) dy = -1;
+    int hx = x + 2 + dx * 2, hy = y + 2 + dy * 2;  // tete
+    jPx(hx, hy, head);
+    if (dx) { jPx(hx, hy - 1, palFull[0]); jPx(hx, hy + 1, palFull[0]); }
+    else { jPx(hx - 1, hy, palFull[0]); jPx(hx + 1, hy, palFull[0]); }
+    if ((gFrame / 4) & 1) { jPx(x - 1, y + 1, dk); jPx(x + 5, y + 3, dk); jPx(x - 1, y + 4, dk); jPx(x + 5, y, dk); }
+    else { jPx(x - 1, y + 3, dk); jPx(x + 5, y + 1, dk); jPx(x - 1, y, dk); jPx(x + 5, y + 4, dk); }
   }
   altBooms(palFull);
   altHud(palFull);
@@ -2827,7 +2892,7 @@ void jDraw() {
 // centre (profondeur) ; les ennemis en sortent en spirale, se rangent en anneau puis plongent vers toi en
 // tirant. Plus ils sont pres, plus ils sont gros. Un ennemi blanc par stage lache une capsule : double tir.
 // Coordonnees polaires : angle a (radians) et profondeur r (0 = centre, 1 = orbite du vaisseau).
-#define O_EN 32
+#define O_EN 56  // jusqu'a 7 vagues de 8
 #define O_SHOTS 8
 #define O_BUL 12
 #define O_STARS 40
@@ -2848,12 +2913,13 @@ float oAngDiff(float a, float b) {  // ecart d'angle ramene entre -pi et pi
   return d;
 }
 void oNewStage() {
+  int waves = min(7, 4 + gWave / 2);     // 4 vagues de 8 au stage 1, puis une de plus tous les 2 stages (7 au plus)
   for (int i = 0; i < O_EN; i++) {
     OEn &e = oEn[i];
     int w = i / 8, k = i % 8;
-    e.on = true;
+    e.on = w < waves;
     e.state = 0;                         // attend son tour
-    e.t = -(w * 110 + k * 9);            // 4 vagues de 8, l'une apres l'autre
+    e.t = -(w * 95 + k * 8);             // les vagues se suivent de pres
     e.a0 = w * 1.5708f + gWave * 0.7f;   // chaque vague sort dans une direction differente
     e.dir = (w & 1) ? -1 : 1;
     e.type = (w + gWave) % 3;
@@ -2935,9 +3001,13 @@ void oStep() {
   if (gStageT > 0) { gStageT--; return; }
   // vaisseau : glisse sur l'orbite vers la direction poussee
   int dx = ((k & 2) ? 1 : 0) - ((k & 1) ? 1 : 0), dy = ((k & 16) ? 1 : 0) - ((k & 8) ? 1 : 0);
-  if (dx || dy) {
+  float sp = 0.075f;
+  if (!gDemo && padDigital && dx && !dy) {  // croix numerique gauche / droite : tourne en continu (tour complet)
+    oPa += dx < 0 ? sp : -sp;
+    if (oPa > 6.2832f) oPa -= 6.2832f;
+    if (oPa < 0) oPa += 6.2832f;
+  } else if (dx || dy) {  // stick (ou croix haut / bas / diagonale) : glisse vers la direction poussee
     float d = oAngDiff(atan2f(dy, dx), oPa);
-    float sp = 0.075f;
     oPa += d > sp ? sp : d < -sp ? -sp : d;
     if (oPa > 6.2832f) oPa -= 6.2832f;
     if (oPa < 0) oPa += 6.2832f;
@@ -3098,10 +3168,844 @@ void oDraw() {
   altHud(palFull);
 }
 
+// ---------------------------------------------------------------- BRIQUES
+// Casse-briques original : une raquette en bas (stick ou croix gauche / droite), X lance la balle.
+// Briques de couleur (1 coup), d'argent (2 ou 3 coups), d'or (incassables, a partir du stage 4).
+// Capsules qui tombent : cyan raquette large, orange balle lente, magenta 3 balles, rouge une vie.
+// Tableau vide (sauf l'or) : stage suivant, 6 dessins qui reviennent en boucle, balle plus rapide.
+#define K_MAXC 25
+#define K_MAXR 12
+#define K_BALLS 3
+#define K_CAPS 4
+uint8_t kBrick[K_MAXR][K_MAXC];  // 0 vide, 1 a 6 couleur, 7 argent (vie dans kHp), 8 or
+uint8_t kHp[K_MAXR][K_MAXC];
+KBall kBall[K_BALLS];
+KCap kCap[K_CAPS];
+int kCols = 12, kRows = 6, kOX = 4, kOY = 11, kLeft = 0, kWide = 0, kSlow = 0, kStuck = 0;
+float kPX = 0, kPW = 18;
+const uint8_t K_COL[9][3] = { { 0, 0, 0 }, { 255, 50, 50 }, { 255, 150, 0 }, { 255, 220, 0 }, { 40, 220, 80 }, { 0, 200, 255 },
+                              { 200, 70, 255 }, { 170, 170, 185 }, { 230, 180, 40 } };
+int kPY() { return H - 4; }
+void kBuild() {  // dessin du tableau selon le stage
+  int pat = (gWave - 1) % 6;
+  kLeft = 0;
+  for (int r = 0; r < K_MAXR; r++)
+    for (int c = 0; c < K_MAXC; c++) {
+      uint8_t b = 0;
+      if (r < kRows && c < kCols) {
+        int mc = c < kCols / 2 ? c : kCols - 1 - c;  // dessins symetriques
+        int col = 1 + r % 6;
+        switch (pat) {
+          case 0: b = col; break;                                                   // mur plein
+          case 1: b = ((r + c) & 1) ? col : 0; break;                               // damier
+          case 2: b = mc >= kRows - 1 - r ? col : 0; break;                         // pyramide
+          case 3: b = abs(mc - kCols / 2 + 1) + abs(r - kRows / 2) <= kRows / 2 + 1 ? col : 0; break;  // losange
+          case 4: b = r == 1 ? 7 : (r & 1) ? 0 : col; break;                        // rangees avec argent
+          default: b = ((mc * 7 + r * 3 + gWave) % 5) < 3 ? col : (r == 0 ? 7 : 0); break;  // motif
+        }
+        if (b && b < 7 && gWave >= 3 && r == 0) b = 7;                            // rangee d'argent en haut
+        if (b && gWave >= 4 && r == kRows - 1 && (c % 5) == 2) b = 8;            // quelques briques d'or
+      }
+      kBrick[r][c] = b;
+      kHp[r][c] = b == 7 ? (gWave >= 6 ? 3 : 2) : 1;
+      if (b && b != 8) kLeft++;
+    }
+}
+void kNewBall() {  // une balle posee sur la raquette, lancee avec X
+  for (auto &b : kBall) b.on = false;
+  kBall[0].on = true;
+  kStuck = 1;
+  kWide = kSlow = 0;
+  kPW = W >= 256 ? 26 : 18;
+  for (auto &cp : kCap) cp.on = false;
+}
+float kSpeed() { return (1.3f + 0.1f * min(gWave, 10) + 0.15f * (gEffDiff() - 1)) * (kSlow ? 0.7f : 1.0f); }
+void kLaunch() {
+  KBall &b = kBall[0];
+  float a = (random(2) ? 1 : -1) * (0.3f + random(25) / 100.0f), sp = kSpeed();
+  b.vx = sinf(a) * sp; b.vy = -cosf(a) * sp;
+  kStuck = 0;
+  sfxShot();
+}
+void kReset() {
+  gLives = (!gDemo && gDiff == 0) ? 5 : 3;
+  gPaused = false;
+  gScore = 0; gWave = 1; gDead = 0; gBonus = 0; gLifeUp = false;
+  gStageT = 100;
+  sndMelody(JINGLE_STAGE, 4);
+  for (auto &b : gBoom) b.t = 0;
+  kCols = min(K_MAXC, (W - 8) / 10);
+  kOX = (W - kCols * 10) / 2 + 1;
+  kRows = H >= 128 ? 10 : 6;
+  kOY = H >= 128 ? 14 : 11;
+  kPX = W / 2 - 9;
+  kBuild();
+  kNewBall();
+}
+uint8_t kAuto() {  // demo : la raquette suit la balle la plus basse qui descend, et lance la balle
+  float tx = W / 2, best = -1;
+  for (auto &b : kBall)
+    if (b.on && b.vy > 0 && b.y > best) { best = b.y; tx = b.x + 1; }
+  if (best < 0) for (auto &b : kBall) if (b.on) tx = b.x + 1;
+  float c = kPX + kPW / 2 + 3 * sinf(gFrame * 0.05f);  // touche un peu de cote : angles varies
+  uint8_t k = tx < c - 2 ? 1 : tx > c + 2 ? 2 : 0;
+  if (kStuck && kStuck > 40) k |= 4;
+  return k;
+}
+void kHitBrick(int r, int c) {
+  uint8_t &b = kBrick[r][c];
+  if (b == 8) { sfxMenu(); return; }  // or : incassable
+  if (--kHp[r][c] > 0) { sndPlay(1800, 1500, 40, 0.25f, false, 1); return; }  // argent : il faut encore frapper
+  gScore += b == 7 ? 50 : 10 * (kRows - r) + 10;
+  int x = kOX + c * 10, y = kOY + r * 4;
+  gBoomAt(x + 4, y + 1);
+  gMark(x, y, 9, 3);  // la brique disparait (effacee a la prochaine image)
+  if (random(100) < 12)
+    for (auto &cp : kCap)
+      if (!cp.on) { cp.on = true; cp.x = x + 2; cp.y = y; cp.type = random(100) < 8 ? 3 : random(3); break; }
+  b = 0;
+  kLeft--;
+  sfxBoom();
+}
+void kStep() {
+  gFrame++;
+  uint8_t k = gDemo ? kAuto() : keysPs4;
+  if (gDead > 0) {
+    if (--gDead == 0) {
+      if (gLives <= 0) {
+        if (gDemo) kReset();
+        else if (gLastRank) startNameEntry();
+        else toDemo();
+        return;
+      }
+      kNewBall();
+    }
+    return;
+  }
+  if (gStageT > 0) { gStageT--; return; }
+  float sp = W > 128 ? 3.4f : 2.6f;
+  if (k & 1) kPX -= sp;
+  if (k & 2) kPX += sp;
+  kPW = (W >= 256 ? 26 : 18) + (kWide ? 10 : 0);
+  kPX = constrain(kPX, 0.0f, W - kPW);
+  if (kWide > 0) kWide--;
+  if (kSlow > 0) kSlow--;
+  int py = kPY();
+  if (kStuck) {  // balle posee : suit la raquette
+    kStuck++;
+    kBall[0].x = kPX + kPW / 2 - 1; kBall[0].y = py - 2;
+    if ((k & (4 | 32)) || kStuck > 300) kLaunch();
+  } else {
+    int alive = 0;
+    for (auto &b : kBall) {
+      if (!b.on) continue;
+      float sp2 = sqrtf(b.vx * b.vx + b.vy * b.vy), want = kSpeed();  // vitesse ramenee doucement a la normale
+      if (fabsf(sp2 - want) > 0.05f) { b.vx *= want / sp2; b.vy *= want / sp2; }
+      int n = (int)ceilf(max(fabsf(b.vx), fabsf(b.vy)));
+      for (int s = 0; s < n && b.on; s++) {  // petits pas : la balle ne traverse pas les briques
+        b.x += b.vx / n;
+        if (b.x < 0) { b.x = 0; b.vx = fabsf(b.vx); }
+        if (b.x > W - 2) { b.x = W - 2; b.vx = -fabsf(b.vx); }
+        int c = (int)floorf((b.x + 1 - kOX) / 10), r = (int)floorf((b.y + 1 - kOY) / 4);
+        if (r >= 0 && r < kRows && c >= 0 && c < kCols && kBrick[r][c]) { b.x -= b.vx / n; b.vx = -b.vx; kHitBrick(r, c); }
+        b.y += b.vy / n;
+        if (b.y < 8) { b.y = 8; b.vy = fabsf(b.vy); }
+        c = (int)floorf((b.x + 1 - kOX) / 10); r = (int)floorf((b.y + 1 - kOY) / 4);
+        if (r >= 0 && r < kRows && c >= 0 && c < kCols && kBrick[r][c]) { b.y -= b.vy / n; b.vy = -b.vy; kHitBrick(r, c); }
+        if (b.vy > 0 && b.y + 2 >= py && b.y + 2 <= py + 2 && b.x + 2 >= kPX && b.x <= kPX + kPW) {  // raquette
+          float rel = constrain((b.x + 1 - (kPX + kPW / 2)) / (kPW / 2), -1.0f, 1.0f), v = sqrtf(b.vx * b.vx + b.vy * b.vy);
+          b.vx = sinf(rel * 1.05f) * v; b.vy = -max(0.5f, cosf(rel * 1.05f)) * v;
+          b.y = py - 2;
+          sndPlay(700, 900, 40, 0.3f, false, 1);
+        }
+        if (b.y > H) b.on = false;
+      }
+      alive += b.on;
+    }
+    if (!alive) { altLoseLife(kPX + kPW / 2, py); return; }
+  }
+  for (auto &cp : kCap) {  // capsules
+    if (!cp.on) continue;
+    cp.y += 0.6f;
+    if (cp.y + 3 >= py && cp.y <= py + 2 && cp.x + 5 >= kPX && cp.x <= kPX + kPW) {
+      cp.on = false;
+      gScore += 100;
+      sndMelody(JINGLE_STAGE, 3);
+      if (cp.type == 0) kWide = 900;
+      else if (cp.type == 1) kSlow = 600;
+      else if (cp.type == 2) {  // 3 balles
+        KBall src = kBall[0];
+        for (auto &b : kBall) if (b.on) { src = b; break; }
+        for (int i = 0; i < K_BALLS; i++)
+          if (!kBall[i].on) { kBall[i] = src; kBall[i].on = true; kBall[i].vx = src.vx * (i == 1 ? 0.6f : -1.0f) + (i == 1 ? 0.8f : 0); }
+      } else if (gLives < 9) gLives++;
+    }
+    if (cp.y > H) cp.on = false;
+  }
+  if (!gDemo && gScore > gHi) gHi = gScore;
+  if (kLeft <= 0) {  // tableau fini
+    gWave++;
+    gStageT = 100;
+    altStageClear(500UL * gWave);
+    sndMelody(JINGLE_STAGE, 4);
+    kBuild();
+    kNewBall();
+  }
+}
+void kDraw() {
+  eraseOld();
+  uint16_t palFull[9];
+  altBackground(0.04f, palFull);
+  for (int r = 0; r < kRows; r++)  // briques : couleur + reflet clair en haut + ombre en bas a droite
+    for (int c = 0; c < kCols; c++) {
+      uint8_t b = kBrick[r][c];
+      if (!b) continue;
+      int x = kOX + c * 10, y = kOY + r * 4;
+      const uint8_t *cc = K_COL[b];
+      bool dmg = b == 7 && kHp[r][c] < (gWave >= 6 ? 3 : 2);
+      uint16_t base = rgb(cc[0] * (dmg ? 3 : 4) / 5, cc[1] * (dmg ? 3 : 4) / 5, cc[2] * (dmg ? 3 : 4) / 5);
+      gfx->fillRect(x, y, 9, 3, base);
+      gfx->drawFastHLine(x, y, 9, (b >= 7 && ((gFrame / 4 + c) % 24) == 0) ? palFull[0] : rgb(min(255, cc[0] + 60), min(255, cc[1] + 60), min(255, cc[2] + 60)));
+      gfx->drawFastHLine(x + 1, y + 2, 8, rgb(cc[0] / 3, cc[1] / 3, cc[2] / 3));
+    }
+  int py = kPY();
+  // raquette : capsule arrondie, bouts rouges, centre cyan (plus large avec la capsule cyan)
+  int px = (int)kPX, pw = (int)kPW;
+  gfx->fillRect(px + 1, py, pw - 2, 2, rgb(170, 170, 190));
+  gfx->drawFastHLine(px + 2, py, pw - 4, palFull[0]);
+  gfx->fillRect(px, py, 3, 2, palFull[1]);
+  gfx->fillRect(px + pw - 3, py, 3, 2, palFull[1]);
+  gfx->drawFastHLine(px + pw / 2 - 2, py + 1, 4, palFull[4]);
+  gMark(px, py, pw, 2);
+  for (auto &b : kBall)
+    if (b.on && gDead == 0) {
+      gfx->fillRect((int)b.x, (int)b.y, 2, 2, palFull[0]);
+      gMark((int)b.x, (int)b.y, 2, 2);
+    }
+  static const uint8_t CC[4][3] = { { 0, 220, 255 }, { 255, 140, 0 }, { 220, 60, 220 }, { 255, 40, 40 } };
+  for (auto &cp : kCap) {  // capsules qui clignotent
+    if (!cp.on) continue;
+    int x = (int)cp.x, y = (int)cp.y;
+    gfx->fillRect(x + 1, y, 4, 3, rgb(CC[cp.type][0], CC[cp.type][1], CC[cp.type][2]));
+    gfx->drawFastVLine(x, y + 1, 1, rgb(CC[cp.type][0], CC[cp.type][1], CC[cp.type][2]));
+    gfx->drawFastVLine(x + 5, y + 1, 1, rgb(CC[cp.type][0], CC[cp.type][1], CC[cp.type][2]));
+    if (gFrame & 8) gfx->drawPixel(x + 2, y + 1, palFull[0]);
+    gMark(x, y, 6, 3);
+  }
+  altBooms(palFull);
+  altHud(palFull);
+}
+
+// ---------------------------------------------------------------- BLOCS
+// Jeu de blocs qui tombent (original) : gauche / droite deplacent la piece, bas accelere, haut la fait tomber d'un coup,
+// X tourne dans un sens, rond dans l'autre. Une ligne complete disparait (flash). 10 lignes : niveau suivant, plus rapide.
+// Pile jusqu'en haut : une vie perdue, le plateau se vide. Piece fantome : ou la piece va tomber.
+#define T_COLS 10
+#define T_MAXR 22
+const uint16_t T_SHAPE[7][4] = {  // 4x4, bit 15 = ligne 0 colonne 0
+  { 0x0F00, 0x2222, 0x00F0, 0x4444 },  // barre
+  { 0x6600, 0x6600, 0x6600, 0x6600 },  // carre
+  { 0x4E00, 0x4640, 0x0E40, 0x4C40 },  // T
+  { 0x6C00, 0x4620, 0x06C0, 0x8C40 },  // S
+  { 0xC600, 0x2640, 0x0C60, 0x4C80 },  // Z
+  { 0x8E00, 0x6440, 0x0E20, 0x44C0 },  // J
+  { 0x2E00, 0x4460, 0x0E80, 0xC440 }   // L
+};
+const uint8_t T_COL[8][3] = { { 0, 0, 0 }, { 0, 220, 255 }, { 255, 220, 0 }, { 200, 70, 255 }, { 40, 220, 80 }, { 255, 50, 50 },
+                              { 50, 100, 255 }, { 255, 140, 0 } };
+uint8_t tB[T_MAXR][T_COLS];
+int tRows = 18, tC = 3, tBX = 0, tBY = 8, tPiece = 0, tNext = 0, tRot = 0, tX = 3, tY = 0, tFall = 0, tLock = 0, tLines = 0;
+int tFlash = 0, tDas = 0, tAiRot = 0, tAiX = 3, tAiT = 0;
+uint8_t tBag[7], tBagN = 0, tPrevK = 0;
+bool tCell(int p, int rot, int r, int c) { return T_SHAPE[p][rot & 3] & (0x8000 >> (r * 4 + c)); }
+bool tFits(int p, int rot, int x, int y) {
+  for (int r = 0; r < 4; r++)
+    for (int c = 0; c < 4; c++)
+      if (tCell(p, rot, r, c)) {
+        int bx = x + c, by = y + r;
+        if (bx < 0 || bx >= T_COLS || by >= tRows) return false;
+        if (by >= 0 && tB[by][bx]) return false;
+      }
+  return true;
+}
+int tDraw7() {  // sac de 7 pieces melangees : jamais trop longtemps sans la barre
+  if (tBagN == 0) {
+    for (int i = 0; i < 7; i++) tBag[i] = i;
+    for (int i = 6; i > 0; i--) { int j = random(i + 1); uint8_t t = tBag[i]; tBag[i] = tBag[j]; tBag[j] = t; }
+    tBagN = 7;
+  }
+  return tBag[--tBagN];
+}
+int tDropY(int p, int rot, int x, int y) { while (tFits(p, rot, x, y + 1)) y++; return y; }
+// demo : cherche la meilleure place (hauteur, trous, lignes, relief)
+void tAiPlan() {
+  float best = -1e9;
+  tAiRot = tRot; tAiX = tX;
+  static uint8_t save[T_MAXR][T_COLS];
+  for (int rot = 0; rot < 4; rot++)
+    for (int x = -2; x < T_COLS; x++) {
+      if (!tFits(tPiece, rot, x, 0)) continue;
+      int y = tDropY(tPiece, rot, x, 0);
+      memcpy(save, tB, sizeof(tB));
+      for (int r = 0; r < 4; r++)
+        for (int c = 0; c < 4; c++)
+          if (tCell(tPiece, rot, r, c) && y + r >= 0) tB[y + r][x + c] = 1;
+      int lines = 0, holes = 0, agg = 0, bump = 0, prevH = -1;
+      for (int r = 0; r < tRows; r++) { bool full = true; for (int c = 0; c < T_COLS; c++) full &= tB[r][c] != 0; lines += full; }
+      for (int c = 0; c < T_COLS; c++) {
+        int h = 0; bool seen = false;
+        for (int r = 0; r < tRows; r++) {
+          if (tB[r][c]) { if (!seen) { h = tRows - r; seen = true; } }
+          else if (seen) holes++;
+        }
+        agg += h;
+        if (prevH >= 0) bump += abs(h - prevH);
+        prevH = h;
+      }
+      float s = -0.51f * agg + 0.76f * lines * 3 - 0.36f * holes * 2 - 0.18f * bump;
+      if (s > best) { best = s; tAiRot = rot; tAiX = x; }
+      memcpy(tB, save, sizeof(tB));
+    }
+}
+void tSpawn() {
+  tPiece = tNext;
+  tNext = tDraw7();
+  tRot = 0; tX = 3; tY = -1; tFall = 0; tLock = 0;
+  if (!tFits(tPiece, tRot, tX, tY)) {  // plus de place : une vie perdue, le plateau se vide
+    altLoseLife(tBX + T_COLS * tC / 2, tBY + 4);
+    return;
+  }
+  if (gDemo) { tAiPlan(); tAiT = 0; }
+}
+void tClearBoard() { memset(tB, 0, sizeof(tB)); }
+void tReset() {
+  gLives = (!gDemo && gDiff == 0) ? 5 : 3;
+  gPaused = false;
+  gScore = 0; gWave = 1; gDead = 0; gBonus = 0; gLifeUp = false;
+  gStageT = 80;
+  sndMelody(JINGLE_STAGE, 4);
+  for (auto &b : gBoom) b.t = 0;
+  tC = max(3, min((H - 8) / 20, (W / 2) / T_COLS));
+  tRows = min(20, (H - 8) / tC);
+  tBX = (W - T_COLS * tC) / 2;
+  tBY = 8 + ((H - 8) - tRows * tC) / 2;
+  tLines = 0; tFlash = 0; tBagN = 0;
+  tClearBoard();
+  tNext = tDraw7();
+  tSpawn();
+}
+bool tTryRotate(int dir) {
+  int nr = (tRot + dir + 4) & 3;
+  static const int8_t KICK[5] = { 0, -1, 1, -2, 2 };
+  for (int k = 0; k < 5; k++)
+    if (tFits(tPiece, nr, tX + KICK[k], tY)) { tRot = nr; tX += KICK[k]; tLock = min(tLock, 10); return true; }
+  return false;
+}
+void tLockPiece() {
+  for (int r = 0; r < 4; r++)
+    for (int c = 0; c < 4; c++)
+      if (tCell(tPiece, tRot, r, c) && tY + r >= 0) tB[tY + r][tX + c] = tPiece + 1;
+  int full = 0;
+  for (int r = 0; r < tRows; r++) {
+    bool f = true;
+    for (int c = 0; c < T_COLS; c++) f &= tB[r][c] != 0;
+    if (f) { full++; for (int c = 0; c < T_COLS; c++) tB[r][c] = 8; }  // 8 : ligne qui clignote avant de disparaitre
+  }
+  if (full) {
+    static const uint16_t PTS[5] = { 0, 100, 300, 500, 800 };
+    gScore += (uint32_t)PTS[full] * gWave;
+    tLines += full;
+    tFlash = 14;
+    if (full == 4) { sndMelody(JINGLE_STAGE, 3); if (!gDemo) rumbleReq = true; }
+    else sfxBoom();
+  } else {
+    sndPlay(300, 200, 50, 0.3f, false, 1);
+    tSpawn();
+  }
+}
+void tStep() {
+  gFrame++;
+  uint8_t k = gDemo ? 0 : keysPs4;
+  uint8_t edge = k & ~tPrevK;
+  tPrevK = k;
+  if (gDead > 0) {
+    if (--gDead == 0) {
+      if (gLives <= 0) {
+        if (gDemo) tReset();
+        else if (gLastRank) startNameEntry();
+        else toDemo();
+        return;
+      }
+      tClearBoard();
+      tSpawn();
+    }
+    return;
+  }
+  if (gStageT > 0) { gStageT--; return; }
+  if (tFlash > 0) {  // lignes qui clignotent puis disparaissent
+    if (--tFlash == 0) {
+      for (int r = 0; r < tRows; r++)
+        if (tB[r][0] == 8) {
+          for (int rr = r; rr > 0; rr--) memcpy(tB[rr], tB[rr - 1], T_COLS);
+          memset(tB[0], 0, T_COLS);
+        }
+      int lvl = 1 + tLines / 10;
+      if (lvl > gWave) {  // niveau suivant : plus rapide, une vie en plus
+        gWave = lvl;
+        gStageT = 70;
+        altStageClear(200UL * gWave);
+        sndMelody(JINGLE_STAGE, 4);
+      }
+      tSpawn();
+    }
+    return;
+  }
+  bool soft = false;
+  if (gDemo) {  // pilote automatique : tourne, se place, puis descend vite
+    if (++tAiT % 4 == 0) {
+      if (tRot != tAiRot) tTryRotate(1);
+      else if (tX < tAiX && tFits(tPiece, tRot, tX + 1, tY)) tX++;
+      else if (tX > tAiX && tFits(tPiece, tRot, tX - 1, tY)) tX--;
+    }
+    soft = tRot == tAiRot && tX == tAiX;
+  } else {
+    if (edge & 4) tTryRotate(1);
+    if (edge & 32) tTryRotate(-1);
+    int dx = (k & 1) ? -1 : (k & 2) ? 1 : 0;
+    if (dx) {
+      if ((edge & 3) || (++tDas > 8 && (tDas & 1))) {  // appui : un pas, puis repetition rapide
+        if (tFits(tPiece, tRot, tX + dx, tY)) { tX += dx; tLock = min(tLock, 10); }
+      }
+    } else tDas = 0;
+    if (edge & 8) {  // haut : tombe d'un coup
+      int ny = tDropY(tPiece, tRot, tX, tY);
+      gScore += 2 * (ny - tY);
+      tY = ny;
+      tLockPiece();
+      return;
+    }
+    soft = k & 16;
+  }
+  int every = max(2, 36 - 3 * gWave - 4 * (gEffDiff() - 1));
+  if (soft) every = min(every, 2);
+  if (++tFall >= every) {
+    tFall = 0;
+    if (tFits(tPiece, tRot, tX, tY + 1)) { tY++; if (soft && !gDemo) gScore++; tLock = 0; }
+  }
+  if (!tFits(tPiece, tRot, tX, tY + 1)) {  // posee : petit delai pour la glisser encore
+    if (++tLock > 18) tLockPiece();
+  }
+  if (!gDemo && gScore > gHi) gHi = gScore;
+}
+void tCellDraw(int x, int y, int s, uint8_t v, bool ghost) {  // bloc en relief : reflet en haut a gauche, ombre en bas a droite
+  if (!v) { gfx->fillRect(x, y, s, s, 0); if (s >= 5) gfx->drawPixel(x + s / 2, y + s / 2, rgb(25, 25, 40)); return; }
+  const uint8_t *c = T_COL[v == 8 ? 0 : v];
+  if (v == 8) { gfx->fillRect(x, y, s, s, (gFrame & 2) ? rgb(255, 255, 255) : rgb(120, 120, 120)); return; }
+  if (ghost) { gfx->fillRect(x, y, s, s, 0); gfx->drawRect(x, y, s, s, rgb(c[0] / 3, c[1] / 3, c[2] / 3)); return; }
+  gfx->fillRect(x, y, s, s, rgb(c[0] * 3 / 4, c[1] * 3 / 4, c[2] * 3 / 4));
+  gfx->drawFastHLine(x, y, s, rgb(min(255, c[0] + 90), min(255, c[1] + 90), min(255, c[2] + 90)));
+  gfx->drawFastVLine(x, y, s, rgb(min(255, c[0] + 60), min(255, c[1] + 60), min(255, c[2] + 60)));
+  if (s >= 4) {
+    gfx->drawFastHLine(x + 1, y + s - 1, s - 1, rgb(c[0] / 3, c[1] / 3, c[2] / 3));
+    gfx->drawFastVLine(x + s - 1, y + 1, s - 1, rgb(c[0] / 3, c[1] / 3, c[2] / 3));
+  }
+}
+void tDraw() {
+  eraseOld();
+  uint16_t palFull[9];
+  for (int i = 0; i < 9; i++) palFull[i] = rgb(G_PAL_RGB[i][0], G_PAL_RGB[i][1], G_PAL_RGB[i][2]);
+  int s = tC, bw = T_COLS * s, bh = tRows * s;
+  uint16_t frame = rgb(70, 80, 140);
+  gfx->drawRect(tBX - 1, tBY - 1, bw + 2, bh + 2, frame);  // cadre du plateau
+  int gy = gDead == 0 && tFlash == 0 ? tDropY(tPiece, tRot, tX, tY) : -99;
+  for (int r = 0; r < tRows; r++)
+    for (int c = 0; c < T_COLS; c++) {
+      uint8_t v = tB[r][c];
+      bool ghost = false;
+      int pr = r - tY, pc = c - tX, qr = r - gy;
+      if (gDead == 0 && tFlash == 0) {
+        if (pr >= 0 && pr < 4 && pc >= 0 && pc < 4 && tCell(tPiece, tRot, pr, pc)) v = tPiece + 1;
+        else if (!v && qr >= 0 && qr < 4 && pc >= 0 && pc < 4 && tCell(tPiece, tRot, qr, pc)) { v = tPiece + 1; ghost = true; }
+      }
+      tCellDraw(tBX + c * s, tBY + r * s, s, v, ghost);
+    }
+  // a gauche : lignes et niveau ; a droite : la piece suivante
+  uint16_t lab = rgb(110, 110, 140), val = rgb(230, 230, 230);
+  char b[8];
+  int lx = max(1, tBX - 6 - tinyWidth("LIGNES")), ly = tBY + 2;
+  tinyText(*gfx, lx, ly, "LIGNES", lab);
+  snprintf(b, sizeof(b), "%d", tLines);
+  tinyText(*gfx, lx, ly + 7, b, val);
+  tinyText(*gfx, lx, ly + 16, "NIVEAU", lab);
+  snprintf(b, sizeof(b), "%d", gWave);
+  tinyText(*gfx, lx, ly + 23, b, val);
+  gMark(lx, ly, tinyWidth("NIVEAU") + 2, 30);
+  int nx = tBX + bw + 5, ns = max(2, s - 1);
+  tinyText(*gfx, nx, ly, "APRES", lab);
+  for (int r = 0; r < 4; r++)
+    for (int c = 0; c < 4; c++)
+      tCellDraw(nx + c * ns, ly + 8 + r * ns, ns, tCell(tNext, 0, r, c) ? tNext + 1 : 0, false);
+  gMark(nx, ly, max(tinyWidth("APRES"), 4 * ns), 8 + 4 * ns);
+  altBooms(palFull);
+  altHud(palFull);
+}
+
+// ---------------------------------------------------------------- CRUCH
+// Bonbons a aligner (original) : la croix ou le stick deplace le curseur, X prend un bonbon, une direction l'echange
+// avec son voisin (rond : annuler). 3 identiques alignes ou plus : ils disparaissent, ceux du dessus tombent (chaines).
+// 4 alignes : bonbon raye (vide sa ligne ou sa colonne) ; 5 : bombe (echangee, elle vide toute une couleur).
+// Chaque niveau : un score a atteindre en un nombre de coups limite ; rate : une vie perdue.
+#define Y_N 8
+#define Y_EMPTY 0xFF
+uint8_t yG[Y_N][Y_N];       // bits 0-2 : sorte (0-5, 6 = bombe) ; bit 4 : raye horizontal ; bit 5 : raye vertical
+uint8_t yMark[Y_N][Y_N];
+float yOff[Y_N][Y_N];       // decalage vertical pendant la chute (pixels)
+int yS = 7, yBX = 2, yBY = 8, yCR = 3, yCC = 3, yState = 0, yT = 0, yCombo = 0, yMoves = 20, yGoal = 1500, yRep = 0;
+int yAR = 0, yAC = 0, yBR = 0, yBC = 0;  // echange en cours (a <-> b)
+uint32_t yStageScore = 0;
+bool ySel = false;
+uint8_t yPrevK = 0;
+const uint8_t Y_COL[7][3] = { { 255, 50, 60 }, { 255, 150, 0 }, { 255, 225, 0 }, { 40, 220, 80 }, { 40, 140, 255 }, { 200, 70, 255 }, { 60, 60, 70 } };
+const char *const Y_SPR[6][6] = {  // bonbons 6x6 (petit ecran) : a couleur, h reflet, d ombre
+  { ".aaaa.", "ahhaaa", "ahaaaa", "aaaaad", "aaaadd", ".addd." },   // rond
+  { "aaaaaa", "ahhaaa", "ahaaaa", "aaaaad", "aaaadd", "adddd." },   // carre
+  { "..aa..", ".ahaa.", "ahaaaa", "aaaaad", ".aadd.", "..dd.." },   // losange
+  { "..aa..", "..ha..", ".haaa.", ".aaaad", "aaaadd", "dddddd" },   // triangle
+  { "..a...", ".aha..", ".haaa.", "ahaaaa", "aaaadd", ".ddd.." },   // goutte
+  { "..a...", ".aha..", "aahaaa", ".aaad.", ".a.dd.", "a...d." }    // etoile
+};
+uint8_t yType(uint8_t v) { return v == Y_EMPTY ? 7 : v & 7; }
+bool yRunAt(int r, int c) {  // le bonbon (r, c) fait-il partie d'un alignement de 3 ?
+  uint8_t t = yType(yG[r][c]);
+  if (t >= 6) return false;
+  int h = 1, v = 1;
+  for (int k = c - 1; k >= 0 && yType(yG[r][k]) == t; k--) h++;
+  for (int k = c + 1; k < Y_N && yType(yG[r][k]) == t; k++) h++;
+  for (int k = r - 1; k >= 0 && yType(yG[k][c]) == t; k--) v++;
+  for (int k = r + 1; k < Y_N && yType(yG[k][c]) == t; k++) v++;
+  return h >= 3 || v >= 3;
+}
+bool yAnyRun() { for (int r = 0; r < Y_N; r++) for (int c = 0; c < Y_N; c++) if (yRunAt(r, c)) return true; return false; }
+void ySwapCells(int r1, int c1, int r2, int c2) { uint8_t t = yG[r1][c1]; yG[r1][c1] = yG[r2][c2]; yG[r2][c2] = t; }
+int yGain(int r1, int c1, int r2, int c2) {  // interet d'un echange (pour la demo et pour savoir s'il reste un coup)
+  if (yType(yG[r1][c1]) == 6 || yType(yG[r2][c2]) == 6) return 10;
+  ySwapCells(r1, c1, r2, c2);
+  int n = 0;
+  for (int r = 0; r < Y_N; r++) for (int c = 0; c < Y_N; c++) n += yRunAt(r, c);
+  ySwapCells(r1, c1, r2, c2);
+  return n;
+}
+bool yBestMove(int &br, int &bc, int &dr, int &dc) {
+  int best = 0;
+  for (int r = 0; r < Y_N; r++)
+    for (int c = 0; c < Y_N; c++)
+      for (int d = 0; d < 2; d++) {
+        int r2 = r + (d == 1), c2 = c + (d == 0);
+        if (r2 >= Y_N || c2 >= Y_N) continue;
+        int g = yGain(r, c, r2, c2) * 10 + random(10);
+        if (g > best) { best = g; br = r; bc = c; dr = r2 - r; dc = c2 - c; }
+      }
+  return best >= 30;
+}
+void yFill() {  // nouveau plateau sans alignement de depart, avec au moins un coup possible
+  int br, bc, dr, dc;
+  do {
+    for (int r = 0; r < Y_N; r++)
+      for (int c = 0; c < Y_N; c++) {
+        do yG[r][c] = random(6); while (yRunAt(r, c));
+        yOff[r][c] = -(float)(Y_N - r) * yS - random(yS);  // les bonbons tombent en place
+      }
+  } while (!yBestMove(br, bc, dr, dc));
+  yState = 4;  // chute
+}
+void yNewLevel() {
+  yMoves = gEffDiff() == 0 ? 25 : gEffDiff() == 2 ? 16 : 20;
+  yGoal = 1500 + 700 * (gWave - 1);
+  yStageScore = 0;
+  yCombo = 0;
+  ySel = false;
+  yFill();
+}
+void yReset() {
+  gLives = (!gDemo && gDiff == 0) ? 5 : 3;
+  gPaused = false;
+  gScore = 0; gWave = 1; gDead = 0; gBonus = 0; gLifeUp = false;
+  gStageT = 80;
+  sndMelody(JINGLE_STAGE, 4);
+  for (auto &b : gBoom) b.t = 0;
+  yS = min(14, min((H - 8) / Y_N, (W - 44) / Y_N));
+  yBX = H >= 128 ? 4 : 2;
+  yBY = 8 + ((H - 8) - Y_N * yS) / 2;
+  yCR = yCC = 3;
+  yNewLevel();
+}
+// marque les alignements (et cree les bonbons speciaux), renvoie le nombre de bonbons qui vont disparaitre
+int yFindMatches() {
+  memset(yMark, 0, sizeof(yMark));
+  int n = 0;
+  for (int r = 0; r < Y_N; r++)
+    for (int c = 0; c < Y_N; c++)
+      if (yRunAt(r, c)) { yMark[r][c] = 1; n++; }
+  // rayures et bombes : un alignement de 4 ou 5 laisse un bonbon special a la place de l'echange (ou au milieu)
+  for (int pass = 0; pass < 2; pass++)
+    for (int a = 0; a < Y_N; a++) {
+      int run = 1;
+      for (int b = 1; b <= Y_N; b++) {
+        int r = pass ? b : a, c = pass ? a : b, pr = pass ? b - 1 : a, pc = pass ? a : b - 1;
+        bool same = b < Y_N && yType(yG[r][c]) == yType(yG[pr][pc]) && yType(yG[pr][pc]) < 6;
+        if (same) { run++; continue; }
+        if (run >= 4) {
+          int kr = pass ? b - 1 - run / 2 : a, kc = pass ? a : b - 1 - run / 2;  // milieu de l'alignement
+          for (int k = 0; k < run; k++) {
+            int rr = pass ? b - 1 - k : a, cc = pass ? a : b - 1 - k;
+            if ((rr == yAR && cc == yAC) || (rr == yBR && cc == yBC)) { kr = rr; kc = cc; }
+          }
+          uint8_t t = yType(yG[kr][kc]);
+          yG[kr][kc] = run >= 5 ? 6 : (t | (pass ? 0x20 : 0x10));
+          yMark[kr][kc] = 2;  // reste en place (special)
+          n--;
+        }
+        run = 1;
+      }
+    }
+  // un bonbon raye qui disparait vide sa ligne ou sa colonne (en chaine)
+  for (int loop = 0; loop < 4; loop++)
+    for (int r = 0; r < Y_N; r++)
+      for (int c = 0; c < Y_N; c++)
+        if (yMark[r][c] == 1 && yG[r][c] != Y_EMPTY && (yG[r][c] & 0x30)) {
+          bool hz = yG[r][c] & 0x10;
+          yG[r][c] &= 7;  // une seule fois
+          for (int k = 0; k < Y_N; k++) {
+            int rr = hz ? r : k, cc = hz ? k : c;
+            if (!yMark[rr][cc]) { yMark[rr][cc] = 1; n++; }
+          }
+          sfxDive();
+        }
+  return n;
+}
+void yClearColor(uint8_t t) {  // bombe : tous les bonbons d'une couleur
+  memset(yMark, 0, sizeof(yMark));
+  for (int r = 0; r < Y_N; r++)
+    for (int c = 0; c < Y_N; c++)
+      if (yType(yG[r][c]) == t || yType(yG[r][c]) == 6) yMark[r][c] = 1;
+}
+void yCollapse() {  // les bonbons tombent, de nouveaux arrivent par le haut
+  for (int c = 0; c < Y_N; c++) {
+    int w = Y_N - 1;
+    for (int r = Y_N - 1; r >= 0; r--)
+      if (yG[r][c] != Y_EMPTY) {
+        if (w != r) { yG[w][c] = yG[r][c]; yOff[w][c] = yOff[r][c] - (w - r) * yS; yG[r][c] = Y_EMPTY; }
+        w--;
+      }
+    for (int r = w; r >= 0; r--) { yG[r][c] = random(6); yOff[r][c] = -(float)(w + 1) * yS - (w - r) * 2; }
+  }
+}
+void yStartClear(int n) {
+  yCombo++;
+  uint32_t pts = (uint32_t)n * 60 * yCombo;
+  gScore += pts;
+  yStageScore += pts;
+  yState = 3; yT = 12;
+  if (yCombo > 1) sndPlay(900 + 150 * yCombo, 1400 + 150 * yCombo, 80, 0.3f, false, 1);
+  else sfxBoom();
+}
+void yStep() {
+  gFrame++;
+  if (gDead > 0) {
+    if (--gDead == 0) {
+      if (gLives <= 0) {
+        if (gDemo) yReset();
+        else if (gLastRank) startNameEntry();
+        else toDemo();
+        return;
+      }
+      yNewLevel();
+    }
+    return;
+  }
+  if (gStageT > 0) { gStageT--; return; }
+  uint8_t k = gDemo ? 0 : keysPs4, edge = k & ~yPrevK;
+  if (!gDemo) {  // repetition quand on garde la direction appuyee
+    if (k & 27) { if (++yRep > 12 && (yRep & 3) == 0) edge |= k & 27; } else yRep = 0;
+  }
+  yPrevK = k;
+  if (yState == 0) {  // a toi de jouer
+    if (gDemo) {  // demo : va vers le meilleur coup, le prend, l'echange
+      static int tr = -1, tc = 0, dr = 0, dc = 0;
+      if (tr < 0 && !yBestMove(tr, tc, dr, dc)) { yFill(); return; }
+      if ((gFrame & 7) == 0) {
+        if (yCR != tr) yCR += yCR < tr ? 1 : -1;
+        else if (yCC != tc) yCC += yCC < tc ? 1 : -1;
+        else if (!ySel) ySel = true;
+        else { edge = dr ? 16 : 2; tr = -1; }
+      }
+      if (!(edge & 18)) return;
+    }
+    int dr = (edge & 8) ? -1 : (edge & 16) ? 1 : 0, dc = (edge & 1) ? -1 : (edge & 2) ? 1 : 0;
+    if (dr && dc) dc = 0;
+    if (edge & 32) { ySel = false; sfxMenu(); }
+    if (!gDemo && (edge & 4)) { ySel = !ySel; sfxMenu(); }
+    if ((dr || dc)) {
+      int nr = yCR + dr, nc = yCC + dc;
+      if (nr < 0 || nr >= Y_N || nc < 0 || nc >= Y_N) return;
+      if (ySel) {  // echange avec le voisin
+        yAR = yCR; yAC = yCC; yBR = nr; yBC = nc;
+        ySel = false;
+        yState = 1; yT = 0;
+        yCR = nr; yCC = nc;
+        sfxShot();
+      } else { yCR = nr; yCC = nc; }
+    }
+    return;
+  }
+  if (yState == 1 || yState == 2) {  // echange anime (2 : retour, coup impossible)
+    if (++yT < 7) return;
+    ySwapCells(yAR, yAC, yBR, yBC);
+    if (yState == 2) { yState = 0; return; }
+    uint8_t ta = yType(yG[yAR][yAC]), tb = yType(yG[yBR][yBC]);
+    yCombo = 0;
+    if (ta == 6 || tb == 6) {  // bombe echangee : toute la couleur de l'autre bonbon
+      yMoves--;
+      yClearColor(ta == 6 ? tb : ta);
+      int n = 0;
+      for (int r = 0; r < Y_N; r++) for (int c = 0; c < Y_N; c++) n += yMark[r][c] == 1;
+      if (!gDemo) rumbleReq = true;
+      yStartClear(n);
+      return;
+    }
+    int n = yFindMatches();
+    if (n <= 0 && !yAnyRun()) { yState = 2; yT = 0; sndPlay(300, 200, 120, 0.3f, false, 1); return; }  // pas d'alignement : retour
+    yMoves--;
+    yStartClear(max(n, 1));
+    return;
+  }
+  if (yState == 3) {  // les bonbons alignes clignotent puis disparaissent
+    if (--yT > 0) return;
+    for (int r = 0; r < Y_N; r++)
+      for (int c = 0; c < Y_N; c++)
+        if (yMark[r][c] == 1) { yG[r][c] = Y_EMPTY; if (random(4) == 0) gBoomAt(yBX + c * yS + yS / 2, yBY + r * yS + yS / 2); }
+    yCollapse();
+    yState = 4;
+    return;
+  }
+  if (yState == 4) {  // chute
+    bool moving = false;
+    for (int r = 0; r < Y_N; r++)
+      for (int c = 0; c < Y_N; c++)
+        if (yOff[r][c] < 0) { yOff[r][c] = min(0.0f, yOff[r][c] + 1.0f + yS / 7.0f); moving = true; }
+    if (moving) return;
+    int n = yFindMatches();
+    if (n > 0) { yStartClear(n); return; }  // reaction en chaine
+    yState = 0;
+    yCombo = 0;
+    if (!gDemo && gScore > gHi) gHi = gScore;
+    if (yStageScore >= (uint32_t)yGoal) {  // niveau gagne : bonus des coups restants
+      gWave++;
+      gStageT = 90;
+      altStageClear(100UL * yMoves);
+      sndMelody(JINGLE_STAGE, 4);
+      yNewLevel();
+    } else if (yMoves <= 0) {  // plus de coups : une vie perdue, on recommence le niveau
+      altLoseLife(yBX + Y_N * yS / 2, yBY + Y_N * yS / 2);
+    } else {
+      int a, b, c, d;
+      if (!yBestMove(a, b, c, d)) yFill();  // plus aucun coup possible : nouveau melange
+    }
+  }
+}
+void yGem(int x, int y, uint8_t v, int s, bool flash) {  // un bonbon (forme selon la sorte), reflet et ombre
+  uint8_t t = yType(v);
+  if (t > 6) return;
+  const uint8_t *c = Y_COL[t];
+  uint16_t main = flash ? rgb(255, 255, 255) : rgb(c[0], c[1], c[2]);
+  uint16_t hi = flash ? main : rgb(min(255, c[0] + 120), min(255, c[1] + 120), min(255, c[2] + 120));
+  uint16_t dk = flash ? main : rgb(c[0] / 3, c[1] / 3, c[2] / 3);
+  if (t == 6) {  // bombe : boule sombre et etincelles de toutes les couleurs qui tournent
+    int r = max(2, s / 2 - 1);
+    gfx->fillCircle(x + s / 2, y + s / 2, r, rgb(50, 40, 70));
+    for (int k = 0; k < 4; k++) {
+      float a = gFrame * 0.15f + k * 1.5708f;
+      const uint8_t *cc = Y_COL[(k + gFrame / 10) % 6];
+      gfx->drawPixel(x + s / 2 + (int)(cosf(a) * (r - 1)), y + s / 2 + (int)(sinf(a) * (r - 1)), rgb(cc[0], cc[1], cc[2]));
+    }
+    gfx->drawPixel(x + s / 2, y + s / 2, rgb(255, 255, 255));
+    return;
+  }
+  if (s <= 7) {  // petit ecran : dessin 6x6
+    for (int r = 0; r < 6; r++)
+      for (int cc = 0; cc < 6; cc++) {
+        char ch = Y_SPR[t][r][cc];
+        if (ch != '.') gfx->drawPixel(x + cc, y + r, ch == 'h' ? hi : ch == 'd' ? dk : main);
+      }
+  } else {  // grand ecran : formes pleines
+    int m = 1, w = s - 2, cx = x + s / 2, cy = y + s / 2, R = w / 2;
+    switch (t) {
+      case 0: gfx->fillCircle(cx, cy, R, main); break;
+      case 1: gfx->fillRoundRect(x + m, y + m, w, w, 2, main); break;
+      case 2: gfx->fillTriangle(cx, y + m, x + m, cy, x + m + w - 1, cy, main); gfx->fillTriangle(cx, y + m + w - 1, x + m, cy, x + m + w - 1, cy, main); break;
+      case 3: gfx->fillTriangle(cx, y + m, x + m, y + m + w - 1, x + m + w - 1, y + m + w - 1, main); break;
+      case 4: gfx->fillCircle(cx, cy + R / 3, R * 2 / 3 + 1, main); gfx->fillTriangle(cx, y + m, cx - R * 2 / 3 - 1, cy + R / 3, cx + R * 2 / 3 + 1, cy + R / 3, main); break;
+      default: gfx->fillTriangle(cx, y + m, x + m, y + m + w * 3 / 4, x + m + w - 1, y + m + w * 3 / 4, main);
+               gfx->fillTriangle(cx, y + m + w - 1, x + m, y + m + w / 4, x + m + w - 1, y + m + w / 4, main); break;
+    }
+    gfx->fillRect(cx - R / 2, cy - R / 2, 2, 2, hi);  // reflet
+    gfx->drawPixel(cx + R / 2, cy + R / 2, dk);
+  }
+  if (v & 0x10) { gfx->drawFastHLine(x + 1, y + s / 2 - 2, s - 2, rgb(255, 255, 255)); gfx->drawFastHLine(x + 1, y + s / 2 + 1, s - 2, rgb(255, 255, 255)); }
+  if (v & 0x20) { gfx->drawFastVLine(x + s / 2 - 2, y + 1, s - 2, rgb(255, 255, 255)); gfx->drawFastVLine(x + s / 2 + 1, y + 1, s - 2, rgb(255, 255, 255)); }
+}
+void yDraw() {
+  eraseOld();
+  uint16_t palFull[9];
+  for (int i = 0; i < 9; i++) palFull[i] = rgb(G_PAL_RGB[i][0], G_PAL_RGB[i][1], G_PAL_RGB[i][2]);
+  int s = yS;
+  uint16_t bgA = rgb(28, 18, 52), bgB = rgb(40, 26, 72);
+  for (int r = 0; r < Y_N; r++)  // fond en damier, puis les bonbons (redessines a chaque image)
+    for (int c = 0; c < Y_N; c++) gfx->fillRect(yBX + c * s, yBY + r * s, s, s, ((r + c) & 1) ? bgA : bgB);
+  float u = (yState == 1 || yState == 2) ? min(1.0f, yT / 7.0f) : 0;
+  for (int r = 0; r < Y_N; r++)
+    for (int c = 0; c < Y_N; c++) {
+      if (yG[r][c] == Y_EMPTY) continue;
+      float dx = 0, dy = yOff[r][c];
+      if (u > 0 && r == yAR && c == yAC) { dx = (yBC - yAC) * s * u; dy += (yBR - yAR) * s * u; }
+      if (u > 0 && r == yBR && c == yBC) { dx = (yAC - yBC) * s * u; dy += (yAR - yBR) * s * u; }
+      int x = yBX + c * s + (int)dx, y = yBY + r * s + (int)dy;
+      if (y < yBY) continue;  // encore au-dessus du plateau
+      bool flash = yState == 3 && yMark[r][c] == 1 && (yT & 2);
+      yGem(x, y, yG[r][c], s, flash);
+    }
+  if (yState == 0 || ySel) {  // curseur : blanc, jaune qui clignote quand un bonbon est pris
+    uint16_t cc = ySel ? ((gFrame & 4) ? palFull[2] : palFull[7]) : palFull[0];
+    gfx->drawRect(yBX + yCC * s - 1, yBY + yCR * s - 1, s + 2, s + 2, cc);
+    if (ySel) gfx->drawRect(yBX + yCC * s, yBY + yCR * s, s, s, cc);
+  }
+  int bw = Y_N * s;  // seul le contour du plateau (ou passe le curseur) est efface : le plateau est redessine en entier
+  gMark(yBX - 1, yBY - 1, bw + 2, 1); gMark(yBX - 1, yBY + bw, bw + 2, 1);
+  gMark(yBX - 1, yBY - 1, 1, bw + 2); gMark(yBX + bw, yBY - 1, 1, bw + 2);
+  // a droite : coups restants, objectif et jauge de progression
+  int px = yBX + Y_N * s + 4, pw = W - px - 2, py = yBY + 1;
+  uint16_t lab = rgb(110, 110, 140), val = rgb(230, 230, 230);
+  char b[10];
+  tinyText(*gfx, px, py, "COUPS", lab);
+  snprintf(b, sizeof(b), "%d", yMoves);
+  tinyText(*gfx, px, py + 7, b, yMoves <= 3 ? palFull[1] : val);
+  tinyText(*gfx, px, py + 16, "BUT", lab);
+  snprintf(b, sizeof(b), "%d", yGoal);
+  tinyText(*gfx, px, py + 23, b, val);
+  int gy = py + 32, gh = max(4, Y_N * s - 34);
+  if (gy + gh > H) gh = H - gy - 1;
+  gfx->drawRect(px, gy, min(pw, 10), gh, rgb(90, 90, 120));  // jauge verticale qui monte vers l'objectif
+  int fill = (int)min((float)(gh - 2), (gh - 2) * (float)yStageScore / yGoal);
+  gfx->fillRect(px + 1, gy + gh - 1 - fill, min(pw, 10) - 2, fill, yStageScore >= (uint32_t)yGoal ? palFull[5] : palFull[6]);
+  gMark(px, py, pw, gy + gh - py);
+  altBooms(palFull);
+  altHud(palFull);
+}
+
 // aiguillage selon le jeu choisi
-void altReset() { if (gGame == 1) rReset(); else if (gGame == 2) cReset(); else if (gGame == 3) qReset(); else if (gGame == 4) bReset(); else if (gGame == 5) lReset(); else if (gGame == 6) jReset(); else oReset(); }
-void altStep() { if (gGame == 1) rStep(); else if (gGame == 2) cStep(); else if (gGame == 3) qStep(); else if (gGame == 4) bStep(); else if (gGame == 5) lStep(); else if (gGame == 6) jStep(); else oStep(); }
-void altDraw() { if (gGame == 1) rDraw(); else if (gGame == 2) cDraw(); else if (gGame == 3) qDraw(); else if (gGame == 4) bDraw(); else if (gGame == 5) lDraw(); else if (gGame == 6) jDraw(); else oDraw(); }
+void altReset() { if (gGame == 1) rReset(); else if (gGame == 2) cReset(); else if (gGame == 3) qReset(); else if (gGame == 4) bReset(); else if (gGame == 5) lReset(); else if (gGame == 6) jReset(); else if (gGame == 7) oReset(); else if (gGame == 8) kReset(); else if (gGame == 9) tReset(); else yReset(); }
+void altStep() { if (gGame == 1) rStep(); else if (gGame == 2) cStep(); else if (gGame == 3) qStep(); else if (gGame == 4) bStep(); else if (gGame == 5) lStep(); else if (gGame == 6) jStep(); else if (gGame == 7) oStep(); else if (gGame == 8) kStep(); else if (gGame == 9) tStep(); else yStep(); }
+void altDraw() { if (gGame == 1) rDraw(); else if (gGame == 2) cDraw(); else if (gGame == 3) qDraw(); else if (gGame == 4) bDraw(); else if (gGame == 5) lDraw(); else if (gGame == 6) jDraw(); else if (gGame == 7) oDraw(); else if (gGame == 8) kDraw(); else if (gGame == 9) tDraw(); else yDraw(); }
 // remise a zero du jeu choisi (partie ou demo)
 void resetCurrent() { if (gGame == 0) gReset(); else altReset(); }
 
@@ -3397,6 +4301,8 @@ void ps4Poll() {
   if (PS4.Cross() || PS4.Square() || PS4.Triangle() || PS4.R1() || PS4.L1() || PS4.R2Value() > 60) k |= 4;  // tir / saut
   if (PS4.Circle()) k |= 32;  // rond : action speciale (bombe dans RAID)
   if (k) lastInput = millis();
+  { int sy2 = PS4.LStickY(); padStickY = abs(sy2) > 18 ? constrain(sy2, -127, 127) : 0; }
+  padDigital = PS4.Left() || PS4.Right() || PS4.Up() || PS4.Down() || PS4.UpLeft() || PS4.UpRight() || PS4.DownLeft() || PS4.DownRight();
   keysPs4 = gPaused ? 0 : k;
   // boutons du menu et START (Options) : on agit a l'appui
   static uint8_t prevB = 0;
