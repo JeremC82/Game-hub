@@ -23,13 +23,12 @@
 #include <Preferences.h>
 #include <ESP32-HUB75-MatrixPanel-I2S-DMA.h>
 #include <Adafruit_GFX.h>
-#include "src/PS4Controller/PS4Controller.h"  // copie corrigee de PS4Controller 1.1.0 (GPL-3), voir ps4_l2cap.c
-#include <esp_gap_bt_api.h>
+#include <Bluepad32.h>  // manettes Bluetooth (PS4, PS5, Xbox...) : jusqu'a 4 en meme temps (carte "ESP32 + Bluepad32")
 #include <esp_timer.h>
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "3.70"
+#define GAMES_VERSION "3.81"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -100,6 +99,7 @@ uint16_t rgb(uint8_t r, uint8_t g, uint8_t b) { return dma->color565(r, g, b); }
 int8_t padStickX = 0;               // stick gauche horizontal (-127 gauche .. 127 droite), BRIQUES : vitesse proportionnelle
 int8_t padStickY = 0;               // stick gauche vertical (-127 bas .. 127 haut), RAQUETTES : vitesse proportionnelle
 bool padDigital = false;            // la croix numerique est appuyee (ORBITE : gauche / droite = tourner en continu)
+uint8_t keysP2 = 0;                 // touches de la 2e manette (memes bits), pour les jeux a deux joueurs
 uint8_t keysPs4 = 0;                // touches de la manette PS4 : 1 gauche, 2 droite, 4 feu, 8 haut, 16 bas, 32 rond
 int gPYBase = 0;                    // hauteur de depart du vaisseau (en bas) ; il peut monter jusqu'a gPYMin
 int gPYMin = 0;
@@ -111,7 +111,8 @@ bool gPaused = false;               // START pendant une partie : pause
 uint8_t gDiff = 1;                  // difficulte : 0 facile, 1 normal, 2 difficile
 const char *const DIFF_NAME[3] = { "FACILE", "NORMAL", "DIFFICILE" };
 uint8_t menuSel = 0;                // ligne choisie : 0 jouer, 1 niveau, 2 luminosite, 3 volume, 4 scores, 5 demo
-#define MENU_N 6
+#define MENU_N 7
+uint8_t gPlayers = 1;  // 1 ou 2 joueurs (menu) : seuls les jeux a deux joueurs utilisent la 2e manette
 int brightPct() { return (bright * 100 + 127) / 255 / 10 * 10; }  // luminosite en %, arrondie a 10 %
 void setBrightPct(int p) {  // 0 % : tres faible mais jamais noir (le menu reste visible)
   p = constrain(p, 0, 100);
@@ -137,7 +138,67 @@ char gName[4] = "AAA";              // nom en cours de saisie (3 lettres)
 uint8_t gNamePos = 0;               // lettre en cours (0 a 2)
 const char NAME_CHARS[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 -";
 #define IDLE_TO_DEMO_MS 60000UL     // partie abandonnee : retour a la demo apres 1 min sans appui
-char ipText[20] = "";  // adresse Bluetooth de l'ESP32, affichee pendant la demo
+char ipText[20] = "";  // adresse Bluetooth de l'ESP32 (moniteur serie)
+ControllerPtr gPads[BP32_MAX_GAMEPADS];  // manettes connectees : [0] joueur 1, [1] joueur 2...
+// Adaptation : les jeux gardent PS4.Cross(), PS4.LStickX()... qui lisent la manette du joueur 1 (gPads[0]).
+// Croix (PS) = BUTTON_A, rond = B, carre = X, triangle = Y ; Share = SELECT, Options = START ; sticks -512..511 (Y vers le bas).
+struct PadShim {
+  uint8_t idx;
+  uint8_t ledR = 0, ledG = 0, ledB = 40, rumW = 0, rumS = 0;
+  explicit PadShim(uint8_t i) : idx(i) {}
+  ControllerPtr c() const { ControllerPtr p = gPads[idx]; return (p && p->isConnected()) ? p : nullptr; }
+  bool isConnected() const { return c() != nullptr; }
+  uint16_t btn() const { ControllerPtr p = c(); return p ? p->buttons() : 0; }
+  uint8_t dp() const { ControllerPtr p = c(); return p ? p->dpad() : 0; }
+  uint16_t misc() const { ControllerPtr p = c(); return p ? p->miscButtons() : 0; }
+  bool Up() const { return (dp() & (DPAD_UP | DPAD_LEFT | DPAD_RIGHT)) == DPAD_UP; }
+  bool Down() const { return (dp() & (DPAD_DOWN | DPAD_LEFT | DPAD_RIGHT)) == DPAD_DOWN; }
+  bool Left() const { return (dp() & (DPAD_LEFT | DPAD_UP | DPAD_DOWN)) == DPAD_LEFT; }
+  bool Right() const { return (dp() & (DPAD_RIGHT | DPAD_UP | DPAD_DOWN)) == DPAD_RIGHT; }
+  bool UpLeft() const { return (dp() & (DPAD_UP | DPAD_LEFT)) == (DPAD_UP | DPAD_LEFT); }
+  bool UpRight() const { return (dp() & (DPAD_UP | DPAD_RIGHT)) == (DPAD_UP | DPAD_RIGHT); }
+  bool DownLeft() const { return (dp() & (DPAD_DOWN | DPAD_LEFT)) == (DPAD_DOWN | DPAD_LEFT); }
+  bool DownRight() const { return (dp() & (DPAD_DOWN | DPAD_RIGHT)) == (DPAD_DOWN | DPAD_RIGHT); }
+  bool Cross() const { return btn() & BUTTON_A; }
+  bool Circle() const { return btn() & BUTTON_B; }
+  bool Square() const { return btn() & BUTTON_X; }
+  bool Triangle() const { return btn() & BUTTON_Y; }
+  bool L1() const { return btn() & BUTTON_SHOULDER_L; }
+  bool R1() const { return btn() & BUTTON_SHOULDER_R; }
+  int R2Value() const { ControllerPtr p = c(); return p ? p->throttle() / 4 : 0; }
+  bool Share() const { return misc() & MISC_BUTTON_SELECT; }
+  bool Options() const { return misc() & MISC_BUTTON_START; }
+  int LStickX() const { ControllerPtr p = c(); return p ? constrain(p->axisX() / 4, -128, 127) : 0; }
+  int LStickY() const { ControllerPtr p = c(); return p ? constrain(-p->axisY() / 4, -128, 127) : 0; }  // vers le haut : positif
+  uint8_t Battery() const { ControllerPtr p = c(); return p && p->battery() ? (p->battery() * 10 + 127) / 255 : 0; }  // 0 a 10
+  bool Charging() const { return false; }  // pas donne par Bluepad32
+  void setLed(uint8_t r, uint8_t g, uint8_t b) { ledR = r; ledG = g; ledB = b; }
+  void setRumble(uint8_t w, uint8_t s) { rumW = w; rumS = s; }
+  void sendToController() {
+    ControllerPtr p = c();
+    if (!p) return;
+    p->setColorLED(ledR, ledG, ledB);
+    if (rumW || rumS) p->playDualRumble(0, 250, rumW ? rumW : 0x40, rumS);
+  }
+};
+PadShim PS4(0), PAD2(1);
+bool rumbleReq2 = false;  // le vaisseau du joueur 2 est touche : sa manette vibre
+void onPadConnected(ControllerPtr c) {
+  for (int i = 0; i < BP32_MAX_GAMEPADS; i++)
+    if (!gPads[i]) {
+      gPads[i] = c;
+      c->setColorLED(i == 0 ? 0 : 255, i == 0 ? 0 : 30, i == 0 ? 40 : 30);
+      Serial.printf("Manette %d connectee : %s, memoire libre %u\n", i + 1, c->getModelName().c_str(), ESP.getFreeHeap());
+      return;
+    }
+}
+void onPadDisconnected(ControllerPtr c) {
+  for (int i = 0; i < BP32_MAX_GAMEPADS; i++)
+    if (gPads[i] == c) { gPads[i] = nullptr; Serial.printf("Manette %d deconnectee\n", i + 1); }
+  if (!gPads[0])  // le joueur 1 est parti : le joueur 2 prend sa place
+    for (int i = 1; i < BP32_MAX_GAMEPADS; i++)
+      if (gPads[i]) { gPads[0] = gPads[i]; gPads[i] = nullptr; break; }
+}
 
 // ---------------------------------------------------------------- petite police 3x5 (score)
 const uint8_t TF_DIG[10][5] = { { 7, 5, 5, 5, 7 }, { 2, 6, 2, 2, 7 }, { 7, 1, 7, 4, 7 }, { 7, 1, 7, 1, 7 }, { 5, 5, 7, 1, 1 },
@@ -305,7 +366,7 @@ void audioBegin() {
 // Sans joueur, un pilote automatique joue (demo). Les ennemis pulsent doucement.
 // Dessin sans scintillement : seuls les rectangles dessines a l'image precedente sont effaces.
 #define G_MAXE 100
-#define G_SHOTS 9
+#define G_SHOTS 14  // tirs a l'ecran (deux vaisseaux en mode 2 joueurs)
 #define G_BOMBS 10
 #define G_BOOMS 10
 #define G_STARS 128
@@ -487,12 +548,17 @@ void gNewWave() {
   if (gWave >= 2 && gWave <= 4) sndMelody(JINGLE_ARME, 4);  // nouvelle arme
   else sndMelody(JINGLE_STAGE, 4);
 }
+bool g2On = false;    // SPACE DEFENDER a deux : un 2e vaisseau (vert), vies et score communs
+float g2Px = 0;
+int g2PY = 0, g2Cool = 0, g2Dead = 0;
 void gReset() {
   gLives = (!gDemo && gDiff == 0) ? 5 : 3;  // facile : 5 vies
   gPaused = false;
   gScore = 0; gWave = 0; gDead = 0; gCool = 0; gBonus = 0; gLifeUp = false;
   gPx = W / 2 - 4;
   if (gPYBase) gPY = gPYBase;
+  g2On = !gDemo && gPlayers == 2 && PAD2.isConnected();
+  if (g2On) { gPx = W / 3 - 4; g2Px = W * 2 / 3 - 4; g2PY = gPY; g2Cool = 0; g2Dead = 0; }
   for (auto &s : gShot) s.on = false;
   for (auto &b : gBomb) b.on = false;
   for (auto &b : gBoom) b.t = 0;
@@ -517,19 +583,21 @@ void gameSetup() {
   gLastStep = millis();
 }
 // tir du vaisseau selon son evolution ; renvoie false si trop de tirs deja a l'ecran
-bool gFire() {
+bool gFireAt(float px, int py, int &cool);
+bool gFire() { return gFireAt(gPx, gPY, gCool); }
+bool gFireAt(float px, int py, int &cool) {
   static const int8_t N[4] = { 1, 1, 2, 3 }, COOL[4] = { 8, 5, 6, 7 };
   int t = gTier(), n = N[t], freeShots = 0;
   for (auto &s : gShot) freeShots += !s.on;
   if (freeShots < n) return false;
   for (int k = 0; k < n; k++) {
-    float x = gPx + 4, vx = 0;
-    if (n == 2) x = gPx + (k ? 6 : 2);          // double canon : 2 tirs paralleles
+    float x = px + 4, vx = 0;
+    if (n == 2) x = px + (k ? 6 : 2);          // double canon : 2 tirs paralleles
     if (n == 3) vx = (k - 1) * 0.5f;            // triple canon : eventail
     for (auto &s : gShot)
-      if (!s.on) { s = { x, (float)gPY - 3, true, vx }; break; }
+      if (!s.on) { s = { x, (float)py - 3, true, vx }; break; }
   }
-  gCool = COOL[t];
+  cool = COOL[t];
   sfxShot();
   return true;
 }
@@ -572,6 +640,27 @@ void topAdd() {
   prefs.putBytes(topKey(), gBest, sizeof(gBest));
   gLastRank = pos + 1;
   gHi = gBest[0].score;
+}
+void gHitPlayer2() {  // vaisseau du joueur 2 touche : vies communes
+  rumbleReq2 = true;
+  sfxHit();
+  if (gLives == 1) sndMelody(JINGLE_OVER, 4);
+  gBoomAt(g2Px + 4, g2PY + 3);
+  gLives--;
+  g2Dead = 50;
+  g2PY = gPYBase;
+  if (gLives <= 0) { gDead = 120; topAdd(); }  // plus de vies : fin de partie pour les deux
+}
+void gPlayer2Control() {
+  uint8_t k = keysP2;
+  float sp = W > 128 ? 3 : 2;
+  if ((k & 1) && !(k & 2)) g2Px -= sp;
+  if ((k & 2) && !(k & 1)) g2Px += sp;
+  g2Px = constrain(g2Px, 0.0f, (float)(W - GW));
+  if ((k & 8) && !(k & 16)) g2PY = max(gPYMin, g2PY - 2);
+  if ((k & 16) && !(k & 8)) g2PY = min(gPYBase, g2PY + 2);
+  if (g2Cool > 0) g2Cool--;
+  if ((k & 4) && g2Cool == 0) gFireAt(g2Px, g2PY, g2Cool);
 }
 void gHitPlayer() {
   int deadY = gPY;
@@ -672,10 +761,12 @@ void gameStep() {
         break;
       }
   }
-  float shipC = gPx + 4;
+  float shipC = gPx + 4;  // vaisseau du joueur 1 (pilote automatique de la demo)
+  bool p2 = g2On && g2Dead == 0 && gLives > 0;
   for (int i = 0; i < gNE; i++) {
     GEnemy &e = gEn[i];
     if (!e.alive) continue;
+    float shipC = (p2 && ((i & 1) || gDead)) ? g2Px + 4 : gPx + 4;  // NOLINT a deux : un ennemi sur deux vise le joueur 2
     float sx = gSlotX(e.col), sy = gSlotY(e.row);
     if (e.state == 0) {
       e.x = sx; e.y = sy;
@@ -716,7 +807,15 @@ void gameStep() {
       e.alive = false;  // collision avec le vaisseau
       gBoomAt(e.x + 4, e.y + 3);
       gHitPlayer();
+    } else if (p2 && e.state == 1 && e.x + GW - 1 >= g2Px && e.x <= g2Px + 8 && e.y + GH - 1 >= g2PY && e.y <= g2PY + 7) {
+      e.alive = false;
+      gBoomAt(e.x + 4, e.y + 3);
+      gHitPlayer2();
     }
+  }
+  if (g2On && gLives > 0) {  // joueur 2 : commandes, ou attente avant de revenir
+    if (g2Dead > 0) { if (--g2Dead == 0) g2Px = W * 2 / 3 - 4; }
+    else gPlayer2Control();
   }
   // joueur aux commandes, sinon pilote automatique : esquive les tirs, vise un ennemi en pique ou la colonne la plus proche
   if (gDead == 0 && !gDemo) {
@@ -799,6 +898,7 @@ void gameStep() {
     b.x += b.vx;
     if (b.y >= H || b.x < 0 || b.x >= W) { b.on = false; continue; }
     if (gDead == 0 && b.x >= gPx && b.x <= gPx + 8 && b.y + 2 >= gPY + 2 && b.y <= gPY + 7) { b.on = false; gHitPlayer(); }
+    else if (g2On && g2Dead == 0 && gLives > 0 && b.x >= g2Px && b.x <= g2Px + 8 && b.y + 2 >= g2PY + 2 && b.y <= g2PY + 7) { b.on = false; gHitPlayer2(); }
   }
   for (auto &b : gBoom)
     if (b.t) b.t = b.t >= 12 ? 0 : b.t + 1;
@@ -909,6 +1009,7 @@ void gameDraw() {
     if (b.t < 6) gPix(b.x, b.y, palFull[0]);
   }
   if (gDead == 0) gSprite(SPR_SHIP[gTier()], 9, 8, (int)gPx, gPY, palFull, 0, 0);
+  if (g2On && g2Dead == 0 && gLives > 0) gSprite(SPR_SHIP[gTier()], 9, 8, (int)g2Px, g2PY, palFull, 'w', 'g');  // joueur 2 : vaisseau vert
   hudTop(palFull);  // score centre et vies
 }
 
@@ -964,15 +1065,16 @@ void drawMenu() {
     if (tall) gText(y + (n + 1) * step + 6, "X : RETOUR", dim);
     return;
   }
-  int y = tall ? H / 2 - 22 : 12, step = tall ? 11 : 8;
-  gBox(y - 6, tall ? y + MENU_N * step + 16 : y + (MENU_N - 1) * step + 12);
-  const char *items[MENU_N] = { nullptr, nullptr, nullptr, nullptr, "SCORES", "DEMO" };
+  int y = tall ? H / 2 - 22 : 10, step = tall ? 10 : 7;  // 7 lignes : un peu plus serrees
+  gBox(y - 6, tall ? y + MENU_N * step + 16 : y + (MENU_N - 1) * step + 11);
+  const char *items[MENU_N] = { nullptr, nullptr, nullptr, nullptr, nullptr, "SCORES", "DEMO" };
   for (int i = 0; i < MENU_N; i++) {
     const char *t = items[i];
     if (i == 0) { snprintf(b, sizeof(b), "%s%s%s%s", strlen(GAME_NAME[gGame]) > 10 ? "" : "JOUER ", i == menuSel ? "<" : "", GAME_NAME[gGame], i == menuSel ? ">" : ""); t = b; }  // nom long : sans JOUER
-    if (i == 1) { snprintf(b, sizeof(b), "NIVEAU %s%s%s", i == menuSel ? "<" : "", DIFF_NAME[gDiff], i == menuSel ? ">" : ""); t = b; }
-    if (i == 2) { snprintf(b, sizeof(b), "LUMINOSITE %s%d%%%s", i == menuSel ? "<" : "", brightPct(), i == menuSel ? ">" : ""); t = b; }
-    if (i == 3) { snprintf(b, sizeof(b), "VOLUME %s%d%%%s", i == menuSel ? "<" : "", volume * 10, i == menuSel ? ">" : ""); t = b; }
+    if (i == 1) { snprintf(b, sizeof(b), "JOUEURS %s%d%s", i == menuSel ? "<" : "", gPlayers, i == menuSel ? ">" : ""); t = b; }
+    if (i == 2) { snprintf(b, sizeof(b), "NIVEAU %s%s%s", i == menuSel ? "<" : "", DIFF_NAME[gDiff], i == menuSel ? ">" : ""); t = b; }
+    if (i == 3) { snprintf(b, sizeof(b), "LUMINOSITE %s%d%%%s", i == menuSel ? "<" : "", brightPct(), i == menuSel ? ">" : ""); t = b; }
+    if (i == 4) { snprintf(b, sizeof(b), "VOLUME %s%d%%%s", i == menuSel ? "<" : "", volume * 10, i == menuSel ? ">" : ""); t = b; }
     char line[26];
     snprintf(line, sizeof(line), "%s%s", i == menuSel ? "> " : "", t);
     gText(y + i * step, line, i == menuSel ? sel : off);
@@ -1013,12 +1115,12 @@ void gOverlay() {
   if (PS4.isConnected() && !gAttract) return;  // manette la : le menu a son propre ecran (menuScreen)
   if (PS4.isConnected()) return;  // mode demo : aucun texte (le menu revient au premier appui)
   // pas de manette : petite indication pour la connecter (mini-police) et l'adresse Bluetooth
-  const char *hint = "MANETTE : BOUTON PS";
+  const char *hint = "MANETTE : PS + SHARE";
   int hy = H >= 128 ? H / 2 + 20 : H - 14;
   uint16_t grey = rgb(100, 100, 120);
   tinyText(*gfx, (W - tinyWidth(hint)) / 2, hy, hint, grey);
   gMark((W - tinyWidth(hint)) / 2, hy, tinyWidth(hint), 5);
-  if (ipText[0] && H >= 128) {
+  if (false) {  // plus d'adresse a recopier avec Bluepad32
     char mac[20];
     snprintf(mac, sizeof(mac), "%s", ipText);
     for (char *c = mac; *c; c++) *c = toupper(*c);
@@ -1455,7 +1557,8 @@ void rDraw() {
 // celle de l'ordinateur a droite. L'angle depend de l'endroit ou la balle touche ; elle accelere a chaque echange.
 // Point gagne : des points ; point perdu : une vie. 5 points gagnes : stage suivant (ordinateur plus fort).
 float qBX, qBY, qVX, qVY, qPY, qCY, qTrail[4][2];
-int qWon = 0, qPH = 10, qServe = 0, qStartLives = 3;
+int qWon = 0, qPH = 10, qServe = 0, qStartLives = 3, qP1 = 0, qP2 = 0, qWinner = 0;
+bool q2p = false;  // match a deux joueurs (2e manette sur la raquette de droite)
 bool qToPlayer = true;
 int qTop() { return 9; }
 int qPX() { return 3; }          // raquette du joueur (gauche)
@@ -1478,6 +1581,8 @@ void qReset() {
   for (auto &b : gBoom) b.t = 0;
   qWon = 0;
   qStartLives = gLives;
+  q2p = !gDemo && gPlayers == 2 && PAD2.isConnected();
+  qP1 = qP2 = qWinner = 0;
   qPH = H >= 128 ? 16 : 10;
   qPY = qCY = (qTop() + H) / 2 - qPH / 2;
   qToPlayer = true;
@@ -1510,9 +1615,15 @@ void qStep() {
   }
   qPY = constrain(qPY, (float)qTop(), (float)(H - qPH));
   // l'ordinateur suit la balle avec un temps de reaction et une vitesse limitee (selon stage et difficulte)
-  float cs = 0.6f + 0.15f * gWave + 0.22f * (gEffDiff() - 1), target = qVX > 0 ? qBY : (qTop() + H) / 2;
-  float cc = qCY + qPH / 2.0f;
-  if (fabsf(target - cc) > 2) qCY += constrain(target - cc, -cs, cs);
+  if (q2p) {  // 2 joueurs : la 2e manette tient la raquette de droite (stick ou croix)
+    int sy = PAD2.LStickY();
+    if (abs(sy) > 18) qCY -= sp * 1.3f * sy / 127.0f;
+    else { if (PAD2.Up()) qCY -= sp; if (PAD2.Down()) qCY += sp; }
+  } else {  // l'ordinateur suit la balle avec un temps de reaction et une vitesse limitee (selon stage et difficulte)
+    float cs = 0.6f + 0.15f * gWave + 0.22f * (gEffDiff() - 1), target = qVX > 0 ? qBY : (qTop() + H) / 2;
+    float cc = qCY + qPH / 2.0f;
+    if (fabsf(target - cc) > 2) qCY += constrain(target - cc, -cs, cs);
+  }
   qCY = constrain(qCY, (float)qTop(), (float)(H - qPH));
   if (qServe > 0) { qServe--; if (gStageT > 0) gStageT--; return; }
   for (int i = 3; i > 0; i--) { qTrail[i][0] = qTrail[i - 1][0]; qTrail[i][1] = qTrail[i - 1][1]; }
@@ -1531,7 +1642,20 @@ void qStep() {
   int px = qPX(), cx = qCX();
   if (qVX < 0 && qBX <= px + 2 && qBX >= px - 1 && qBY + 2 >= qPY && qBY <= qPY + qPH) { qBX = px + 2; bounce(qPY, true); }
   if (qVX > 0 && qBX + 2 >= cx && qBX + 2 <= cx + 3 && qBY + 2 >= qCY && qBY <= qCY + qPH) { qBX = cx - 2; bounce(qCY, false); }
-  if (qBX < -2) {  // point perdu : une vie
+  if (q2p && (qBX < -2 || qBX > W)) {  // match a deux : un point pour celui qui n'a pas rate, 7 points pour gagner
+    bool p1 = qBX > W;
+    if (p1) qP1++; else qP2++;
+    gBoomAt(p1 ? W - 3 : 2, qBY);
+    sfxBoom();
+    qToPlayer = !p1;
+    if (qP1 >= 7 || qP2 >= 7) {
+      qWinner = qP1 >= 7 ? 1 : 2;
+      sndMelody(JINGLE_STAGE, 4);
+      gLives = 0;
+      gLastRank = 0;
+      gDead = 200;  // le vainqueur s'affiche, puis retour au menu (pas de tableau des scores a deux)
+    } else qServeBall();
+  } else if (qBX < -2) {  // point perdu : une vie
     altLoseLife(2, qBY);
     qToPlayer = true;
   } else if (qBX > W) {  // point gagne
@@ -1577,12 +1701,16 @@ void qDraw() {
     }
     if (qServe == 0 || (gFrame & 4)) { gfx->fillRect((int)qBX, (int)qBY, 2, 2, palFull[0]); gMark((int)qBX, (int)qBY, 2, 2); }
   }
-  char b[6];  // tes points (ce stage) a gauche du filet, ceux de l'ordinateur a droite (au 3e, fin de partie)
-  snprintf(b, sizeof(b), "%d", qWon);
+  char b[20];  // tes points (ce stage) a gauche du filet, ceux de l'ordinateur ou du joueur 2 a droite
+  snprintf(b, sizeof(b), "%d", q2p ? qP1 : qWon);
   tinyText(*gfx, mid - 6, qTop() + 1, b, palFull[4]);
-  snprintf(b, sizeof(b), "%d", max(0, qStartLives - gLives));
+  snprintf(b, sizeof(b), "%d", q2p ? qP2 : max(0, qStartLives - gLives));
   tinyText(*gfx, mid + 3, qTop() + 1, b, palFull[1]);
   gMark(mid - 6, qTop() + 1, 13, 5);
+  if (qWinner) {  // fin du match a deux
+    snprintf(b, sizeof(b), "JOUEUR %d GAGNE", qWinner);
+    gText(H / 2 - 4, b, qWinner == 1 ? palFull[4] : palFull[1]);
+  }
   altBooms(palFull);
   altHud(palFull);
 }
@@ -4355,52 +4483,26 @@ void gameUpdate() {
 uint32_t restartAt = 0;
 uint32_t brightSaveAt = 0;  // luminosite changee : enregistree 2 s plus tard
 
-// Adresse Bluetooth que l'ESP32 prend : celle que la manette connait deja (sa console, ou ecrite avec
-// SixaxisPairTool). Vide : adresse d'origine de l'ESP32, a ecrire dans la manette.
+// Bluepad32 : association simple, PS + Share sur la manette (la barre lumineuse clignote vite), plus d'adresse a recopier
 void ps4Begin() {
-  String mac = prefs.getString("ps4mac", "");
-  bool ok = mac.length() == 17 ? PS4.begin(mac.c_str()) : PS4.begin();
-  // pas de mode veille Bluetooth (sniff) : sinon les rapports de la manette n'arrivent que toutes les 1 a 2 s
-  BTM_SetDefaultLinkPolicy(0x0001);  // HCI_ENABLE_MASTER_SLAVE_SWITCH seul (sniff, hold et park interdits)
-  // anciens appairages gardes par l'ESP32 : cause connue de deconnexion juste apres la connexion
-  int nb = esp_bt_gap_get_bond_device_num();
-  if (nb > 0) {
-    esp_bd_addr_t list[8];
-    int n = min(nb, 8);
-    esp_bt_gap_get_bond_device_list(&n, list);
-    for (int i = 0; i < n; i++) esp_bt_gap_remove_bond_device(list[i]);
-    Serial.printf("%d ancien(s) appairage(s) efface(s)\n", n);
-  }
-  snprintf(ipText, sizeof(ipText), "%s", PS4.getAddress().c_str());
-  Serial.printf("Manette PS4 : Bluetooth %s, adresse %s, memoire libre %u\n", ok ? "pret" : "ECHEC", ipText, ESP.getFreeHeap());
+  BP32.setup(&onPadConnected, &onPadDisconnected);
+  BP32.enableNewBluetoothConnections(true);
+  const uint8_t *a = BP32.localBdAddress();
+  if (a) snprintf(ipText, sizeof(ipText), "%02x:%02x:%02x:%02x:%02x:%02x", a[0], a[1], a[2], a[3], a[4], a[5]);
+  Serial.printf("Bluepad32 %s pret, adresse %s, memoire libre %u\n", BP32.firmwareVersion(), ipText, ESP.getFreeHeap());
 }
 
 // lecture de la manette a chaque tour de boucle ; barre lumineuse selon le stage, vibration quand on est touche
-extern "C" uint8_t ps4DbgHdr[24];
-extern "C" volatile int ps4DbgPos;
-extern "C" volatile uint8_t ps4DbgType;
-extern "C" volatile uint8_t ps4DbgRaw[12];
-extern "C" volatile int ps4DbgLen;
-extern "C" volatile uint32_t ps4DbgCount;
-extern "C" volatile uint32_t ps4DbgSent;
-extern "C" volatile int ps4DbgPmPolicy, ps4DbgPmMode;
 void ps4Poll() {
-  static bool dbgShown = false;
-  if (!dbgShown && ps4DbgPos != -2) {  // diagnostic : debut du 1er paquet de la manette
-    dbgShown = true;
-    Serial.printf("1er paquet manette : entete 0xA1 en position %d, rapport 0x%02X, octets :", ps4DbgPos, ps4DbgType);
-    for (int i = 0; i < 24; i++) Serial.printf(" %02X", ps4DbgHdr[i]);
-    Serial.println();
-  }
+  BP32.update();  // nouvelles donnees des manettes (Bluepad32)
   static bool was = false;
   static int lastTier = -2;
   static uint32_t rumbleOff = 0, lastBr = 0, combo = 0, lastLog = 0, since = 0;
-  static bool pmShown = false;
   if (!PS4.isConnected()) {
     keysPs4 = 0;
     if (was) {
       was = false;
-      Serial.printf("Manette PS4 deconnectee apres %lu s, memoire libre %u (plus petit bloc %u)\n", (millis() - since) / 1000,
+      Serial.printf("Manette deconnectee apres %lu s, memoire libre %u (plus petit bloc %u)\n", (millis() - since) / 1000,
                     ESP.getFreeHeap(), ESP.getMaxAllocHeap());
     }
     return;
@@ -4409,22 +4511,12 @@ void ps4Poll() {
     was = true;
     lastTier = -2;
     since = millis();
-    Serial.printf("Manette PS4 connectee, memoire libre %u (plus petit bloc %u)\n", ESP.getFreeHeap(), ESP.getMaxAllocHeap());
-    pmShown = false;
-  }
-  if (!pmShown && ps4DbgPmMode != -1) {  // lien force en mode actif (code 0 = ok)
-    pmShown = true;
-    Serial.printf("Lien manette : veille interdite (code %d), mode actif demande (code %d)\n", ps4DbgPmPolicy, ps4DbgPmMode);
+    Serial.printf("Manette connectee, memoire libre %u (plus petit bloc %u)\n", ESP.getFreeHeap(), ESP.getMaxAllocHeap());
   }
   if (millis() - lastLog > 5000) {  // etat de la manette toutes les 5 s
     lastLog = millis();
-    static uint32_t lastCount = 0, lastSent = 0;
-    uint32_t cnt = ps4DbgCount, sent = ps4DbgSent, rx = cnt - lastCount, tx = sent - lastSent;
-    Serial.printf("  PS4 ok %lu s, %lu paquets/s recus sur ~%lu envoyes (%lu%% perdus), batterie %u/15, memoire libre %u (min %u)\n",
-                  (millis() - since) / 1000, (unsigned long)(rx / 5), (unsigned long)(tx / 5), (unsigned long)(tx > rx ? (tx - rx) * 100 / tx : 0),
-                  PS4.Battery(), ESP.getFreeHeap(), ESP.getMinFreeHeap());
-    lastCount = cnt;
-    lastSent = sent;
+    Serial.printf("  Manette ok %lu s, batterie %u/10, 2e manette %s, memoire libre %u (min %u)\n", (millis() - since) / 1000,
+                  PS4.Battery(), PAD2.isConnected() ? "oui" : "non", ESP.getFreeHeap(), ESP.getMinFreeHeap());
   }
   static bool stable = false;
   if (!stable && millis() - since > 15000) {  // connexion stable : les couleurs choisies tiennent
@@ -4452,6 +4544,19 @@ void ps4Poll() {
   { int sx2 = PS4.LStickX(); padStickX = abs(sx2) > 18 ? constrain(sx2, -127, 127) : 0; }
   padDigital = PS4.Left() || PS4.Right() || PS4.Up() || PS4.Down() || PS4.UpLeft() || PS4.UpRight() || PS4.DownLeft() || PS4.DownRight();
   keysPs4 = gPaused ? 0 : k;
+  {  // 2e manette : memes touches (stick avec hysteresis, croix, tir, rond)
+    uint8_t k2 = 0;
+    if (PAD2.isConnected()) {
+      int x2 = PAD2.LStickX(), y2 = PAD2.LStickY();
+      if (PAD2.Left() || PAD2.UpLeft() || PAD2.DownLeft() || x2 < ((keysP2 & 1) ? -30 : -50)) k2 |= 1;
+      if (PAD2.Right() || PAD2.UpRight() || PAD2.DownRight() || x2 > ((keysP2 & 2) ? 30 : 50)) k2 |= 2;
+      if (PAD2.Up() || PAD2.UpLeft() || PAD2.UpRight() || y2 > ((keysP2 & 8) ? 30 : 50)) k2 |= 8;
+      if (PAD2.Down() || PAD2.DownLeft() || PAD2.DownRight() || y2 < ((keysP2 & 16) ? -30 : -50)) k2 |= 16;
+      if (PAD2.Cross() || PAD2.Square() || PAD2.Triangle() || PAD2.R1() || PAD2.L1() || PAD2.R2Value() > 60) k2 |= 4;
+      if (PAD2.Circle()) k2 |= 32;
+    }
+    keysP2 = gPaused ? 0 : k2;
+  }
   // boutons du menu et START (Options) : on agit a l'appui
   static uint8_t prevB = 0;
   uint8_t bt = PS4.Up() | PS4.Down() << 1 | PS4.Left() << 2 | PS4.Right() << 3 | PS4.Cross() << 4 | PS4.Circle() << 5 |
@@ -4501,6 +4606,7 @@ void ps4Poll() {
     send = true;
   }
   if (send) PS4.sendToController();
+  if (rumbleReq2) { rumbleReq2 = false; PAD2.setRumble(0, 220); PAD2.sendToController(); PAD2.setRumble(0, 0); }
 }
 
 // menu (demo + manette) : haut / bas = ligne, gauche / droite = niveau, X = valider, START = jouer
@@ -4519,7 +4625,12 @@ void menuInput(uint8_t edge) {
   }
   if (edge & 1) { menuSel = (menuSel + MENU_N - 1) % MENU_N; sfxMenu(); }
   if (edge & 2) { menuSel = (menuSel + 1) % MENU_N; sfxMenu(); }
-  if (menuSel == 2 && (edge & (4 | 8 | 16))) {  // luminosite : gauche -10 %, droite ou X +10 % (X boucle 100 -> 0)
+  if (menuSel == 1 && (edge & (4 | 8 | 16))) {  // 1 ou 2 joueurs
+    gPlayers = gPlayers == 1 ? 2 : 1;
+    prefs.putUChar("players", gPlayers);
+    sfxMenu();
+  }
+  if (menuSel == 3 && (edge & (4 | 8 | 16))) {  // luminosite : gauche -10 %, droite ou X +10 % (X boucle 100 -> 0)
     int p = brightPct();
     if (edge & 4) p -= 10;
     else if (edge & 8) p += 10;
@@ -4527,7 +4638,7 @@ void menuInput(uint8_t edge) {
     setBrightPct(p);
     sfxMenu();
   }
-  if (menuSel == 3 && (edge & (4 | 8 | 16))) {  // volume du son (rapport cyclique du PWM) : 0 a 100 %, pas de 10 %
+  if (menuSel == 4 && (edge & (4 | 8 | 16))) {  // volume du son (rapport cyclique du PWM) : 0 a 100 %, pas de 10 %
     int v = volume;
     if (edge & 4) v--;
     else if (edge & 8) v++;
@@ -4536,15 +4647,15 @@ void menuInput(uint8_t edge) {
     prefs.putUChar("vol", volume);
     sfxMenu();  // bip au nouveau volume (rien a 0 %)
   }
-  if (menuSel == 1 && (edge & (4 | 8 | 16))) {
+  if (menuSel == 2 && (edge & (4 | 8 | 16))) {  // niveau
     gDiff = (gDiff + ((edge & 4) ? 2 : 1)) % 3;
     prefs.putUChar("diff", gDiff);
     sfxMenu();
   }
   if (edge & 16) {
     if (menuSel == 0) startReq = true;
-    else if (menuSel == 4) { menuScores = true; sfxMenu(); }
-    else if (menuSel == 5) { menuSel = 0; sfxMenu(); startAttract(); gAttractHold = true; }  // ligne DEMO : demo du jeu choisi
+    else if (menuSel == 5) { menuScores = true; sfxMenu(); }
+    else if (menuSel == 6) { menuSel = 0; sfxMenu(); startAttract(); gAttractHold = true; }  // ligne DEMO : demo du jeu choisi
   }
 }
 
@@ -4555,8 +4666,7 @@ void serialMenu() {
   Serial.printf("Adresse Bluetooth de l'ESP32 : %s\n", ipText);
   Serial.printf("Dalles : %u, disposition %u, retourne %u, serpentin %u -> ecran %dx%d, couleurs %u bits\n", nPanels, arrange, flipAll,
                 serpent, W, H, colorBits);
-  Serial.println("  a xx:xx:xx:xx:xx:xx : adresse de la console connue par la manette (redemarre)");
-  Serial.println("  a                   : revenir a l'adresse d'origine de l'ESP32 (redemarre)");
+  Serial.println("  a : oublier les manettes associees (pour en associer d'autres : PS + Share)");
   Serial.println("  c NDFS : dalles. N nombre 1-4, D 0 l'une sous l'autre / 1 cote a cote / 2 carre,");
   Serial.println("           F ecran retourne 0/1, S une dalle sur deux retournee 0/1. Ex. : c 2000");
   Serial.println("  p N : couleurs des dalles sur N bits (3 a 6, redemarre). 3 = le plus sur pour le Bluetooth,");
@@ -4582,11 +4692,8 @@ void handleSerial() {
     while (*arg == ' ') arg++;
     n = 0;
     if (cmd == 'a') {
-      if (strlen(arg) == 17 || strlen(arg) == 0) {
-        prefs.putString("ps4mac", arg);
-        Serial.printf("Adresse manette : %s, redemarrage\n", arg[0] ? arg : "origine");
-        restartAt = millis() + 300;
-      } else Serial.println("Format : a xx:xx:xx:xx:xx:xx");
+      BP32.forgetBluetoothKeys();
+      Serial.println("Manettes associees oubliees : PS + Share sur chaque manette pour l'associer de nouveau");
     } else if (cmd == 'c') {
       if (strlen(arg) == 4 && arg[0] >= '1' && arg[0] <= '4' && arg[1] >= '0' && arg[1] <= '2') {
         prefs.putUChar("nb", arg[0] - '0');
@@ -4695,6 +4802,7 @@ void setup() {
   }
 
   gDiff = prefs.getUChar("diff", 1) % 3;
+  gPlayers = constrain(prefs.getUChar("players", 1), 1, 2);
   gGame = 0;  // demarrage toujours sur ESSAIM (choix d'un autre jeu : gauche / droite dans le menu)
   ps4Begin();
   audioBegin();

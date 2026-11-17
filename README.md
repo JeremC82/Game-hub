@@ -11,6 +11,17 @@ Jeux d'arcade sur 1 à 4 dalles LED 128x64, avec un ESP32 classique et une **man
 Les 12 jeux ont en commun les niveaux de difficulté, les stages, les vies, les meilleurs scores avec les noms et la démo automatique.
 
 
+## Branche bluepad32 : deux manettes (essai)
+
+Cette branche remplace la bibliothèque PS4Controller par **Bluepad32** : jusqu'à 4 manettes Bluetooth (PS4, PS5, Xbox...).
+
+- **Installation** : 1er flash avec `firmware/GameHub_V3.81_bp32_complet.bin` à **0x0** (le démarrage change), ensuite `GameHub_V3.81_bp32.bin` à 0x10000. Compilation : `build_bp32.ps1` (carte « ESP32 + Bluepad32 », `esp32-bluepad32:esp32` 4.1.0).
+- **Associer une manette** : appuyer sur **Share + PS** jusqu'au clignotement rapide de la barre lumineuse. Plus d'adresse à recopier. La 1re manette connectée est le joueur 1, la 2e le joueur 2. Moniteur série : `a` oublie toutes les manettes associées.
+- **Menu « JOUEURS 1 / 2 »** : seuls les jeux à deux joueurs utilisent la 2e manette.
+  - **RAQUETTES** : match à deux (raquette de droite pour le joueur 2), **le premier à 7 points gagne**.
+  - **SPACE DEFENDER** : coopération, un 2e vaisseau **vert** pour le joueur 2, vies et score communs ; les ennemis piquent sur l'un ou l'autre ; la manette du joueur touché vibre.
+- **Mémoire** : environ 87 Ko libres avec 2 dalles en 3 bits et une manette connectée (une manette en plus : environ 4 Ko).
+
 # SPACE DEFENDER
 
 Le jeu principal : un shoot'em up original, repris du mode Jeu du VU-mètre. Une formation d'ennemis arrive en vol, change de monde à chaque stage, et ton vaisseau évolue.
@@ -346,8 +357,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V3.70_complet.bin](firmware/GameHub_V3.70_complet.bin) | 0x0 | `8567dc87998e5028824adc2d7ec75bb1` |
-| [firmware/GameHub_V3.70.bin](firmware/GameHub_V3.70.bin) | 0x10000 | `b5120dd6aee5ef7bef3df79fb061424a` |
+| [firmware/GameHub_V3.81_bp32_complet.bin](firmware/GameHub_V3.81_bp32_complet.bin) | 0x0 | `a9d52761b55407f8aca4a2b3b7e7e3d4` |
+| [firmware/GameHub_V3.81_bp32.bin](firmware/GameHub_V3.81_bp32.bin) | 0x10000 | `3959873388ccec7bbdc341f827127112` |
 
 Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB SPIFFS)** dans Outils → Partition Scheme.
 
