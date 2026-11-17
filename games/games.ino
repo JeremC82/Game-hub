@@ -28,7 +28,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "3.81"
+#define GAMES_VERSION "3.82"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -182,6 +182,8 @@ struct PadShim {
   }
 };
 PadShim PS4(0), PAD2(1);
+char padToast[20] = "";      // message sur la dalle : MANETTE 2 OK...
+uint32_t padToastUntil = 0;
 bool rumbleReq2 = false;  // le vaisseau du joueur 2 est touche : sa manette vibre
 void onPadConnected(ControllerPtr c) {
   for (int i = 0; i < BP32_MAX_GAMEPADS; i++)
@@ -189,12 +191,19 @@ void onPadConnected(ControllerPtr c) {
       gPads[i] = c;
       c->setColorLED(i == 0 ? 0 : 255, i == 0 ? 0 : 30, i == 0 ? 40 : 30);
       Serial.printf("Manette %d connectee : %s, memoire libre %u\n", i + 1, c->getModelName().c_str(), ESP.getFreeHeap());
+      snprintf(padToast, sizeof(padToast), "MANETTE %d OK", i + 1);
+      padToastUntil = millis() + 3000;
       return;
     }
 }
 void onPadDisconnected(ControllerPtr c) {
   for (int i = 0; i < BP32_MAX_GAMEPADS; i++)
-    if (gPads[i] == c) { gPads[i] = nullptr; Serial.printf("Manette %d deconnectee\n", i + 1); }
+    if (gPads[i] == c) {
+      gPads[i] = nullptr;
+      Serial.printf("Manette %d deconnectee\n", i + 1);
+      snprintf(padToast, sizeof(padToast), "MANETTE %d PARTIE", i + 1);
+      padToastUntil = millis() + 3000;
+    }
   if (!gPads[0])  // le joueur 1 est parti : le joueur 2 prend sa place
     for (int i = 1; i < BP32_MAX_GAMEPADS; i++)
       if (gPads[i]) { gPads[0] = gPads[i]; gPads[i] = nullptr; break; }
@@ -1071,7 +1080,7 @@ void drawMenu() {
   for (int i = 0; i < MENU_N; i++) {
     const char *t = items[i];
     if (i == 0) { snprintf(b, sizeof(b), "%s%s%s%s", strlen(GAME_NAME[gGame]) > 10 ? "" : "JOUER ", i == menuSel ? "<" : "", GAME_NAME[gGame], i == menuSel ? ">" : ""); t = b; }  // nom long : sans JOUER
-    if (i == 1) { snprintf(b, sizeof(b), "JOUEURS %s%d%s", i == menuSel ? "<" : "", gPlayers, i == menuSel ? ">" : ""); t = b; }
+    if (i == 1) { snprintf(b, sizeof(b), "JOUEURS %s%d%s %s", i == menuSel ? "<" : "", gPlayers, i == menuSel ? ">" : "", PAD2.isConnected() ? "**" : PS4.isConnected() ? "*" : ""); t = b; }  // * : manettes connectees
     if (i == 2) { snprintf(b, sizeof(b), "NIVEAU %s%s%s", i == menuSel ? "<" : "", DIFF_NAME[gDiff], i == menuSel ? ">" : ""); t = b; }
     if (i == 3) { snprintf(b, sizeof(b), "LUMINOSITE %s%d%%%s", i == menuSel ? "<" : "", brightPct(), i == menuSel ? ">" : ""); t = b; }
     if (i == 4) { snprintf(b, sizeof(b), "VOLUME %s%d%%%s", i == menuSel ? "<" : "", volume * 10, i == menuSel ? ">" : ""); t = b; }
@@ -1084,6 +1093,7 @@ void drawMenu() {
 void gOverlay() {
   gfx->setFont(NULL);
   gfx->setTextSize(1);
+  if (padToastUntil && millis() < padToastUntil) gText(H - 10, padToast, rgb(0, 220, 255));  // manette connectee / partie
   if (gLives <= 0 && gDead > 0 && !gDemo) {
     gText(H / 2 - 4, "GAME OVER", rgb(255, 40, 40));
     if (gLastRank == 1) gText(H / 2 + 8, "NOUVEAU RECORD !", rgb(255, 220, 0));
@@ -4354,6 +4364,7 @@ void menuScreen() {
   gfx->setTextSize(1);
   if (gNameEntry) drawNameEntry();
   else { drawMenu(); drawPadBattery(); }
+  if (padToastUntil && millis() < padToastUntil) gText(H - 9, padToast, rgb(0, 220, 255));  // manette connectee / partie
 }
 
 // saisie du nom (3 lettres, facon borne d'arcade) apres un score qui entre au tableau
@@ -4486,6 +4497,7 @@ uint32_t brightSaveAt = 0;  // luminosite changee : enregistree 2 s plus tard
 // Bluepad32 : association simple, PS + Share sur la manette (la barre lumineuse clignote vite), plus d'adresse a recopier
 void ps4Begin() {
   BP32.setup(&onPadConnected, &onPadDisconnected);
+  BP32.enableVirtualDevice(false);  // pas de souris virtuelle pour le pave tactile (elle prendrait une place de manette)
   BP32.enableNewBluetoothConnections(true);
   const uint8_t *a = BP32.localBdAddress();
   if (a) snprintf(ipText, sizeof(ipText), "%02x:%02x:%02x:%02x:%02x:%02x", a[0], a[1], a[2], a[3], a[4], a[5]);
@@ -4495,6 +4507,8 @@ void ps4Begin() {
 // lecture de la manette a chaque tour de boucle ; barre lumineuse selon le stage, vibration quand on est touche
 void ps4Poll() {
   BP32.update();  // nouvelles donnees des manettes (Bluepad32)
+  static uint32_t scanAt = 0;
+  if (!PAD2.isConnected() && millis() - scanAt > 5000) { scanAt = millis(); BP32.enableNewBluetoothConnections(true); }  // cherche encore une manette
   static bool was = false;
   static int lastTier = -2;
   static uint32_t rumbleOff = 0, lastBr = 0, combo = 0, lastLog = 0, since = 0;
