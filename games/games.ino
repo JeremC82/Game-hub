@@ -29,7 +29,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "3.62"
+#define GAMES_VERSION "3.70"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -123,10 +123,12 @@ bool gAttractHold = false;         // demo lancee depuis le menu : on attend que
 bool gAttract = false;              // mode demo : menu cache (ligne DEMO, ou 30 s sans toucher la manette)
 #define MENU_IDLE_MS 30000UL        // menu sans activite : passage en mode demo
 bool menuScores = false;            // page des meilleurs scores affichee
-#define N_GAMES 10
-const char *const GAME_NAME[N_GAMES] = { "SPACE DEFENDER", "RAID", "COURSE", "RAQUETTES", "BULLES", "LABYRINTHE", "ORBITUS", "BRIQUES", "BLOCS", "CRUCH" };
+// numeros des jeux (ordre du menu)
+enum GameId : uint8_t { G_SPACE, G_RAID, G_RAQ, G_BUL, G_LAB, G_ORB, G_BRI, G_BLO, G_CRU, G_TAU, G_BIL, G_ESC };
+#define N_GAMES 12
+const char *const GAME_NAME[N_GAMES] = { "SPACE DEFENDER", "RAID", "RAQUETTES", "BULLES", "LABYRINTHE", "ORBITUS", "CASSE BRIQUES", "BLOCS", "CRUCH", "TAUPE", "BILLES", "ESCALADE" };
 uint8_t gGame = 0;                  // jeu choisi dans le menu (gauche / droite sur la ligne JOUER)
-const char *topKey() { static const char *const K[N_GAMES] = { "top", "top1", "top2", "top3", "top4", "top5", "top7", "top8", "top9", "top10" }; return K[gGame % N_GAMES]; }  // top6 : ancienne SAUTERELLE (cle libre)
+const char *topKey() { static const char *const K[N_GAMES] = { "top", "top1", "top3", "top4", "top5", "top7", "top8", "top9", "top10", "top11", "top12", "top13" }; return K[gGame % N_GAMES]; }  // top2 (COURSE) et top6 (SAUTERELLE) : jeux retires
 #define TOP_N 5
 HiScore gBest[TOP_N];                // meilleurs scores (gardes en memoire)
 uint8_t gLastRank = 0;              // place obtenue a la derniere partie (0 : hors tableau)
@@ -386,7 +388,9 @@ int gStageT = 0;
 bool gLifeUp = false;     // vie gagnee a la fin du stage (affichee avec l'annonce)          // images restantes de l'annonce "STAGE n"
 uint32_t gBonus = 0;      // bonus de fin de stage affiche avec l'annonce
 int gTier() { return min(gWave, 4) - 1; }
-const char *const SPR_LIFE_BEETLE[4] = { ".ggg.", "gwgwg", "ggggg", "g.g.g" };  // LABYRINTHE : le scarabee
+const char *const SPR_LIFE_CREATURE[4] = { "p.p.p", ".pwp.", "ppppp", "p.p.p" };  // LABYRINTHE : creature piquante (couleur par icone)
+const char *const SPR_LIFE_BALL[4] = { ".ww..", "wwww.", "wwww.", ".ww.." };      // CASSE BRIQUES : une balle blanche
+const char *const SPR_LIFE_FRUIT[4] = { "..g..", ".rrr.", "rwrrr", ".rrr." };     // CRUCH : une pomme
 const char *const SPR_LIFE_BLOB[4] = { ".ccc.", "cwcwc", "ccccc", "c.c.c" };    // BULLES : le blob
 const char *const SPR_LIFE[4] = { "..c..", ".ccc.", "bcwcb", "b...b" };
 // palette : w blanc, r rouge, y jaune, b bleu, c cyan, g vert, p magenta, o orange, v violet
@@ -830,11 +834,13 @@ void hudTop(uint16_t *palFull) {
   tinyText(*gfx, x, 1, "SCORE", rgb(255, 40, 40));
   tinyText(*gfx, x + lw + 4, 1, num, rgb(230, 230, 230));
   gMark(x, 1, tw, 5);
-  if (gGame == 3 || gGame == 8) return;  // RAQUETTES et BLOCS : pas de vies affichees
-  const char *const *life = gGame == 5 ? SPR_LIFE_BEETLE : gGame == 4 ? SPR_LIFE_BLOB : SPR_LIFE;
+  if (gGame == G_RAQ || gGame == G_BLO || gGame == G_BIL) return;  // RAQUETTES, BLOCS, BILLES : pas de vies affichees
+  const char *const *life = gGame == G_BUL ? SPR_LIFE_BLOB : gGame == G_BRI ? SPR_LIFE_BALL : gGame == G_CRU ? SPR_LIFE_FRUIT
+                          : gGame == G_LAB ? SPR_LIFE_CREATURE : SPR_LIFE;
+  static const char LABC[6] = { 'p', 'o', 'g', 'c', 'y', 'r' };  // LABYRINTHE : une couleur par icone
   int lives = max(0, gLives);
   if (lives <= 5) {
-    for (int i = 0; i < lives; i++) gSprite(life, 5, 4, W - 6 - i * 7, 1, palFull, 0, 0);
+    for (int i = 0; i < lives; i++) gSprite(life, 5, 4, W - 6 - i * 7, 1, palFull, 'p', gGame == G_LAB ? LABC[i % 6] : 'p');
   } else {
     snprintf(num, sizeof(num), "X%d", lives);
     int vw = tinyWidth(num), vx = W - 1 - vw;
@@ -1172,19 +1178,32 @@ void rSmartBomb() {  // bombe : detruit les ennemis a l'ecran, efface les tirs, 
 }
 // pilote automatique (demo) : suit l'ennemi le plus proche ou le boss, esquive les tirs, tire sans arret
 uint8_t rAuto() {
-  float tx = rX, best = 1e9;
-  for (auto &e : rEn)
-    if (e.on && e.t >= 0 && e.y > 10) {
-      float d = fabsf(e.x - rX) + (H - e.y) * 0.2f;
-      if (d < best) { best = d; tx = e.x; }
-    }
-  if (rBoss) tx = rBX + 12;
-  if (rCap.on) tx = rCap.x;
-  for (auto &b : rBomb)
-    if (b.on && b.y > rY - 26 && b.y < rY + 4 && fabsf(b.x - (rX + 4)) < 7) tx = b.x < rX + 4 ? rX + 14 : rX - 14;
+  // cible gardee 20 images (sinon elle change a chaque image) et zone morte plus large que le pas : plus de tremblement
+  static float tx = 0;
+  static uint8_t hold = 0;
+  static int8_t dodge = 0;
+  static uint8_t dodgeT = 0;
+  if (hold) hold--;
+  else {
+    float best = 1e9;
+    tx = rX;
+    for (auto &e : rEn)
+      if (e.on && e.t >= 0 && e.y > 10) {
+        float d = fabsf(e.x - rX) + (H - e.y) * 0.2f;
+        if (d < best) { best = d; tx = e.x; }
+      }
+    if (rBoss) tx = rBX + 12;
+    if (rCap.on) tx = rCap.x;
+    hold = 20;
+  }
+  if (dodgeT) dodgeT--;
+  else
+    for (auto &b : rBomb)
+      if (b.on && b.y > rY - 26 && b.y < rY + 4 && fabsf(b.x - (rX + 4)) < 7) { dodge = b.x < rX + 4 ? 1 : -1; dodgeT = 15; break; }
+  float t = dodgeT ? rX + dodge * 14 : tx;
   uint8_t k = 4;
-  if (tx < rX - 1) k |= 1;
-  else if (tx > rX + 1) k |= 2;
+  if (t < rX - 3) k |= 1;
+  else if (t > rX + 3) k |= 2;
   if (rY < H - 14) k |= 16;
   return k;
 }
@@ -1429,341 +1448,6 @@ void rDraw() {
     gMark(1 + i * 7, H - 5, 5, 5);
   }
   altHud(palFull);
-}
-
-// ---------------------------------------------------------------- COURSE
-// Un petit bonhomme court tout seul vers la droite : sauter (X ou haut, plus haut si on garde appuye).
-// Trous, piques, rochers qui roulent (sauter par-dessus ou les ecraser en retombant), rangees de blocs
-// (on monte dessus ; un coup de tete sous un bloc bonus fait jaillir une piece), pieces (30 = une vie),
-// cristaux. Montagnes au loin qui defilent lentement.
-#define C_PLAT 16
-#define C_ITEMS 28
-#define C_BLOCKS 24
-#define C_ROCKS 4
-struct CPlat { float x0, x1; int16_t y; bool on; };
-struct CItem { float x; int16_t y; uint8_t kind; bool on; };  // kind 0 : piques, 1 : cristal, 2 : piece
-struct CBlock { float x; int16_t y; uint8_t kind; bool on; };  // kind 0 : pierre, 1 : bonus, 2 : bonus vide
-struct CRock { float x, y, vy; bool on; };
-struct CPop { float x, y, vy; int t; };  // piece qui jaillit d'un bloc bonus
-CPlat cPlat[C_PLAT];
-CItem cItem[C_ITEMS];
-CBlock cBlock[C_BLOCKS];
-CRock cRock[C_ROCKS];
-CPop cPop = { 0, 0, 0, 0 };
-float cScroll = 0, cSpeed = 1.2f, cY = 0, cVY = 0, cNextX = 0, cStageAt = 0, cRockAt = 0;
-int16_t cLastY = 0;
-bool cGround = false;
-int cInv = 0, cCoins = 0;
-const int C_PX = 22;  // position du bonhomme a l'ecran (c'est le decor qui defile)
-const char *const SPR_RUN[3][10] = {  // bonhomme original 8x10 : casquette rouge, t-shirt bleu, pantalon cyan
-  { "..rrr...", ".rrrrr..", "..wwy...", "..www...", ".bbbbb..", "w.bbb.w.", "..ccc...", ".c...c..", ".c....c.", "oo....oo" },
-  { "..rrr...", ".rrrrr..", "..wwy...", "..www...", "..bbb...", ".wbbbw..", "..ccc...", "..c.c...", "..c.c...", ".oo.oo.." },
-  { "..rrr...", ".rrrrr..", "..wwy...", "w.www.w.", ".bbbbb..", "..bbb...", "..ccc...", ".c...c..", "oo...oo.", "........" }
-};
-int cGroundY() { return H - 6; }
-void cAddPlat(float x0, float x1, int16_t y) {
-  for (auto &p : cPlat)
-    if (!p.on) { p = { x0, x1, y, true }; return; }
-}
-void cAddItem(float x, int16_t y, uint8_t kind) {
-  for (auto &it : cItem)
-    if (!it.on) { it = { x, y, kind, true }; return; }
-}
-void cAddBlock(float x, int16_t y, uint8_t kind) {
-  for (auto &b : cBlock)
-    if (!b.on) { b = { x, y, kind, true }; return; }
-}
-// construit le parcours en avance : sol, trous, plateformes, blocs, piques, pieces, cristaux
-void cGenerate() {
-  while (cNextX < cScroll + W + 60) {
-    int gap = random(100) < 45 ? random(14, 22 + (int)(cSpeed * 4)) : 0;
-    float x0 = cNextX + gap;
-    bool high = random(100) < 35;
-    int16_t y = cGroundY();
-    if (high) y = constrain(cLastY - (int16_t)random(8, 18), (int16_t)(H * 45 / 100), (int16_t)cGroundY());
-    else if (cLastY < cGroundY() && random(2)) y = min((int)cGroundY(), cLastY + (int)random(6, 14));
-    float len = high ? random(24, 42) : random(40, 86);
-    cAddPlat(x0, x0 + len, y);
-    if (gap > 0)  // arc de pieces au-dessus du trou
-      for (int c = 0; c < 4; c++) cAddItem(x0 - gap + gap * (c + 0.5f) / 4, y - 14 - (c == 1 || c == 2 ? 6 : 0), 2);
-    int r = random(100);
-    if (!high && len > 50 && r < 40) {  // rangee de blocs (avec des blocs bonus) et pieces dessus
-      int n = random(3, 6);
-      float bx = x0 + random(10, (int)len - n * 6 - 4);
-      int16_t by = y - 26;
-      for (int b = 0; b < n; b++) cAddBlock(bx + b * 6, by, random(100) < 35 ? 1 : 0);
-      for (int b = 0; b < n; b += 2) cAddItem(bx + b * 6 + 1, by - 6, 2);
-    } else if (len > 40 && r < 70) {
-      cAddItem(x0 + random(14, (int)len - 10), y, 0);  // piques
-    } else {
-      for (int c = 0; c < 3; c++) cAddItem(x0 + len / 2 - 8 + c * 8, y - 8, 2);  // rangee de pieces
-    }
-    if (random(100) < 15) cAddItem(x0 + len / 2, y - 22, 1);  // cristal (rare)
-    cLastY = y;
-    cNextX = x0 + len;
-  }
-}
-bool cPlatAt(float wx, int16_t &py) {  // sol ou plateforme sous la position wx (la plus haute)
-  bool found = false;
-  for (auto &p : cPlat)
-    if (p.on && p.x0 <= wx && p.x1 >= wx && (!found || p.y < py)) { py = p.y; found = true; }
-  return found;
-}
-void cRespawn() {
-  float wx = cScroll + C_PX;
-  int16_t py = cGroundY();
-  if (!cPlatAt(wx + 3, py)) cAddPlat(wx - 10, wx + 40, cGroundY());
-  cY = py - 10;
-  cVY = 0;
-  cInv = 90;
-  for (auto &it : cItem)
-    if (it.on && it.kind == 0 && it.x > wx - 10 && it.x < wx + 40) it.on = false;
-  for (auto &rk : cRock) rk.on = false;
-}
-void cReset() {
-  gLives = (!gDemo && gDiff == 0) ? 5 : 3;
-  gPaused = false;
-  gScore = 0; gWave = 1; gDead = 0; gBonus = 0; gLifeUp = false;
-  gStageT = 100;
-  sndMelody(JINGLE_STAGE, 4);
-  for (auto &p : cPlat) p.on = false;
-  for (auto &it : cItem) it.on = false;
-  for (auto &b : cBlock) b.on = false;
-  for (auto &rk : cRock) rk.on = false;
-  for (auto &b : gBoom) b.t = 0;
-  cPop.t = 0;
-  cScroll = 0; cCoins = 0;
-  cSpeed = 1.1f + 0.25f * (gEffDiff() - 1);
-  cLastY = cGroundY();
-  cAddPlat(-10, W + 20, cGroundY());  // depart sur un long sol
-  cNextX = W + 20;
-  cStageAt = 1500;
-  cRockAt = 400;
-  cY = cGroundY() - 10; cVY = 0; cInv = 0;
-  cGenerate();
-}
-void cCoin(int pts) {  // piece ramassee : 30 pieces = une vie
-  gScore += pts;
-  sfxMenu();
-  if (++cCoins >= 30) {
-    cCoins = 0;
-    if (gLives < 9) { gLives++; sndMelody(JINGLE_ARME, 4); }
-  }
-}
-// pilote automatique (demo) : saute devant un trou, des piques, un rocher ou une marche
-uint8_t cAuto() {
-  float wx = cScroll + C_PX;
-  if (!cGround) return cVY < 0 ? 4 : 0;
-  float ahead = 10 + cSpeed * 14;
-  for (auto &it : cItem)
-    if (it.on && it.kind == 0 && it.x > wx && it.x < wx + ahead) return 4;
-  for (auto &rk : cRock)
-    if (rk.on && rk.x > wx && rk.x < wx + ahead + 10) return 4;
-  int16_t py;
-  if (!cPlatAt(wx + 8 + cSpeed * 6, py) || py > cY + 11) return 4;  // trou devant
-  for (auto &p : cPlat)
-    if (p.on && p.x0 > wx && p.x0 < wx + ahead && p.y < cY + 8) return 4;  // marche plus haute
-  return 0;
-}
-void cStep() {
-  gFrame++;
-  uint8_t k = gDemo ? cAuto() : keysPs4;
-  bool jumpKey = k & (4 | 8);
-  if (gDead > 0) {
-    if (--gDead == 0) {
-      if (gLives <= 0) {
-        if (gDemo) cReset();
-        else if (gLastRank) startNameEntry();
-        else toDemo();
-        return;
-      }
-      cRespawn();
-    }
-    return;
-  }
-  cScroll += cSpeed;
-  if ((gFrame & 3) == 0) gScore += 1 + (int)cSpeed;  // la distance rapporte des points
-  static bool prevJump = false;
-  if (jumpKey && !prevJump && cGround) { cVY = -4.1f; cGround = false; sfxShot(); }
-  prevJump = jumpKey;
-  cVY += (jumpKey && cVY < 0) ? 0.22f : 0.36f;  // bouton garde : saut plus haut
-  cVY = min(cVY, 4.5f);
-  float oldFeet = cY + 10, oldHead = cY;
-  cY += cVY;
-  float feet = cY + 10, wx = cScroll + C_PX;
-  cGround = false;
-  for (auto &p : cPlat) {  // atterrir sur une plateforme
-    if (!p.on) continue;
-    if (p.x1 < cScroll - 20) { p.on = false; continue; }
-    if (wx + 6 >= p.x0 && wx + 1 <= p.x1 && cVY >= 0 && oldFeet <= p.y + 1 && feet >= p.y) {
-      cY = p.y - 10; cVY = 0; cGround = true;
-    }
-  }
-  for (auto &b : cBlock) {  // blocs : on se pose dessus, coup de tete par-dessous
-    if (!b.on) continue;
-    if (b.x < cScroll - 20) { b.on = false; continue; }
-    if (wx + 6 < b.x || wx + 1 > b.x + 6) continue;
-    if (cVY >= 0 && oldFeet <= b.y + 1 && cY + 10 >= b.y) { cY = b.y - 10; cVY = 0; cGround = true; }
-    else if (cVY < 0 && oldHead >= b.y + 6 && cY <= b.y + 6) {
-      cY = b.y + 6; cVY = 0.5f;
-      if (b.kind == 1) {  // bloc bonus : une piece jaillit
-        b.kind = 2;
-        cPop = { b.x + 1, (float)b.y - 6, -2.2f, 18 };
-        cCoin(100);
-      }
-    }
-  }
-  if (cPop.t > 0) { cPop.t--; cPop.y += cPop.vy; cPop.vy += 0.25f; }
-  if (cInv > 0) cInv--;
-  for (auto &it : cItem) {
-    if (!it.on) continue;
-    if (it.x < cScroll - 20) { it.on = false; continue; }
-    float sx = it.x - cScroll;
-    if (it.kind >= 1) {  // cristal ou piece
-      if (sx >= C_PX - 4 && sx <= C_PX + 8 && it.y >= cY - 4 && it.y <= cY + 11) {
-        it.on = false;
-        if (it.kind == 1) { gScore += 200; sfxMenu(); }
-        else cCoin(10);
-      }
-    } else if (cInv == 0 && sx >= C_PX - 3 && sx <= C_PX + 6 && cY + 10 > it.y - 5 && cY < it.y) {  // piques
-      altLoseLife(C_PX + 4, (int)cY + 5);
-      return;
-    }
-  }
-  // rochers : arrivent de la droite en roulant, tombent dans les trous ; on les ecrase en retombant dessus
-  if (cScroll > cRockAt && gStageT == 0) {
-    cRockAt = cScroll + random(260, 520) / (0.8f + 0.2f * gWave);
-    for (auto &rk : cRock)
-      if (!rk.on) { rk = { cScroll + W + 8, (float)cGroundY() - 40, 0, true }; break; }
-  }
-  for (auto &rk : cRock) {
-    if (!rk.on) continue;
-    rk.x -= 0.9f;  // il roule vers le bonhomme (le decor defile en plus)
-    rk.vy = min(rk.vy + 0.3f, 4.0f);
-    rk.y += rk.vy;
-    int16_t py;
-    if (cPlatAt(rk.x + 3, py) && rk.y + 7 >= py && rk.y + 7 - rk.vy <= py + 2) { rk.y = py - 7; rk.vy = 0; }
-    if (rk.y > H || rk.x < cScroll - 20) { rk.on = false; continue; }
-    float sx = rk.x - cScroll;
-    if (sx + 7 >= C_PX + 1 && sx <= C_PX + 6 && rk.y + 7 >= cY && rk.y <= cY + 10) {
-      if (cVY > 0 && cY + 10 <= rk.y + 4) {  // ecrase par dessus : rebond
-        rk.on = false;
-        cVY = -3.0f;
-        gScore += 200;
-        gBoomAt(sx + 3, rk.y + 3);
-        sfxBoom();
-      } else if (cInv == 0) {
-        rk.on = false;
-        altLoseLife(C_PX + 4, (int)cY + 5);
-        return;
-      }
-    }
-  }
-  if (!gDemo && gScore > gHi) gHi = gScore;
-  if (cY > H) {  // tombe dans un trou
-    altLoseLife(C_PX + 4, H - 4);
-    return;
-  }
-  if (cScroll >= cStageAt) {  // stage suivant : plus vite, une vie en plus
-    gWave++;
-    gStageT = 100;
-    altStageClear(200UL * gWave);
-    sndMelody(JINGLE_STAGE, 4);
-    cSpeed += 0.2f;
-    cStageAt += 1500;
-  }
-  cGenerate();
-  if (gStageT > 0) gStageT--;
-}
-void cDrawCoin(int x, int y, uint16_t c, uint16_t hi) {  // piece ronde 5x5 avec reflet
-  gfx->drawFastHLine(x + 1, y, 3, c);
-  gfx->fillRect(x, y + 1, 5, 3, c);
-  gfx->drawFastHLine(x + 1, y + 4, 3, c);
-  gfx->drawPixel(x + 1, y + 1, hi);
-  gMark(x, y, 5, 5);
-}
-void cDraw() {
-  eraseOld();
-  uint16_t palFull[9];
-  altBackground(0.12f, palFull);
-  // montagnes au loin (defilement lent) : lignes de crete
-  uint16_t mount = rgb(40, 50, 90);
-  float m = cScroll * 0.3f;
-  int base = H - 20;
-  for (int x = 0; x < W; x += 2) {
-    float wx = x + m;
-    int h = 10 + (int)(8 * sinf(wx * 0.045f) + 5 * sinf(wx * 0.11f + 1));
-    gPix(x, base - h, mount);
-    gPix(x + 1, base - h, mount);
-  }
-  uint16_t grass = rgb(40, 200, 60), dirt = rgb(110, 60, 25), stone = rgb(120, 120, 140);
-  for (auto &p : cPlat) {
-    if (!p.on) continue;
-    int x0 = max(0, (int)(p.x0 - cScroll)), x1 = min(W, (int)(p.x1 - cScroll));
-    if (x1 <= x0) continue;
-    bool ground = p.y >= cGroundY();
-    int hgt = ground ? H - p.y : 3;
-    gfx->fillRect(x0, p.y, x1 - x0, hgt, ground ? dirt : stone);
-    gfx->drawFastHLine(x0, p.y, x1 - x0, grass);
-    gMark(x0, p.y, x1 - x0, hgt);
-  }
-  uint16_t blockC = rgb(150, 110, 70), blockD = rgb(80, 55, 30), gold = rgb(230, 180, 40), used = rgb(70, 60, 50);
-  for (auto &b : cBlock) {  // blocs de pierre et blocs bonus (bordure doree, cristal grave)
-    if (!b.on) continue;
-    int sx = b.x - cScroll;
-    if (sx < -6 || sx > W) continue;
-    if (b.kind == 0) {
-      gfx->fillRect(sx, b.y, 6, 6, blockC);
-      gfx->drawFastHLine(sx, b.y + 5, 6, blockD);
-      gfx->drawFastVLine(sx + 5, b.y, 6, blockD);
-    } else {
-      gfx->fillRect(sx, b.y, 6, 6, b.kind == 1 ? rgb(60, 40, 10) : used);
-      gfx->drawRect(sx, b.y, 6, 6, b.kind == 1 ? gold : blockD);
-      if (b.kind == 1) { gfx->drawPixel(sx + 2, b.y + 2, palFull[4]); gfx->drawPixel(sx + 3, b.y + 3, palFull[4]); }
-    }
-    gMark(sx, b.y, 6, 6);
-  }
-  for (auto &it : cItem) {
-    if (!it.on) continue;
-    int sx = it.x - cScroll;
-    if (sx < -6 || sx > W) continue;
-    if (it.kind == 0) {  // piques
-      for (int t = 0; t < 3; t++)
-        for (int r = 0; r < 4; r++) gfx->drawFastHLine(sx + t * 3 + (3 - r) / 2 - 1, it.y - 1 - r, max(1, r / 2 + 1), palFull[0]);
-      gMark(sx - 1, it.y - 5, 11, 5);
-    } else if (it.kind == 2) {
-      cDrawCoin(sx, it.y - 2, gold, (gFrame & 16) ? palFull[0] : gold);
-    } else {  // cristal qui scintille
-      uint16_t c = (gFrame & 8) ? palFull[4] : palFull[6];
-      gfx->drawPixel(sx + 2, it.y - 3, c);
-      gfx->drawFastHLine(sx + 1, it.y - 2, 3, c);
-      gfx->drawFastHLine(sx, it.y - 1, 5, c);
-      gfx->drawFastHLine(sx + 1, it.y, 3, c);
-      gfx->drawPixel(sx + 2, it.y + 1, c);
-      gMark(sx, it.y - 3, 5, 5);
-    }
-  }
-  if (cPop.t > 0) cDrawCoin(cPop.x - cScroll, cPop.y, gold, palFull[0]);
-  for (auto &rk : cRock) {  // rochers ronds qui tournent
-    if (!rk.on) continue;
-    int sx = rk.x - cScroll;
-    gfx->fillCircle(sx + 3, rk.y + 3, 3, rgb(130, 120, 110));
-    float a = -rk.x * 0.3f;
-    gfx->drawLine(sx + 3, rk.y + 3, sx + 3 + cosf(a) * 3, rk.y + 3 + sinf(a) * 3, rgb(60, 55, 50));
-    gMark(sx - 1, rk.y - 1, 9, 9);
-  }
-  altBooms(palFull);
-  if (gDead == 0 && !(cInv > 0 && (gFrame & 4))) {
-    int fr = !cGround ? 2 : (gFrame / 5) & 1;
-    gSprite(SPR_RUN[fr], 8, 10, C_PX, (int)cY, palFull, 0, 0);
-  }
-  altHud(palFull);
-  char b[8];  // pieces ramassees (sous les vies)
-  snprintf(b, sizeof(b), "%d", cCoins);
-  int tw = tinyWidth(b);
-  cDrawCoin(W - 1 - tw - 7, 7, gold, gold);
-  tinyText(*gfx, W - 1 - tw, 7, b, palFull[0]);
-  gMark(W - 1 - tw, 7, tw, 5);
 }
 
 // ---------------------------------------------------------------- RAQUETTES
@@ -3688,10 +3372,766 @@ void yDraw() {
   altHud(palFull);
 }
 
+// ---------------------------------------------------------------- TAUPE
+// Jeu de creusage original : une taupe creuse des galeries sous terre (4 couches de couleur). X lance un jet de boue
+// (3 cases) : une creature touchee est assommee, touchee encore une fois elle eclate (plus de points en profondeur).
+// Vers roses (dans les galeries) et chauves-souris (traversent parfois la terre). Rochers : creuser dessous les fait
+// tomber (ils ecrasent les creatures). Toutes les creatures eliminees : stage suivant.
+#define D_MAXC 26
+#define D_MAXR 18
+#define D_EN 8
+#define D_ROCKS 5
+uint8_t dGrid[D_MAXR][D_MAXC];  // 1 terre, 0 galerie
+int dTS = 5, dCols = 25, dRows = 10, dX0 = 1, dY0 = 14;
+float dPX, dPY;
+int8_t dPC, dPR, dDX = 1, dDY = 0, dFace = 1;
+int8_t dWantX = 0, dWantY = 0;
+struct DShot { float x, y; int8_t dx, dy; uint8_t left; bool on; } dShot;
+DEn dEn[D_EN];
+DRock dRock[D_ROCKS];
+bool dPrevFire = false;
+float dcx(int c) { return dX0 + c * dTS + dTS / 2.0f; }
+float dcy(int r) { return dY0 + r * dTS + dTS / 2.0f; }
+bool dDug(int c, int r) { return c >= 0 && c < dCols && r >= 0 && r < dRows && dGrid[r][c] == 0; }
+bool dRockAt(int c, int r) {
+  for (auto &k : dRock) if (k.on && k.c == c && (int)((k.y - dY0) / dTS) == r) return true;
+  return false;
+}
+void dLevel() {
+  for (int r = 0; r < dRows; r++) for (int c = 0; c < dCols; c++) dGrid[r][c] = 1;
+  int mc = dCols / 2;
+  for (int r = 0; r <= dRows / 2; r++) dGrid[r][mc] = 0;  // puits de depart, depuis la surface
+  dPC = mc; dPR = 0; dPX = dcx(dPC); dPY = dcy(dPR); dDX = 0; dDY = 1; dFace = 1;
+  dWantX = 0; dWantY = 0;
+  int n = min(D_EN, 3 + gWave);
+  randomSeed(777 + gWave * 31);
+  for (int i = 0; i < D_EN; i++) {
+    DEn &e = dEn[i];
+    e.on = i < n;
+    if (!e.on) continue;
+    int r = 2 + random(dRows - 3), c = random(2, dCols - 6);
+    if (abs(c - mc) < 4) c = (c + 8) % (dCols - 5);
+    bool horiz = random(2);
+    for (int k = 0; k < 4; k++) { if (horiz) dGrid[r][min(dCols - 1, c + k)] = 0; else dGrid[min(dRows - 1, r + k / 2)][c] = 0; }  // sa galerie
+    e.c = c; e.r = r; e.x = dcx(c); e.y = dcy(r); e.dx = horiz ? 1 : 0; e.dy = horiz ? 0 : 1;
+    e.type = i % 3 == 2 ? 1 : 0; e.stun = 0; e.ghost = 0; e.t = random(200);
+  }
+  for (int i = 0; i < D_ROCKS; i++) {
+    DRock &k = dRock[i];
+    k.on = i < 2 + min(gWave, 3);
+    k.c = random(1, dCols - 1);
+    int r = 1 + random(dRows - 3);
+    if (k.c == mc) k.c++;
+    k.y = dY0 + r * dTS; k.vy = 0; k.wob = 0; k.state = 0;
+  }
+  randomSeed(micros());
+  dShot.on = false;
+}
+void dReset() {
+  gLives = (!gDemo && gDiff == 0) ? 5 : 3;
+  gPaused = false;
+  gScore = 0; gWave = 1; gDead = 0; gBonus = 0; gLifeUp = false;
+  gStageT = 90;
+  sndMelody(JINGLE_STAGE, 4);
+  for (auto &b : gBoom) b.t = 0;
+  dTS = H >= 128 ? 8 : 5;
+  dY0 = H >= 128 ? 20 : 14;
+  dCols = min(D_MAXC, W / dTS);
+  dRows = min(D_MAXR, (H - dY0) / dTS);
+  dX0 = (W - dCols * dTS) / 2;
+  dLevel();
+}
+uint8_t dAuto() {  // demo : va vers la creature la plus proche, tire quand elle est alignee
+  int best = 999, bi = -1;
+  for (int i = 0; i < D_EN; i++)
+    if (dEn[i].on) { int d = abs(dEn[i].c - dPC) + abs(dEn[i].r - dPR); if (d < best) { best = d; bi = i; } }
+  if (bi < 0) return 0;
+  DEn &e = dEn[bi];
+  uint8_t k = 0;
+  int dc = e.c - dPC, dr = e.r - dPR;
+  if ((dr == 0 && abs(dc) <= 3 && dFace == (dc > 0 ? 1 : -1) && dDY == 0) || (dc == 0 && abs(dr) <= 3 && dDY == (dr > 0 ? 1 : -1))) k |= 4;
+  if (abs(dc) > abs(dr) || dr == 0) k |= dc < 0 ? 1 : 2;
+  else k |= dr < 0 ? 8 : 16;
+  if (best <= 1 && !e.stun) k = (k & 4) | (dc < 0 ? 2 : 1);  // trop pres : on recule en tirant
+  return k;
+}
+void dKill(DEn &e, int mult) {
+  e.on = false;
+  gScore += (200UL + 100UL * (e.r * 4 / dRows)) * mult;
+  gBoomAt(e.x, e.y);
+  sfxBoom();
+}
+void dStep() {
+  gFrame++;
+  uint8_t k = gDemo ? dAuto() : keysPs4;
+  if (gDead > 0) {
+    if (--gDead == 0) {
+      if (gLives <= 0) {
+        if (gDemo) dReset();
+        else if (gLastRank) startNameEntry();
+        else toDemo();
+        return;
+      }
+      int mc = dCols / 2;
+      dPC = mc; dPR = 0; dPX = dcx(dPC); dPY = dcy(dPR); dDX = 0; dDY = 0;
+    }
+    return;
+  }
+  if (gStageT > 0) { gStageT--; return; }
+  if (k & 1) { dWantX = -1; dWantY = 0; }
+  else if (k & 2) { dWantX = 1; dWantY = 0; }
+  else if (k & 8) { dWantX = 0; dWantY = -1; }
+  else if (k & 16) { dWantX = 0; dWantY = 1; }
+  else { dWantX = 0; dWantY = 0; }
+  // deplacement de case en case : on change de direction au centre d'une case ; creuser ralentit
+  float tx = dcx(dPC), ty = dcy(dPR);
+  bool atCenter = fabsf(dPX - tx) < 0.01f && fabsf(dPY - ty) < 0.01f;
+  if (atCenter) {
+    dPX = tx; dPY = ty;
+    if (dWantX || dWantY) {
+      int nc = dPC + dWantX, nr = dPR + dWantY;
+      if (nc >= 0 && nc < dCols && nr >= 0 && nr < dRows && !dRockAt(nc, nr)) { dPC = nc; dPR = nr; dDX = dWantX; dDY = dWantY; }
+      if (dWantX) dFace = dWantX;
+    }
+  }
+  float sp = (dGrid[dPR][dPC] ? 0.55f : 0.95f) * dTS / 5.0f;
+  tx = dcx(dPC); ty = dcy(dPR);
+  dPX += constrain(tx - dPX, -sp, sp);
+  dPY += constrain(ty - dPY, -sp, sp);
+  if (dGrid[dPR][dPC] && fabsf(dPX - tx) + fabsf(dPY - ty) < dTS * 0.6f) { dGrid[dPR][dPC] = 0; gScore += 1; }  // la taupe creuse
+  // jet de boue
+  bool fire = k & (4 | 32);
+  if (fire && !dPrevFire && !dShot.on) {
+    dShot.on = true; dShot.x = dPX; dShot.y = dPY; dShot.dx = dDY ? 0 : dFace; dShot.dy = dDY; dShot.left = dTS * 3;
+    sndPlay(500, 900, 70, 0.3f, false, 1);
+  }
+  dPrevFire = fire;
+  if (dShot.on) {
+    for (int s = 0; s < 2 && dShot.on; s++) {
+      dShot.x += dShot.dx; dShot.y += dShot.dy;
+      int c = (int)((dShot.x - dX0) / dTS), r = (int)((dShot.y - dY0) / dTS);
+      if (--dShot.left == 0 || c < 0 || c >= dCols || r < 0 || r >= dRows || dGrid[r][c]) { dShot.on = false; break; }
+      for (auto &e : dEn)
+        if (e.on && fabsf(e.x - dShot.x) < dTS * 0.7f && fabsf(e.y - dShot.y) < dTS * 0.7f) {
+          dShot.on = false;
+          if (e.stun) dKill(e, 1);  // deuxieme jet : elle eclate
+          else { e.stun = 180; e.ghost = 0; sndPlay(1200, 600, 120, 0.3f, false, 1); }
+          break;
+        }
+    }
+  }
+  // creatures
+  float es = (0.45f + 0.05f * min(gWave, 8) + 0.07f * (gEffDiff() - 1)) * dTS / 5.0f;
+  static const int8_t DX[4] = { 1, -1, 0, 0 }, DY[4] = { 0, 0, 1, -1 };
+  for (auto &e : dEn) {
+    if (!e.on) continue;
+    if (e.stun) { e.stun--; continue; }
+    e.t++;
+    if (e.ghost) {  // traverse la terre, droit vers la taupe
+      e.ghost--;
+      e.x += constrain(dPX - e.x, -es * 0.6f, es * 0.6f);
+      e.y += constrain(dPY - e.y, -es * 0.6f, es * 0.6f);
+      e.c = constrain((int)((e.x - dX0) / dTS), 0, dCols - 1); e.r = constrain((int)((e.y - dY0) / dTS), 0, dRows - 1);
+      if (!e.ghost) { if (dGrid[e.r][e.c]) e.ghost = 20; else { e.x = dcx(e.c); e.y = dcy(e.r); } }  // ressort dans une galerie
+    } else {
+      float ex = dcx(e.c), ey = dcy(e.r);
+      if (fabsf(e.x - ex) < 0.01f && fabsf(e.y - ey) < 0.01f) {
+        if (e.type == 1 && e.t % 360 == 200) { e.ghost = 160; continue; }  // chauve-souris : passe dans la terre
+        int opts[4], n = 0, best = -1, bd = 9999;
+        for (int d = 0; d < 4; d++) {
+          int nc = e.c + DX[d], nr = e.r + DY[d];
+          if (!dDug(nc, nr) || dRockAt(nc, nr)) continue;
+          if (DX[d] == -e.dx && DY[d] == -e.dy && n) continue;
+          opts[n++] = d;
+          int dd = abs(nc - dPC) + abs(nr - dPR);
+          if (dd < bd) { bd = dd; best = d; }
+        }
+        if (n) {
+          int d = random(100) < 55 ? best : opts[random(n)];
+          e.dx = DX[d]; e.dy = DY[d]; e.c += e.dx; e.r += e.dy;
+        } else if (e.type == 0 && e.t % 300 == 150) e.ghost = 120;  // coince : finit par traverser
+      }
+      e.x += constrain(dcx(e.c) - e.x, -es, es);
+      e.y += constrain(dcy(e.r) - e.y, -es, es);
+    }
+    if (fabsf(e.x - dPX) < dTS * 0.8f && fabsf(e.y - dPY) < dTS * 0.8f) { altLoseLife(dPX, dPY); dShot.on = false; return; }
+  }
+  // rochers : creuser dessous les fait trembler puis tomber
+  for (auto &rk : dRock) {
+    if (!rk.on) continue;
+    int r = (int)((rk.y - dY0) / dTS);
+    if (rk.state == 0) {
+      if (r + 1 < dRows && dGrid[r + 1][rk.c] == 0 && !(dPC == rk.c && dPR == r + 1)) { rk.state = 1; rk.wob = 40; }
+    } else if (rk.state == 1) {
+      if (--rk.wob <= 0) { rk.state = 2; rk.vy = 0.3f; sndPlay(300, 120, 300, 0.4f, true, 1); }
+    } else {
+      rk.vy = min(rk.vy + 0.08f, 2.5f);
+      rk.y += rk.vy;
+      int rr = (int)((rk.y + dTS - 1 - dY0) / dTS);
+      int crushed = 0;
+      for (auto &e : dEn)
+        if (e.on && e.c == rk.c && fabsf(e.y - (rk.y + dTS / 2)) < dTS) dKill(e, 2 + crushed++);  // ecrasees : bonus
+      if (fabsf(dPX - dcx(rk.c)) < dTS * 0.7f && fabsf(dPY - (rk.y + dTS / 2)) < dTS * 0.8f) { rk.on = false; altLoseLife(dPX, dPY); return; }
+      if (rr >= dRows || dGrid[rr][rk.c]) { rk.on = false; gBoomAt(dcx(rk.c), rk.y + dTS / 2); }
+    }
+  }
+  if (!gDemo && gScore > gHi) gHi = gScore;
+  bool any = false;
+  for (auto &e : dEn) any |= e.on;
+  if (!any) {
+    gWave++;
+    gStageT = 90;
+    altStageClear(1000UL * gWave);
+    sndMelody(JINGLE_STAGE, 4);
+    dLevel();
+  }
+}
+void dSpr(const char *const *rows, int w, int h, int x, int y, bool flip, uint16_t *pal) {  // petit sprite, miroir possible
+  for (int r = 0; r < h; r++)
+    for (int c = 0; c < w; c++) {
+      char ch = rows[r][flip ? w - 1 - c : c];
+      if (ch == '.') continue;
+      int i = gPalIdx(ch);
+      if (i >= 0) jPx(x + c, y + r, pal[i]);
+    }
+}
+void dDraw() {
+  eraseOld();
+  uint16_t palFull[9];
+  for (int i = 0; i < 9; i++) palFull[i] = rgb(G_PAL_RGB[i][0], G_PAL_RGB[i][1], G_PAL_RGB[i][2]);
+  // ciel (degrade) et herbe
+  for (int y = 8; y < dY0 - 1; y++) jRect(0, y, W, 1, rgb(20, 40 + (y - 8) * 8, 120 + (y - 8) * 10));
+  jRect(0, dY0 - 1, W, 1, rgb(40, 200, 60));
+  jRect(W - 12, 9, 4, 4, rgb(255, 220, 60));  // soleil
+  static const uint8_t SOIL[4][3] = { { 170, 110, 50 }, { 200, 120, 40 }, { 150, 70, 40 }, { 110, 50, 90 } };
+  for (int r = 0; r < dRows; r++) {
+    const uint8_t *s = SOIL[r * 4 / dRows];
+    uint16_t c1 = rgb(s[0], s[1], s[2]), c2 = rgb(s[0] * 2 / 3, s[1] * 2 / 3, s[2] * 2 / 3);
+    for (int c = 0; c < dCols; c++) {
+      int x = dX0 + c * dTS, y = dY0 + r * dTS;
+      if (dGrid[r][c]) {
+        jRect(x, y, dTS, dTS, c1);
+        jPx(x + ((r * 3 + c * 7) % dTS), y + ((r * 5 + c * 3) % dTS), c2);  // grains de terre
+        jPx(x + ((r * 7 + c * 5 + 2) % dTS), y + ((r + c * 4 + 1) % dTS), c2);
+      } else jRect(x, y, dTS, dTS, 0);
+    }
+  }
+  jRect(0, dY0, dX0, H, 0);
+  jRect(dX0 + dCols * dTS, dY0, W, H, 0);
+  for (auto &rk : dRock) {  // rochers gris, ombres, ils tremblent avant de tomber
+    if (!rk.on) continue;
+    int x = dX0 + rk.c * dTS + (rk.state == 1 ? ((gFrame / 2) & 1) : 0), y = (int)rk.y;
+    jRect(x, y + 1, dTS, dTS - 1, rgb(130, 130, 140));
+    jRect(x + 1, y, dTS - 2, 1, rgb(130, 130, 140));
+    jRect(x + 1, y + 1, 2, 1, rgb(220, 220, 230));
+    jRect(x + 1, y + dTS - 1, dTS - 2, 1, rgb(60, 60, 70));
+  }
+  static const char *const WORM[2][4] = { { ".ppp..", "pwpppp", "pppppp", "..pp.." }, { "..ppp.", "ppwppp", "pppppp", ".p..p." } };
+  static const char *const BAT[2][4] = { { "v.vv.v", "vvwwvv", ".vvvv.", "..vv.." }, { "..vv..", ".vwwv.", "vvvvvv", "v....v" } };
+  for (auto &e : dEn) {
+    if (!e.on) continue;
+    int x = (int)e.x - 3, y = (int)e.y - 2, fr = (gFrame / 8) & 1;
+    if (e.ghost) {  // dans la terre : seulement les yeux
+      jPx(x + 2, y + 1, palFull[0]); jPx(x + 4, y + 1, palFull[0]);
+      continue;
+    }
+    if (e.stun && (gFrame & 4)) { dSpr(e.type ? BAT[0] : WORM[0], 6, 4, x, y, e.dx < 0, palFull); jRect(x + 1, y - 2, 4, 1, palFull[2]); continue; }
+    dSpr(e.type ? BAT[fr] : WORM[fr], 6, 4, x, y, e.dx < 0, palFull);
+  }
+  if (dShot.on) { jRect((int)dShot.x - 1, (int)dShot.y - 1, 2, 2, rgb(150, 90, 40)); jPx((int)dShot.x, (int)dShot.y - 1, palFull[2]); }
+  if (gDead == 0) {  // taupe : fourrure brune, nez rose, griffes blanches
+    static const char *const MOLE[2][5] = { { "..ooo.", ".oooob", "oooooo", "ooooop", ".w..w." }, { "..ooo.", ".oooob", "oooooo", "ooooop", "w..w.." } };
+    dSpr(MOLE[(gFrame / 6) & 1], 6, 5, (int)dPX - 3, (int)dPY - 2, dFace < 0, palFull);
+  }
+  altBooms(palFull);
+  altHud(palFull);
+}
+
+// ---------------------------------------------------------------- BILLES
+// Tir de billes original : un canon en bas se vise (gauche / droite, ou le stick qui donne l'angle), X tire. La bille
+// rebondit sur les murs et se colle a la grappe ; 3 billes de meme couleur ou plus eclatent, et celles qui ne tiennent
+// plus au plafond tombent (gros bonus). Le plafond descend tous les 8 tirs ; une bille sur la ligne du bas : fin.
+#define P_COLS 8
+#define P_ROWS 14
+uint8_t pG[P_ROWS][P_COLS];  // 0 vide, 1..6 couleur
+int pB = 6, pRH = 5, pX0 = 30, pY0 = 9, pRowsVis = 9, pShots = 0, pDrop = 0, pNColors = 4;
+float pAng = 0, pBX, pBY, pVX, pVY;
+uint8_t pCur = 1, pNext = 2, pPrevK = 0;
+bool pFlying = false;
+int8_t pPopT = 0;
+const uint8_t P_COL[7][3] = { { 0, 0, 0 }, { 255, 50, 60 }, { 255, 220, 0 }, { 40, 220, 80 }, { 40, 120, 255 }, { 200, 70, 255 }, { 0, 220, 255 } };
+int pRowCols(int r) { return (r + pDrop) & 1 ? P_COLS - 1 : P_COLS; }  // une rangee sur deux decalee d'une demi-bille
+float pCX(int r, int c) { return pX0 + c * pB + ((r + pDrop) & 1 ? pB / 2.0f : 0) + pB / 2.0f; }
+float pCY(int r) { return pY0 + r * pRH + pB / 2.0f; }
+void pNeighbors(int r, int c, int nb[6][2]) {
+  bool odd = (r + pDrop) & 1;
+  static const int8_t E[6][2] = { { 0, -1 }, { 0, 1 }, { -1, -1 }, { -1, 0 }, { 1, -1 }, { 1, 0 } }, O[6][2] = { { 0, -1 }, { 0, 1 }, { -1, 0 }, { -1, 1 }, { 1, 0 }, { 1, 1 } };
+  for (int k = 0; k < 6; k++) { nb[k][0] = r + (odd ? O : E)[k][0]; nb[k][1] = c + (odd ? O : E)[k][1]; }
+}
+bool pIn(int r, int c) { return r >= 0 && r < P_ROWS && c >= 0 && c < pRowCols(r); }
+uint8_t pPick() {  // couleur parmi celles encore presentes
+  uint8_t have[7] = { 0 };
+  int n = 0;
+  for (int r = 0; r < P_ROWS; r++) for (int c = 0; c < P_COLS; c++) if (pG[r][c]) have[pG[r][c]] = 1;
+  for (int k = 1; k <= 6; k++) n += have[k];
+  if (!n) return 1 + random(pNColors);
+  int pick = random(n);
+  for (int k = 1; k <= 6; k++) if (have[k] && pick-- == 0) return k;
+  return 1;
+}
+void pLevel() {
+  memset(pG, 0, sizeof(pG));
+  pDrop = 0; pShots = 0;
+  pNColors = min(6, 3 + gWave / 2);
+  int rows = min(pRowsVis - 3, 4 + gWave / 2);
+  for (int r = 0; r < rows; r++)
+    for (int c = 0; c < pRowCols(r); c++) pG[r][c] = 1 + random(pNColors);
+  pCur = pPick(); pNext = pPick();
+  pFlying = false; pAng = 0;
+}
+void pReset() {
+  gLives = 1;  // une seule partie
+  gPaused = false;
+  gScore = 0; gWave = 1; gDead = 0; gBonus = 0; gLifeUp = false;
+  gStageT = 80;
+  sndMelody(JINGLE_STAGE, 4);
+  for (auto &b : gBoom) b.t = 0;
+  pB = H >= 128 ? 10 : 6;
+  pRH = H >= 128 ? 9 : 5;
+  pY0 = H >= 128 ? 12 : 9;
+  pRowsVis = min(P_ROWS, (H - pY0 - pB - 6) / pRH);
+  pX0 = (W - (P_COLS * pB + pB / 2)) / 2;
+  pLevel();
+}
+// trouve les billes de meme couleur reliees (ou toutes celles reliees au plafond si col = 0) ; marque 1 dans mk
+int pFlood(int r0, int c0, uint8_t col, uint8_t mk[P_ROWS][P_COLS]) {
+  static int16_t q[P_ROWS * P_COLS];
+  int h = 0, t = 0, n = 0;
+  q[t++] = r0 * P_COLS + c0; mk[r0][c0] = 1;
+  while (h < t) {
+    int r = q[h] / P_COLS, c = q[h] % P_COLS;
+    h++; n++;
+    int nb[6][2];
+    pNeighbors(r, c, nb);
+    for (auto &v : nb)
+      if (pIn(v[0], v[1]) && !mk[v[0]][v[1]] && pG[v[0]][v[1]] && (!col || pG[v[0]][v[1]] == col)) { mk[v[0]][v[1]] = 1; q[t++] = v[0] * P_COLS + v[1]; }
+  }
+  return n;
+}
+void pLand(int r, int c) {
+  pG[r][c] = pCur;
+  pFlying = false;
+  static uint8_t mk[P_ROWS][P_COLS];
+  memset(mk, 0, sizeof(mk));
+  int n = pFlood(r, c, pCur, mk);
+  if (n >= 3) {  // eclatent
+    for (int rr = 0; rr < P_ROWS; rr++)
+      for (int cc = 0; cc < P_COLS; cc++)
+        if (mk[rr][cc]) { pG[rr][cc] = 0; if (random(3) == 0) gBoomAt(pCX(rr, cc), pCY(rr)); }
+    gScore += 10UL * n;
+    sfxBoom();
+    memset(mk, 0, sizeof(mk));  // celles qui ne tiennent plus au plafond tombent
+    for (int cc = 0; cc < P_COLS; cc++) if (pG[0][cc] && !mk[0][cc]) pFlood(0, cc, 0, mk);
+    int fall = 0;
+    for (int rr = 0; rr < P_ROWS; rr++)
+      for (int cc = 0; cc < P_COLS; cc++)
+        if (pG[rr][cc] && !mk[rr][cc]) { pG[rr][cc] = 0; fall++; gBoomAt(pCX(rr, cc), pCY(rr)); }
+    if (fall) { gScore += 20UL << min(fall, 10); sndMelody(JINGLE_STAGE, 3); }
+  } else sndPlay(400, 300, 50, 0.3f, false, 1);
+  if (++pShots >= 8) {  // le plafond descend d'un rang
+    pShots = 0;
+    for (int rr = P_ROWS - 1; rr > 0; rr--) memcpy(pG[rr], pG[rr - 1], P_COLS);
+    memset(pG[0], 0, P_COLS);
+    pDrop++;
+    for (int cc = 0; cc < pRowCols(0); cc++) pG[0][cc] = 1 + random(pNColors);
+    sndPlay(200, 120, 200, 0.5f, true, 2);
+  }
+  bool any = false, over = false;
+  for (int rr = 0; rr < P_ROWS; rr++)
+    for (int cc = 0; cc < P_COLS; cc++)
+      if (pG[rr][cc]) { any = true; if (rr >= pRowsVis) over = true; }
+  if (!gDemo && gScore > gHi) gHi = gScore;
+  if (over) { altLoseLife(W / 2, H - 6); return; }
+  if (!any) {
+    gWave++;
+    gStageT = 80;
+    altStageClear(1000UL * gWave);
+    sndMelody(JINGLE_STAGE, 4);
+    pLevel();
+    return;
+  }
+  pCur = pNext; pNext = pPick();
+}
+// trajectoire simulee (demo et pointilles) : renvoie la case d'arrivee
+bool pTrace(float ang, int &lr, int &lc, bool draw, uint16_t col) {
+  float x = W / 2.0f, y = H - pB / 2.0f - 3, vx = sinf(ang), vy = -cosf(ang);
+  float minX = pX0 + pB / 2.0f, maxX = pX0 + P_COLS * pB;
+  for (int s = 0; s < 400; s++) {
+    x += vx; y += vy;
+    if (x < minX) { x = minX; vx = -vx; }
+    if (x > maxX) { x = maxX; vx = -vx; }
+    if (draw && s % 4 == 0 && s > 6) jPx((int)x, (int)y, col);
+    bool hit = y <= pY0 + pB / 2.0f;
+    for (int r = 0; r < pRowsVis + 1 && !hit; r++)
+      for (int c = 0; c < pRowCols(r) && !hit; c++)
+        if (pG[r][c] && fabsf(pCX(r, c) - x) < pB * 0.9f && fabsf(pCY(r) - y) < pB * 0.9f) hit = true;
+    if (hit) {  // case vide la plus proche
+      float bd = 1e9;
+      lr = -1;
+      for (int r = 0; r < P_ROWS; r++)
+        for (int c = 0; c < pRowCols(r); c++) {
+          if (pG[r][c]) continue;
+          float d = (pCX(r, c) - x) * (pCX(r, c) - x) + (pCY(r) - y) * (pCY(r) - y);
+          if (d < bd) { bd = d; lr = r; lc = c; }
+        }
+      return lr >= 0;
+    }
+  }
+  return false;
+}
+uint8_t pAuto() {  // demo : essaie les angles, garde celui qui fait eclater le plus
+  static float target = 0;
+  static uint8_t plan = 0;
+  if (!plan) {
+    int best = -1;
+    for (int a = -70; a <= 70; a += 4) {
+      int r, c;
+      if (!pTrace(a * 0.01745f, r, c, false, 0)) continue;
+      static uint8_t mk[P_ROWS][P_COLS];
+      memset(mk, 0, sizeof(mk));
+      pG[r][c] = pCur;
+      int n = pFlood(r, c, pCur, mk) * 10 + random(5) - r;
+      pG[r][c] = 0;
+      if (n > best) { best = n; target = a * 0.01745f; }
+    }
+    plan = 1;
+  }
+  if (fabsf(target - pAng) > 0.03f) return target < pAng ? 1 : 2;
+  plan = 0;
+  return 4;
+}
+void pStep() {
+  gFrame++;
+  uint8_t k = 0;
+  if (gDead > 0) {
+    if (--gDead == 0) {
+      if (gDemo) pReset();
+      else if (gLastRank) startNameEntry();
+      else toDemo();
+    }
+    return;
+  }
+  if (gStageT > 0) { gStageT--; return; }
+  if (!pFlying) k = gDemo ? pAuto() : keysPs4;
+  uint8_t edge = k & ~pPrevK;
+  pPrevK = k;
+  if (!gDemo && padStickX) pAng = constrain(padStickX / 127.0f * 1.3f, -1.3f, 1.3f);  // stick : l'angle suit le stick
+  else {
+    if (k & 1) pAng -= 0.035f;
+    if (k & 2) pAng += 0.035f;
+  }
+  pAng = constrain(pAng, -1.3f, 1.3f);
+  if (!pFlying && (edge & (4 | 32) || (gDemo && (k & 4)))) {
+    pFlying = true;
+    pBX = W / 2.0f; pBY = H - pB / 2.0f - 3;
+    float sp = H >= 128 ? 4.0f : 2.6f;
+    pVX = sinf(pAng) * sp; pVY = -cosf(pAng) * sp;
+    sfxShot();
+  }
+  if (pFlying) {
+    float minX = pX0 + pB / 2.0f, maxX = pX0 + P_COLS * pB;
+    for (int s = 0; s < 4 && pFlying; s++) {
+      pBX += pVX / 4; pBY += pVY / 4;
+      if (pBX < minX) { pBX = minX; pVX = -pVX; }
+      if (pBX > maxX) { pBX = maxX; pVX = -pVX; }
+      bool hit = pBY <= pY0 + pB / 2.0f;
+      for (int r = 0; r < P_ROWS && !hit; r++)
+        for (int c = 0; c < pRowCols(r) && !hit; c++)
+          if (pG[r][c] && fabsf(pCX(r, c) - pBX) < pB * 0.9f && fabsf(pCY(r) - pBY) < pB * 0.9f) hit = true;
+      if (hit) {
+        float bd = 1e9;
+        int lr = 0, lc = 0;
+        for (int r = 0; r < P_ROWS; r++)
+          for (int c = 0; c < pRowCols(r); c++) {
+            if (pG[r][c]) continue;
+            float d = (pCX(r, c) - pBX) * (pCX(r, c) - pBX) + (pCY(r) - pBY) * (pCY(r) - pBY);
+            if (d < bd) { bd = d; lr = r; lc = c; }
+          }
+        pLand(lr, lc);
+      }
+    }
+  }
+}
+void pBall(int cx, int cy, uint8_t col) {  // bille ronde avec reflet
+  const uint8_t *c = P_COL[col];
+  uint16_t main = rgb(c[0], c[1], c[2]), dk = rgb(c[0] / 3, c[1] / 3, c[2] / 3);
+  int r = pB / 2 - 1;
+  if (pB <= 6) {
+    jRect(cx - 2, cy - 1, 5, 3, main); jRect(cx - 1, cy - 2, 3, 5, main);
+    jPx(cx - 1, cy - 1, rgb(255, 255, 255)); jPx(cx + 1, cy + 2, dk); jPx(cx + 2, cy + 1, dk);
+  } else {
+    gfx->fillCircle(cx, cy, r, main);
+    gfx->drawCircle(cx, cy, r, dk);
+    gfx->fillRect(cx - r / 2, cy - r / 2, 2, 2, rgb(255, 255, 255));
+  }
+}
+void pDraw() {
+  eraseOld();
+  uint16_t palFull[9];
+  for (int i = 0; i < 9; i++) palFull[i] = rgb(G_PAL_RGB[i][0], G_PAL_RGB[i][1], G_PAL_RGB[i][2]);
+  int bw = P_COLS * pB + pB / 2, by1 = pY0 + pRowsVis * pRH + pB / 2;
+  jRect(pX0, 8, bw, H - 8, rgb(10, 12, 30));  // fond du puits (redessine a chaque image)
+  jRect(pX0 - 2, 8, 2, H - 8, rgb(90, 100, 160));
+  jRect(pX0 + bw, 8, 2, H - 8, rgb(90, 100, 160));
+  jRect(pX0, 8, bw, pY0 - 8, rgb(150, 120, 60));  // plafond qui descend
+  for (int x = pX0 + 2; x < pX0 + bw; x += 6) jPx(x, pY0 - 1, rgb(80, 60, 30));
+  for (int x = pX0; x < pX0 + bw; x += 3) jPx(x, by1, rgb(255, 60, 60));  // ligne a ne pas depasser
+  for (int r = 0; r < P_ROWS; r++)
+    for (int c = 0; c < pRowCols(r); c++)
+      if (pG[r][c] && pCY(r) < H) pBall((int)pCX(r, c), (int)pCY(r), pG[r][c]);
+  int lr, lc;
+  if (!pFlying && gDead == 0) pTrace(pAng, lr, lc, true, rgb(140, 140, 160));  // pointilles de visee
+  int cx = W / 2, cy = H - pB / 2 - 3;  // canon : socle, tube oriente
+  gfx->drawLine(cx, cy, cx + (int)(sinf(pAng) * (pB + 2)), cy - (int)(cosf(pAng) * (pB + 2)), palFull[0]);
+  jRect(cx - 4, H - 3, 9, 3, rgb(120, 120, 140));
+  if (pFlying) pBall((int)pBX, (int)pBY, pCur);
+  else pBall(cx, cy, pCur);
+  // a droite : bille suivante, tirs avant que le plafond descende
+  int px = min(pX0 + bw + 6, W - 24);
+  tinyText(*gfx, px, 12, "APRES", rgb(110, 110, 140));
+  pBall(px + 6, 22 + pB / 2, pNext);
+  gMark(px, 12, 24, 14 + pB);
+  for (int i = 0; i < 8 - pShots; i++) jRect(px + i * 3, H - 6, 2, 3, rgb(255, 160, 40));
+  gMark(px, H - 6, 26, 3);
+  altBooms(palFull);
+  altHud(palFull);
+}
+
+// ---------------------------------------------------------------- ESCALADE
+// Jeu de plateformes original : un robot geant, en haut a gauche, lance des caisses qui roulent sur les poutres et
+// tombent d'un etage a l'autre (parfois par une echelle). L'explorateur monte les echelles, saute (X ou rond) par-dessus
+// les caisses (points) et doit atteindre le drapeau en haut a droite. Stage suivant : caisses plus rapides et nombreuses.
+#define E_FLOORS 4
+#define E_CRATES 8
+int eFY[E_FLOORS], eLadX[E_FLOORS - 1][2], eGap = 8;
+float eX, eY, eVY;
+int eFloor = 0, eJump = 0, eThrowT = 0;
+bool eClimb = false, ePrevJump = false, eFace = true;
+ECrate eCr[E_CRATES];
+int eDir(int f) { return (f & 1) ? 1 : -1; }  // sens de roulement : etage 3 vers la droite, 2 vers la gauche...
+int eMinX(int f) { return (f > 0 && eDir(f) < 0) ? eGap : 0; }       // trou du cote ou les caisses tombent
+int eMaxX(int f) { return (f > 0 && eDir(f) > 0) ? W - eGap : W; }
+void eLevel() {
+  int sp = (H - 14) / E_FLOORS;
+  for (int f = 0; f < E_FLOORS; f++) eFY[f] = H - 3 - f * sp;  // haut de chaque poutre
+  for (int f = 0; f < E_FLOORS - 1; f++) {  // deux echelles par etage, a des places differentes
+    eLadX[f][0] = (f & 1) ? W / 4 + 6 * f : W * 3 / 4 - 6 * f;
+    eLadX[f][1] = (f & 1) ? W * 2 / 3 + 4 * f : W / 3 - 4 * f;
+  }
+  eX = 8; eY = eFY[0]; eFloor = 0; eClimb = false; eJump = 0; eVY = 0; eFace = true;
+  for (auto &c : eCr) c.on = false;
+  eThrowT = 60;
+}
+void eReset() {
+  gLives = (!gDemo && gDiff == 0) ? 5 : 3;
+  gPaused = false;
+  gScore = 0; gWave = 1; gDead = 0; gBonus = 0; gLifeUp = false;
+  gStageT = 90;
+  sndMelody(JINGLE_STAGE, 4);
+  for (auto &b : gBoom) b.t = 0;
+  eGap = H >= 128 ? 12 : 8;
+  eLevel();
+}
+int eLadderAt(int f, float x, bool up) {  // echelle sous les pieds (vers le haut) ou vers le bas, -1 sinon
+  int lf = up ? f : f - 1;
+  if (lf < 0 || lf >= E_FLOORS - 1) return -1;
+  for (int k = 0; k < 2; k++) if (fabsf(x + 2 - eLadX[lf][k]) < 3) return eLadX[lf][k];
+  return -1;
+}
+uint8_t eAuto() {  // demo : va vers une echelle qui monte, la grimpe, saute les caisses qui arrivent
+  uint8_t k = 0;
+  if (eClimb) return 8;
+  for (auto &c : eCr)
+    if (c.on && c.floor == eFloor && !c.fall && fabsf(c.x - eX) < 14 && (c.x - eX) * eDir(eFloor) < 0) k |= 4;
+  if (eFloor >= E_FLOORS - 1) return k | 2;
+  int best = -1, bd = 9999;
+  for (int i = 0; i < 2; i++) { int d = abs(eLadX[eFloor][i] - (int)(eX + 2)); if (d < bd) { bd = d; best = eLadX[eFloor][i]; } }
+  if (bd < 2) return k | 8;
+  return k | (best < eX + 2 ? 1 : 2);
+}
+void eStep() {
+  gFrame++;
+  uint8_t k = gDemo ? eAuto() : keysPs4;
+  if (gDead > 0) {
+    if (--gDead == 0) {
+      if (gLives <= 0) {
+        if (gDemo) eReset();
+        else if (gLastRank) startNameEntry();
+        else toDemo();
+        return;
+      }
+      eLevel();
+    }
+    return;
+  }
+  if (gStageT > 0) { gStageT--; return; }
+  float sp = H >= 128 ? 1.2f : 0.9f;
+  bool jumpKey = k & (4 | 32);
+  if (eClimb) {  // sur une echelle : haut / bas
+    if (k & 8) eY -= 0.6f;
+    if (k & 16) eY += 0.6f;
+    int top = eFY[eFloor + 1], bot = eFY[eFloor];
+    if (eY <= top) { eY = top; eFloor++; eClimb = false; gScore += 20; }
+    else if (eY >= bot) { eY = bot; eClimb = false; }
+  } else {
+    if (!eJump) {
+      if (k & 1) { eX -= sp; eFace = false; }
+      if (k & 2) { eX += sp; eFace = true; }
+      if ((k & 8) && eLadderAt(eFloor, eX, true) >= 0) { eX = eLadderAt(eFloor, eX, true) - 2; eClimb = true; }
+      else if ((k & 16) && eLadderAt(eFloor, eX, false) >= 0) { eX = eLadderAt(eFloor, eX, false) - 2; eFloor--; eY = eFY[eFloor + 1]; eClimb = true; }
+      if (jumpKey && !ePrevJump && !eClimb) { eJump = 1; eVY = -1.6f; sndPlay(600, 1100, 80, 0.25f, false, 1); }
+    } else {  // saut : un peu d'elan dans la direction
+      eX += eFace ? sp * 0.8f : -sp * 0.8f;
+      eVY += 0.16f;
+      eY += eVY;
+      if (eY >= eFY[eFloor]) { eY = eFY[eFloor]; eJump = 0; }
+    }
+    eX = constrain(eX, (float)eMinX(eFloor), (float)(eMaxX(eFloor) - 5));
+  }
+  ePrevJump = jumpKey;
+  // le robot lance des caisses
+  if (--eThrowT <= 0) {
+    eThrowT = max(45, 140 - 12 * gWave - 20 * (gEffDiff() - 1)) + random(40);
+    for (auto &c : eCr)
+      if (!c.on) { c.on = true; c.floor = E_FLOORS - 1; c.x = 16; c.y = eFY[E_FLOORS - 1] - 5; c.fall = false; c.jumped = false; c.ladder = -1; break; }
+  }
+  float cs = (0.7f + 0.08f * min(gWave, 8) + 0.1f * (gEffDiff() - 1)) * (H >= 128 ? 1.4f : 1);
+  for (auto &c : eCr) {
+    if (!c.on) continue;
+    int f = c.floor;
+    if (c.ladder >= 0) {  // descend par une echelle
+      c.y += cs * 0.8f;
+      if (c.y >= eFY[f - 1] - 5) { c.floor--; c.y = eFY[c.floor] - 5; c.ladder = -1; }
+    } else if (c.fall) {  // tombe dans le trou vers l'etage du dessous
+      c.y += 1.5f;
+      if (f == 0 || c.y >= eFY[f - 1] - 5) { if (f == 0) { c.on = false; continue; } c.floor--; c.y = eFY[c.floor] - 5; c.fall = false; }
+    } else {
+      c.x += eDir(f) * cs;
+      if (f > 0 && (c.x < eMinX(f) - 2 || c.x > eMaxX(f) - 3)) c.fall = true;
+      if (f == 0 && (c.x < -6 || c.x > W)) c.on = false;
+      for (int i = 0; i < 2 && f > 0; i++)  // parfois, prend l'echelle qui descend
+        if (fabsf(c.x + 2 - eLadX[f - 1][i]) < cs * 0.6f && random(100) < 25) c.ladder = i;
+    }
+    // collision avec l'explorateur (7 de haut) ; saute par-dessus : points
+    bool sameLevel = fabsf((c.y + 5) - eY) < 6;
+    if (sameLevel && fabsf(c.x - eX) < 4.5f && eY > c.y + 1) { altLoseLife(eX + 2, eY - 3); return; }
+    if (!c.jumped && eJump && fabsf(c.x - eX) < 3 && eY <= c.y + 1) { c.jumped = true; gScore += 100; sndPlay(1500, 2000, 60, 0.25f, false, 1); }
+  }
+  if (!gDemo && gScore > gHi) gHi = gScore;
+  if (eFloor == E_FLOORS - 1 && !eClimb && eX >= eMaxX(eFloor) - 12) {  // drapeau atteint
+    gWave++;
+    gStageT = 90;
+    altStageClear(1000UL * gWave);
+    sndMelody(JINGLE_STAGE, 4);
+    eLevel();
+  }
+}
+void eDraw() {
+  eraseOld();
+  uint16_t palFull[9];
+  altBackground(0.03f, palFull);
+  uint16_t girder = rgb(220, 60, 60), rivet = rgb(255, 200, 140), lad = rgb(80, 200, 255);
+  for (int f = 0; f < E_FLOORS; f++) {  // poutres rouges a rivets (avec un trou pour les etages 1 a 3)
+    int x0 = eMinX(f), x1 = eMaxX(f), y = eFY[f];
+    gfx->fillRect(x0, y, x1 - x0, 2, girder);
+    for (int x = x0 + 2; x < x1; x += 6) gfx->drawPixel(x, y, rivet);
+    gMark(x0, y, x1 - x0, 2);
+  }
+  for (int f = 0; f < E_FLOORS - 1; f++)  // echelles
+    for (int i = 0; i < 2; i++) {
+      int x = eLadX[f][i] - 2, y0 = eFY[f + 1] + 2, y1 = eFY[f];
+      gfx->drawFastVLine(x, y0, y1 - y0, lad);
+      gfx->drawFastVLine(x + 4, y0, y1 - y0, lad);
+      for (int y = y0 + 1; y < y1; y += 3) gfx->drawFastHLine(x, y, 5, lad);
+      gMark(x, y0, 5, y1 - y0);
+    }
+  // robot geant (original) : tete grise, yeux rouges, bras qui lancent
+  int ry = eFY[E_FLOORS - 1] - 10, arm = (eThrowT < 15) ? -2 : 0;
+  static const char *const ROBOT[10] = { "...www...", "..wwwww..", "..wrwrw..", "..wwwww..", "...ccc...", "w.ccccc.w", "wcccbcccw",
+                                         "..ccccc..", "..c...c..", ".cc...cc." };
+  gSprite(ROBOT, 9, 10, 2, ry, palFull, 0, 0);
+  gfx->drawPixel(1, ry + 5 + arm, palFull[0]);
+  gfx->drawPixel(11, ry + 5 + arm, palFull[0]);
+  gMark(1, ry - 2, 11, 12);
+  // drapeau d'arrivee
+  int fx = eMaxX(E_FLOORS - 1) - 6, fy = eFY[E_FLOORS - 1] - 8;
+  gfx->drawFastVLine(fx, fy, 8, palFull[0]);
+  gfx->fillRect(fx + 1, fy, 4, 3, (gFrame & 16) ? palFull[2] : palFull[7]);
+  gMark(fx, fy, 5, 8);
+  for (auto &c : eCr) {  // caisses en bois qui roulent (planche qui tourne)
+    if (!c.on) continue;
+    int x = (int)c.x, y = (int)c.y;
+    gfx->fillRect(x, y, 5, 5, rgb(170, 110, 50));
+    gfx->drawRect(x, y, 5, 5, rgb(100, 60, 20));
+    if ((int)(c.x / 3) & 1) gfx->drawLine(x, y, x + 4, y + 4, rgb(100, 60, 20)); else gfx->drawLine(x + 4, y, x, y + 4, rgb(100, 60, 20));
+    gMark(x, y, 5, 5);
+  }
+  if (gDead == 0) {  // explorateur : casque jaune, veste verte, jambes qui bougent
+    static const char *const HERO[2][7] = { { ".yyy.", ".www.", "ggggg", ".ggg.", ".bbb.", ".b.b.", "o...o" },
+                                            { ".yyy.", ".www.", "ggggg", ".ggg.", ".bbb.", "b...b", "o...o" } };
+    int fr = (eClimb || ((int)(eX / 3) & 1)) ? (gFrame / 8) & 1 : 0;
+    gSprite(HERO[fr], 5, 7, (int)eX, (int)eY - 7, palFull, 0, 0);
+  }
+  altBooms(palFull);
+  altHud(palFull);
+}
+
 // aiguillage selon le jeu choisi
-void altReset() { if (gGame == 1) rReset(); else if (gGame == 2) cReset(); else if (gGame == 3) qReset(); else if (gGame == 4) bReset(); else if (gGame == 5) lReset(); else if (gGame == 6) oReset(); else if (gGame == 7) kReset(); else if (gGame == 8) tReset(); else yReset(); }
-void altStep() { if (gGame == 1) rStep(); else if (gGame == 2) cStep(); else if (gGame == 3) qStep(); else if (gGame == 4) bStep(); else if (gGame == 5) lStep(); else if (gGame == 6) oStep(); else if (gGame == 7) kStep(); else if (gGame == 8) tStep(); else yStep(); }
-void altDraw() { if (gGame == 1) rDraw(); else if (gGame == 2) cDraw(); else if (gGame == 3) qDraw(); else if (gGame == 4) bDraw(); else if (gGame == 5) lDraw(); else if (gGame == 6) oDraw(); else if (gGame == 7) kDraw(); else if (gGame == 8) tDraw(); else yDraw(); }
+void altReset() {
+  switch (gGame) {
+    case G_RAID: rReset(); break;
+    case G_RAQ: qReset(); break;
+    case G_BUL: bReset(); break;
+    case G_LAB: lReset(); break;
+    case G_ORB: oReset(); break;
+    case G_BRI: kReset(); break;
+    case G_BLO: tReset(); break;
+    case G_CRU: yReset(); break;
+    case G_TAU: dReset(); break;
+    case G_BIL: pReset(); break;
+    default: eReset(); break;
+  }
+}
+void altStep() {
+  switch (gGame) {
+    case G_RAID: rStep(); break;
+    case G_RAQ: qStep(); break;
+    case G_BUL: bStep(); break;
+    case G_LAB: lStep(); break;
+    case G_ORB: oStep(); break;
+    case G_BRI: kStep(); break;
+    case G_BLO: tStep(); break;
+    case G_CRU: yStep(); break;
+    case G_TAU: dStep(); break;
+    case G_BIL: pStep(); break;
+    default: eStep(); break;
+  }
+}
+void altDraw() {
+  switch (gGame) {
+    case G_RAID: rDraw(); break;
+    case G_RAQ: qDraw(); break;
+    case G_BUL: bDraw(); break;
+    case G_LAB: lDraw(); break;
+    case G_ORB: oDraw(); break;
+    case G_BRI: kDraw(); break;
+    case G_BLO: tDraw(); break;
+    case G_CRU: yDraw(); break;
+    case G_TAU: dDraw(); break;
+    case G_BIL: pDraw(); break;
+    default: eDraw(); break;
+  }
+}
 // remise a zero du jeu choisi (partie ou demo)
 void resetCurrent() { if (gGame == 0) gReset(); else altReset(); }
 
@@ -3772,13 +4212,13 @@ void menuScreen() {
   if (H >= 128 && !menuScores && !gNameEntry) {  // titre et record au-dessus du menu
     int ty = H / 2 - 62;  // titre ARCADE GAMES et record au-dessus du cadre du menu (qui commence a H/2 - 28)
     gfx->setTextSize(2);
-    gfx->setTextColor(rgb(255, 220, 0));
+    gfx->setTextColor(rgb(40, 230, 80));
     int tw = 6 * 12;
     gfx->setCursor((W - tw) / 2, ty);
     gfx->print("ARCADE");
     gMark((W - tw) / 2, ty, tw, 16);
     gfx->setTextSize(1);
-    gText(ty + 17, "GAMES", rgb(0, 220, 255));
+    gText(ty + 17, "GAMES", rgb(140, 255, 150));
     char b[24];
     snprintf(b, sizeof(b), "RECORD %lu %s", (unsigned long)gHi, gBest[0].score ? gBest[0].name : "");
     gText(ty + 27, b, rgb(255, 40, 40));
@@ -3886,12 +4326,12 @@ void gameUpdate() {
     gfx->fillScreen(0);
     gNOld = 0;
   }
-  // demo : un autre jeu au hasard toutes les 40 s ; au retour au menu, le jeu choisi est remis
+  // demo : un autre jeu au hasard toutes les 5 min ; au retour au menu, le jeu choisi est remis
   static uint32_t demoSince = 0;
   static int8_t menuGame = -1;
   if (screen == 1) {
     if (!demoSince) demoSince = now;
-    if (now - demoSince > 40000UL) {
+    if (now - demoSince > 300000UL) {  // demo : un autre jeu au hasard toutes les 5 min
       if (menuGame < 0) menuGame = gGame;
       int ng = random(N_GAMES - 1);
       if (ng >= gGame) ng++;
@@ -4043,9 +4483,9 @@ void ps4Poll() {
     else if (millis() - combo > 3000) restartAt = millis();
   } else combo = 0;
   bool send = false;
-  int tier = gDemo ? -1 : gTier();
+  int tier = gDemo ? -1 : (gWave - 1) % 6;  // une couleur par stage (6 couleurs en boucle), bleu sombre en demo
   if (tier != lastTier) {  // barre lumineuse : bleu sombre en demo, puis couleur du vaisseau
-    static const uint8_t LED[5][3] = { { 0, 0, 40 }, { 0, 90, 255 }, { 40, 230, 80 }, { 0, 220, 255 }, { 255, 40, 40 } };
+    static const uint8_t LED[7][3] = { { 0, 0, 40 }, { 0, 90, 255 }, { 40, 230, 80 }, { 255, 200, 0 }, { 0, 220, 255 }, { 255, 40, 40 }, { 200, 60, 255 } };
     lastTier = tier;
     PS4.setLed(LED[tier + 1][0], LED[tier + 1][1], LED[tier + 1][2]);
     send = true;
@@ -4246,11 +4686,11 @@ void setup() {
     int y = H / 2 - 18;
     gfx->setFont(NULL);
     gfx->setTextSize(2);
-    gfx->setTextColor(rgb(255, 220, 0));
+    gfx->setTextColor(rgb(40, 230, 80));
     gfx->setCursor((W - 6 * 12) / 2, y);
     gfx->print("ARCADE");
     gfx->setTextSize(1);
-    gText(y + 18, "GAMES", rgb(0, 220, 255));
+    gText(y + 18, "GAMES", rgb(140, 255, 150));
     gText(y + 28, "V" GAMES_VERSION, rgb(150, 150, 170));
   }
 

@@ -12,3 +12,6 @@ struct OEn { float a, r, a0, sa; int16_t t; int8_t dir; uint8_t type, state; boo
 struct OShot { float a, r; bool on; };  // ORBITE : tir, tir ennemi, etoile ou capsule (coordonnees polaires)
 struct KBall { float x, y, vx, vy; bool on; };  // BRIQUES : balle
 struct KCap { float x, y; uint8_t type; bool on; };  // BRIQUES : capsule (0 large, 1 lente, 2 trois balles, 3 vie)
+struct DEn { float x, y; int8_t c, r, dx, dy; uint8_t type, stun, ghost; int16_t t; bool on; };  // TAUPE : ver (0) ou chauve-souris (1)
+struct DRock { float y, vy; int8_t c; uint8_t wob, state; bool on; };                         // TAUPE : rocher (0 pose, 1 tremble, 2 tombe)
+struct ECrate { float x, y; int8_t floor, ladder; bool on, fall, jumped; };                  // ESCALADE : caisse

@@ -6,9 +6,9 @@ Jeux d'arcade sur 1 à 4 dalles LED 128x64, avec un ESP32 classique et une **man
 - **Partition unique de 3 Mo :** il reste de la place pour d'autres jeux.
 - **Son en option :** une broche PWM vers un petit ampli et un haut-parleur.
 
-**10 jeux originaux**, à choisir dans le menu (gauche / droite sur la ligne JOUER). Au démarrage, c'est toujours **SPACE DEFENDER** qui est proposé.
+**12 jeux originaux**, à choisir dans le menu (gauche / droite sur la ligne JOUER). Au démarrage, c'est toujours **SPACE DEFENDER** qui est proposé.
 
-Les 10 jeux ont en commun les niveaux de difficulté, les stages, les vies, les meilleurs scores avec les noms et la démo automatique.
+Les 12 jeux ont en commun les niveaux de difficulté, les stages, les vies, les meilleurs scores avec les noms et la démo automatique.
 
 
 # SPACE DEFENDER
@@ -84,18 +84,6 @@ Un shoot vertical : tu te déplaces partout dans le bas de l'écran, et les vagu
   - Sous la moitié de sa vie, le boss passe en **2ᵉ phase** : plus rapide, avec des tirs en spirale.
   - Le détruire termine le stage : gros bonus et une vie en plus.
 
-### COURSE
-
-![COURSE](docs/jeu-course.gif)
-
-Un petit bonhomme original (casquette rouge, t-shirt bleu) court tout seul vers la droite, devant des montagnes qui défilent au loin.
-- **Commandes :** ✕ ou haut pour sauter. Garde le bouton appuyé pour sauter plus haut.
-- **Pièces dorées :** en arcs au-dessus des trous et en rangées. Chacune vaut 10 points, et **30 pièces donnent une vie** (compteur en haut à droite).
-- **Blocs :** les rangées de blocs de pierre servent de plateformes. Un **coup de tête par-dessous** sur un bloc à bordure dorée fait jaillir une pièce (100 points).
-- **Rochers qui roulent :** saute par-dessus, ou **écrase-les en retombant dessus** (200 points, avec un rebond).
-- **Trous et piques :** les toucher fait perdre une vie. Les cristaux, plus rares, valent 200 points.
-- **Stages :** tous les 1500 pixels, la course accélère et tu gagnes une vie.
-
 ### BULLES
 
 ![BULLES](docs/jeu-bulles.gif)
@@ -113,7 +101,7 @@ Un petit blob cyan original souffle des bulles, sur un écran de plateformes dif
 ![LABYRINTHE](docs/jeu-labyrinthe.gif)
 
 Un petit scarabée vert ramasse toutes les graines d'un labyrinthe original, poursuivi par 4 créatures piquantes.
-- **Vies :** petites icônes du scarabée en haut à droite.
+- **Vies :** petites créatures piquantes en haut à droite, chacune d'une couleur différente (6 couleurs).
 - **Sur une seule dalle (128x64)**, le labyrinthe garde des cases de 6 pixels et **défile verticalement** pour suivre le scarabée. Il tient en entier à partir de 128x128.
 - **Graphisme :** murs « néon » aux coins arrondis (couleur différente à chaque stage), grosses graines qui pulsent, créatures aux piquants qui tournent et aux yeux qui regardent où elles vont, scarabée avec carapace, reflet, tête et pattes qui bougent.
 - **Commandes :** croix ou stick pour diriger le scarabée. La direction choisie est gardée jusqu'au prochain croisement possible.
@@ -150,11 +138,12 @@ Une balle et deux raquettes, **à l'horizontale** : la tienne à gauche, celle d
 - **Stages :** 5 points gagnés font passer au stage suivant. L'ordinateur devient plus rapide, les raquettes un peu plus petites.
 - **À deux manettes :** pas possible pour l'instant. La bibliothèque de la manette n'en gère qu'une à la fois ; il faudrait passer à une autre bibliothèque (Bluepad32).
 
-### BRIQUES
+### CASSE BRIQUES
 
-![BRIQUES](docs/jeu-briques.gif)
+![CASSE BRIQUES](docs/jeu-casse-briques.gif)
 
 Un casse-briques original. Une raquette en bas renvoie la balle vers un mur de briques.
+- **Vies :** de petites balles blanches en haut à droite.
 - **Commandes :** stick ou croix gauche / droite pour la raquette (au **stick**, elle va d'autant plus vite que tu le pousses loin), **✕ pour lancer la balle**.
 - **Briques :** de couleur (1 coup, plus elles sont hautes plus elles rapportent), **d'argent** (2 coups, 3 à partir du stage 6) et **d'or** (incassables, à partir du stage 4). Chaque brique a un reflet et une ombre.
 - **Capsules :** une brique cassée lâche parfois une capsule qui tombe. Cyan : **raquette large**. Orange : **balle lente**. Magenta : **3 balles**. Rouge : **une vie**.
@@ -170,11 +159,43 @@ Des blocs qui tombent, à empiler pour compléter des lignes.
 - **Points :** 1, 2, 3 ou 4 lignes d'un coup : 100, 300, 500 ou 800 × le niveau. Les lignes complètes clignotent puis disparaissent.
 - **Niveaux :** toutes les 10 lignes, les pièces tombent plus vite. **Une seule partie** (pas de vies) : si la pile atteint le haut, la partie est finie.
 
+### TAUPE
+
+![TAUPE](docs/jeu-taupe.gif)
+
+Un jeu de creusage original : une taupe creuse ses galeries sous terre (4 couches de terre de couleurs différentes).
+- **Commandes :** croix ou stick pour se déplacer (creuser ralentit), **✕ ou ○ : jet de boue** (3 cases devant).
+- **Les créatures :** des vers roses qui suivent les galeries, et des chauves-souris qui traversent parfois la terre (on ne voit que leurs yeux).
+- **Jet de boue :** une créature touchée est **assommée** (elle clignote) ; touchée une 2e fois, elle **éclate**. Plus elle est profonde, plus elle rapporte.
+- **Rochers :** creuser sous un rocher le fait trembler puis **tomber** : il écrase les créatures (gros bonus)… et la taupe si elle est dessous.
+- **Stages :** toutes les créatures éliminées : stage suivant, avec plus de créatures et de rochers.
+
+### BILLES
+
+![BILLES](docs/jeu-billes.gif)
+
+Un jeu de tir de billes original, dans un puits.
+- **Commandes :** gauche / droite pour viser (au **stick**, l'angle suit directement le stick), **✕ pour tirer**. Des pointillés montrent la trajectoire, rebonds compris.
+- **Règles :** la bille rebondit sur les murs et se colle à la grappe. **3 billes de même couleur ou plus éclatent** ; celles qui ne tiennent plus au plafond **tombent** (gros bonus).
+- **Plafond :** il descend d'un rang **tous les 8 tirs** (les marques orange en bas à droite). Une bille qui dépasse la ligne rouge : partie finie (une seule partie, pas de vies).
+- **Stages :** tout vider fait passer au suivant, avec plus de rangées et plus de couleurs.
+
+### ESCALADE
+
+![ESCALADE](docs/jeu-escalade.gif)
+
+Un jeu de plateformes original : un robot géant, en haut à gauche, lance des caisses qui roulent sur les poutres.
+- **Commandes :** gauche / droite pour marcher, haut / bas pour monter ou descendre les échelles, **✕ ou ○ pour sauter**.
+- **Les caisses :** elles roulent d'un bout à l'autre de chaque poutre, tombent par le trou à l'étage du dessous, et prennent parfois une échelle.
+- **Points :** sauter par-dessus une caisse rapporte 100 points ; monter un étage, 20.
+- **But :** atteindre le **drapeau** en haut à droite : stage suivant, avec des caisses plus rapides et plus nombreuses.
+
 ### CRUCH
 
 ![CRUCH](docs/jeu-cruch.gif)
 
 Des bonbons à aligner sur un plateau de 8 × 8. Six sortes, chacune avec sa couleur et sa forme (rond, carré, losange, triangle, goutte, étoile), pour bien les distinguer.
+- **Vies :** de petites pommes en haut à droite.
 - **Commandes :** croix ou stick pour déplacer le curseur, **✕ pour prendre un bonbon** (le curseur clignote en jaune), puis une **direction pour l'échanger** avec son voisin. ○ annule.
 - **Alignements :** 3 bonbons identiques ou plus disparaissent, ceux du dessus tombent et de nouveaux arrivent par le haut. Les **réactions en chaîne** rapportent de plus en plus. Un échange qui n'aligne rien est annulé.
 - **Bonbons spéciaux :** en aligner **4** laisse un **bonbon rayé**, qui vide toute sa ligne ou sa colonne quand il disparaît. En aligner **5** laisse une **bombe** : échange-la avec un bonbon pour faire disparaître toute sa couleur.
@@ -182,9 +203,9 @@ Des bonbons à aligner sur un plateau de 8 × 8. Six sortes, chacune avec sa cou
 
 ## Menu
 
-Au démarrage, la dalle affiche **ARCADE GAMES** et la **version** (par exemple V3.62) pendant 2 s, le temps que le Bluetooth et le son démarrent.
+Au démarrage, la dalle affiche **ARCADE GAMES** (en vert) et la **version** (par exemple V3.70) pendant 2 s, le temps que le Bluetooth et le son démarrent.
 
-Sans partie en cours, le jeu tourne tout seul en démo, sans son. **La démo change de jeu au hasard toutes les 40 s** (au retour au menu, le jeu choisi est remis). **Sans manette connectée**, la démo affiche seulement une petite indication, « MANETTE : BOUTON PS », avec l'adresse Bluetooth de l'ESP32. Dès que la manette est connectée, le menu s'affiche **sur son propre écran**, sans la démo derrière. On y voit un fond d'étoiles, le titre ARCADE GAMES et le record avec le nom de son détenteur :
+Sans partie en cours, le jeu tourne tout seul en démo, sans son. **La démo change de jeu au hasard toutes les 5 minutes** (au retour au menu, le jeu choisi est remis). **Sans manette connectée**, la démo affiche seulement une petite indication, « MANETTE : BOUTON PS », avec l'adresse Bluetooth de l'ESP32. Dès que la manette est connectée, le menu s'affiche **sur son propre écran**, sans la démo derrière. On y voit un fond d'étoiles, le titre ARCADE GAMES et le record avec le nom de son détenteur :
 
 **Batterie de la manette :** en haut à droite du menu, un pourcentage et une petite pile (verte, orange, puis rouge qui clignote quand elle est faible). En charge, la pile est jaune, avec un éclair et une jauge qui se remplit en boucle.
 
@@ -192,7 +213,7 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. **La démo cha
 
 | Ligne | Action |
 |---|---|
-| **JOUER** | **gauche / droite : choix du jeu** (SPACE DEFENDER, RAID, COURSE, RAQUETTES, BULLES, LABYRINTHE, ORBITUS, BRIQUES, BLOCS, CRUCH). Au démarrage : SPACE DEFENDER. ✕ ou OPTIONS lance la partie. |
+| **JOUER** | **gauche / droite : choix du jeu** (SPACE DEFENDER, RAID, RAQUETTES, BULLES, LABYRINTHE, ORBITUS, CASSE BRIQUES, BLOCS, CRUCH, TAUPE, BILLES, ESCALADE). Au démarrage : SPACE DEFENDER. ✕ ou OPTIONS lance la partie. |
 | **NIVEAU** | Facile / Normal / Difficile (gauche / droite ou ✕), choix gardé en mémoire |
 | **LUMINOSITE** | 0 à 100 % par pas de 10 % (gauche / droite ou ✕), visible tout de suite et gardée en mémoire. À 0 %, les dalles restent très faiblement allumées pour qu'on voie encore le menu. |
 | **VOLUME** | volume du son, 0 à 100 % par pas de 10 % (gauche / droite ou ✕). Un bip fait entendre le niveau. 0 % = muet. C'est le rapport cyclique du PWM : le potentiomètre de l'ampli règle le maximum. |
@@ -230,7 +251,7 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. **La démo cha
 |---|---|
 | stick gauche ou croix gauche / droite | bouger |
 | stick gauche ou croix haut / bas | avancer / reculer (dans le bas de l'écran, environ 45 %) |
-| croix, carré, triangle, R1, L1 ou R2 | tirer (SPACE DEFENDER, RAID, ORBITUS), sauter (COURSE), lancer la balle (BRIQUES), tourner la pièce (BLOCS), prendre un bonbon (CRUCH) |
+| croix, carré, triangle, R1, L1 ou R2 | tirer (SPACE DEFENDER, RAID, ORBITUS, BILLES), jet de boue (TAUPE), sauter (ESCALADE), lancer la balle (CASSE BRIQUES), tourner la pièce (BLOCS), prendre un bonbon (CRUCH) |
 | ○ (rond) | bombe dans RAID, saut dans BULLES, tourner dans l'autre sens (BLOCS), annuler (CRUCH) ; dans les menus : retour |
 | OPTIONS | jouer depuis le menu, pause en partie |
 | ○ (rond), pendant la pause | quitter la partie et revenir au menu |
@@ -239,7 +260,7 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. **La démo cha
 | Share + Options pendant 3 s | redémarrer l'ESP32 |
 
 - **Vibration :** la manette vibre quand ton vaisseau est touché.
-- **Barre lumineuse :** bleu sombre au menu, puis la couleur de l'évolution du vaisseau.
+- **Barre lumineuse :** bleu sombre au menu et en démo ; **pendant une partie, elle change de couleur à chaque stage** (bleu, vert, jaune, cyan, rouge, violet, en boucle), dans tous les jeux.
 
 **Connexion, une seule fois.** Une manette PS4 ne se connecte qu'à l'adresse Bluetooth qu'elle a enregistrée. Il y a deux façons de faire.
 
@@ -325,8 +346,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V3.62_complet.bin](firmware/GameHub_V3.62_complet.bin) | 0x0 | `47797da1125808cdbd2531bc9ba7f2a0` |
-| [firmware/GameHub_V3.62.bin](firmware/GameHub_V3.62.bin) | 0x10000 | `61487d4b8bf294e8e0d5a00d355c1ff5` |
+| [firmware/GameHub_V3.70_complet.bin](firmware/GameHub_V3.70_complet.bin) | 0x0 | `8567dc87998e5028824adc2d7ec75bb1` |
+| [firmware/GameHub_V3.70.bin](firmware/GameHub_V3.70.bin) | 0x10000 | `b5120dd6aee5ef7bef3df79fb061424a` |
 
 Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB SPIFFS)** dans Outils → Partition Scheme.
 

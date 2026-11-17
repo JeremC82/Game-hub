@@ -1,6 +1,6 @@
-"""GIF des jeux (apercus simules, comme les demos du jeu) : RAID, COURSE, RAQUETTES, BULLES, LABYRINTHE, ORBITUS, BRIQUES, BLOCS, CRUCH.
+"""GIF des jeux (apercus simules, comme les demos du jeu) : RAID, RAQUETTES, BULLES, LABYRINTHE, ORBITUS, BRIQUES, BLOCS, CRUCH.
 
-Sorties : docs/jeu-raid.gif, docs/jeu-course.gif, docs/jeu-raquettes.gif, docs/jeu-bulles.gif, docs/jeu-labyrinthe.gif, docs/jeu-orbite.gif
+Sorties : docs/jeu-raid.gif, docs/jeu-raquettes.gif, docs/jeu-bulles.gif, docs/jeu-labyrinthe.gif, docs/jeu-orbite.gif
 Usage : python docs/gif_jeux.py [raid course raquettes bulles labyrinthe orbite briques blocs cruch]
 Memes sprites, regles et pilotes automatiques que games.ino (version simplifiee pour l'apercu).
 """
@@ -24,8 +24,6 @@ W = H = 128
 P = 4
 WHITE = (230, 230, 230)
 GOLD = (230, 180, 40)
-run = re.findall(r'"([.wrybcgpov]{8})"', re.search(r'SPR_RUN\[3\]\[10\] = \{(.*?)\};', SRC, re.S).group(1))
-SPR_RUN = [run[i * 10:(i + 1) * 10] for i in range(3)]
 
 
 def led(img):
@@ -296,185 +294,6 @@ def raid():
                             'P : arme (3 niveaux)', 'S : bouclier (1 tir)', 'B : une bombe de plus', '8 vagues puis le boss',
                             '2e phase sous 50 % :', 'tirs en spirale']))
     save(frames, 'jeu-raid.gif')
-
-
-# ================================================================ COURSE
-def course():
-    rnd = random.Random(2)
-    st = stars_init(rnd, 40)
-    GY = H - 6
-    plats, items, blocks, rocks = [[-10, W + 20, GY]], [], [], []
-    scroll, speed, y, vy, ground, nextx, lasty = 0.0, 1.3, GY - 10.0, 0.0, True, W + 20, GY
-    score, coins, frames, PX, rock_at, pop = 0, 0, [], 22, 220, None
-
-    def plat_at(wx):
-        ys = [p[2] for p in plats if p[0] <= wx <= p[1]]
-        return min(ys) if ys else None
-
-    def gen():
-        nonlocal nextx, lasty
-        while nextx < scroll + W + 60:
-            gap = rnd.randrange(14, 24) if rnd.random() < 0.45 else 0
-            x0 = nextx + gap
-            high = rnd.random() < 0.35
-            yy = GY
-            if high:
-                yy = max(int(H * 0.45), lasty - rnd.randrange(8, 18))
-            elif lasty < GY and rnd.random() < 0.5:
-                yy = min(GY, lasty + rnd.randrange(6, 14))
-            ln = rnd.randrange(24, 42) if high else rnd.randrange(40, 86)
-            plats.append([x0, x0 + ln, yy])
-            if gap:  # arc de pieces au-dessus du trou
-                for c in range(4):
-                    items.append([x0 - gap + gap * (c + 0.5) / 4, yy - 14 - (6 if c in (1, 2) else 0), 2])
-            r = rnd.random()
-            if not high and ln > 50 and r < 0.45:  # rangee de blocs (avec blocs bonus) et pieces dessus
-                n = rnd.randrange(3, 6)
-                bx = x0 + rnd.randrange(10, int(ln) - n * 6 - 3)
-                for b in range(n):
-                    blocks.append([bx + b * 6, yy - 26, 1 if rnd.random() < 0.35 else 0])
-                for b in range(0, n, 2):
-                    items.append([bx + b * 6 + 1, yy - 32, 2])
-            elif ln > 40 and r < 0.7:
-                items.append([x0 + rnd.randrange(14, int(ln) - 10), yy, 0])
-            else:
-                for c in range(3):
-                    items.append([x0 + ln / 2 - 8 + c * 8, yy - 8, 2])
-            lasty, nextx = yy, x0 + ln
-    gen()
-    hold = False
-    for f in range(420):
-        scroll += speed
-        wx = scroll + PX
-        jump = False
-        if ground:  # pilote automatique
-            ahead = 10 + speed * 14
-            if any(it[2] == 0 and wx < it[0] < wx + ahead for it in items):
-                jump = True
-            if any(wx < rk[0] < wx + ahead + 10 for rk in rocks):
-                jump = True
-            py_ = plat_at(wx + 8 + speed * 6)
-            if py_ is None or py_ > y + 11:
-                jump = True
-            if any(wx < p[0] < wx + ahead and p[2] < y + 8 for p in plats):
-                jump = True
-            if any(b[0] - 3 < wx < b[0] + 3 and b[2] == 1 for b in blocks):  # coup de tete sous un bloc bonus
-                jump = True
-        if jump and ground:
-            vy, ground, hold = -4.1, False, True
-        if vy >= 0:
-            hold = False
-        vy = min(vy + (0.22 if hold and vy < 0 else 0.36), 4.5)
-        old_feet, old_head = y + 10, y
-        y += vy
-        ground = False
-        for p in plats:
-            if wx + 6 >= p[0] and wx + 1 <= p[1] and vy >= 0 and old_feet <= p[2] + 1 and y + 10 >= p[2]:
-                y, vy, ground = p[2] - 10, 0, True
-        for b in blocks:
-            if wx + 6 < b[0] or wx + 1 > b[0] + 6:
-                continue
-            if vy >= 0 and old_feet <= b[1] + 1 and y + 10 >= b[1]:
-                y, vy, ground = b[1] - 10, 0, True
-            elif vy < 0 and old_head >= b[1] + 6 and y <= b[1] + 6:
-                y, vy = b[1] + 6, 0.5
-                if b[2] == 1:
-                    b[2] = 2
-                    pop = [b[0] + 1, b[1] - 6, -2.2, 18]
-                    coins += 1; score += 100
-        if pop:
-            pop[3] -= 1; pop[1] += pop[2]; pop[2] += 0.25
-            if pop[3] <= 0:
-                pop = None
-        for it in list(items):
-            sx = it[0] - scroll
-            if it[2] >= 1 and PX - 4 <= sx <= PX + 8 and y - 4 <= it[1] <= y + 11:
-                items.remove(it)
-                coins += 1; score += 10
-        if scroll > rock_at:  # rocher qui arrive en roulant
-            rock_at = scroll + rnd.randrange(220, 420)
-            rocks.append([scroll + W + 8, GY - 40.0, 0.0])
-        for rk in list(rocks):
-            rk[0] -= 0.9
-            rk[2] = min(rk[2] + 0.3, 4)
-            rk[1] += rk[2]
-            py_ = plat_at(rk[0] + 3)
-            if py_ is not None and rk[1] + 7 >= py_ and rk[1] + 7 - rk[2] <= py_ + 2:
-                rk[1], rk[2] = py_ - 7, 0
-            sx = rk[0] - scroll
-            if sx + 7 >= PX + 1 and sx <= PX + 6 and rk[1] + 7 >= y and rk[1] <= y + 10 and vy > 0 and y + 10 <= rk[1] + 4:
-                rocks.remove(rk); vy = -3; score += 200  # ecrase en retombant dessus
-                continue
-            if rk[1] > H or rk[0] < scroll - 20:
-                rocks.remove(rk)
-        if y > H:
-            y, vy = GY - 10, 0
-        if f % 4 == 0:
-            score += 2
-        plats = [p for p in plats if p[1] > scroll - 20]
-        items = [it for it in items if it[0] > scroll - 20]
-        blocks = [b for b in blocks if b[0] > scroll - 20]
-        gen()
-        if f % 2:
-            continue
-        s = Screen(W, H)
-        stars_draw(s, st, 0.12, rnd)
-        d = ImageDraw.Draw(s.im)
-        m = scroll * 0.3
-        for x in range(0, W, 2):  # montagnes au loin
-            h = 10 + int(8 * math.sin((x + m) * 0.045) + 5 * math.sin((x + m) * 0.11 + 1))
-            s.px(x, H - 20 - h, (40, 50, 90)); s.px(x + 1, H - 20 - h, (40, 50, 90))
-        for p in plats:
-            x0, x1 = max(0, int(p[0] - scroll)), min(W - 1, int(p[1] - scroll))
-            if x1 <= x0:
-                continue
-            gnd = p[2] >= GY
-            d.rectangle((x0, p[2], x1, H - 1 if gnd else p[2] + 2), fill=(110, 60, 25) if gnd else (120, 120, 140))
-            d.line((x0, p[2], x1, p[2]), fill=(40, 200, 60))
-        for b in blocks:
-            sx = int(b[0] - scroll)
-            if b[2] == 0:  # bloc de pierre
-                d.rectangle((sx, b[1], sx + 5, b[1] + 5), fill=(150, 110, 70))
-                d.line((sx, b[1] + 5, sx + 5, b[1] + 5), fill=(80, 55, 30))
-                d.line((sx + 5, b[1], sx + 5, b[1] + 5), fill=(80, 55, 30))
-            else:  # bloc bonus (bordure doree, cristal grave) ou eteint
-                d.rectangle((sx, b[1], sx + 5, b[1] + 5), fill=(60, 40, 10) if b[2] == 1 else (70, 60, 50),
-                            outline=GOLD if b[2] == 1 else (80, 55, 30))
-                if b[2] == 1:
-                    s.px(sx + 2, b[1] + 2, PAL['c']); s.px(sx + 3, b[1] + 3, PAL['c'])
-
-        def coin(x, yy):
-            d.line((x + 1, yy, x + 3, yy), fill=GOLD)
-            d.rectangle((x, yy + 1, x + 4, yy + 3), fill=GOLD)
-            d.line((x + 1, yy + 4, x + 3, yy + 4), fill=GOLD)
-            s.px(x + 1, yy + 1, PAL['w'] if f & 16 else GOLD)
-        for it in items:
-            sx = int(it[0] - scroll)
-            if it[2] == 0:  # piques
-                for t in range(3):
-                    for r in range(4):
-                        x = sx + t * 3 + (3 - r) // 2 - 1
-                        d.line((x, it[1] - 1 - r, x + max(1, r // 2 + 1) - 1, it[1] - 1 - r), fill=PAL['w'])
-            else:
-                coin(sx, int(it[1]) - 2)
-        if pop:
-            coin(int(pop[0] - scroll), int(pop[1]))
-        for rk in rocks:
-            sx = int(rk[0] - scroll)
-            d.ellipse((sx, int(rk[1]), sx + 6, int(rk[1]) + 6), fill=(130, 120, 110))
-            a = -rk[0] * 0.3
-            d.line((sx + 3, int(rk[1]) + 3, sx + 3 + math.cos(a) * 3, int(rk[1]) + 3 + math.sin(a) * 3), fill=(60, 55, 50))
-        fr = 2 if not ground else (f // 5) & 1
-        s.sprite(SPR_RUN[fr], PX, int(y))
-        hud(s, score)
-        tw = len(str(coins)) * 4 - 1
-        coin(W - 1 - tw - 7, 7)
-        s.tiny(W - 1 - tw, 7, str(coins), WHITE)
-        frames.append(page(led(s.im), 'COURSE', 'Pieces, blocs, rochers qui roulent : le petit bonhomme court tout seul.',
-                           ['Commandes :', 'X ou haut : sauter', 'garder appuye : plus haut', '', 'Regles :',
-                            'piece : 10 (30 = 1 vie)', 'bloc dore : coup de tete', '  = une piece', 'rocher : sauter ou',
-                            '  ecraser (200)', 'trou ou piques : -1 vie', 'stage : plus vite, +1 vie']))
-    save(frames, 'jeu-course.gif')
 
 
 # ================================================================ RAQUETTES
@@ -813,7 +632,8 @@ def labyrinthe():
             px8(lx, ly, dk)
         for b in booms:
             boom(s, [b[0], b[1] - cam, b[2]])
-        hud(s, score, 3, ['.ggg.', 'gwgwg', 'ggggg', 'g.g.g'])  # vies : le scarabee
+        hud(s, score, 0)
+        life_icons(s, ['p.p.p', '.pwp.', 'ppppp', 'p.p.p'], 3, 'pog')  # vies : creatures de couleurs
         frames.append(page(led64(s.im), 'LABYRINTHE', 'Une dalle 128x64 : le labyrinthe defile pour suivre le scarabee.',
                            ['Commandes :', 'croix / stick : diriger', '', 'Regles :', 'graine : 10 points',
                             'grosse graine : les', 'creatures deviennent', 'bleues et fuient', 'en attraper une :',
@@ -1421,12 +1241,13 @@ def briques():
                 s.px(x + 2, y + 1, PAL['w'])
         for b in booms:
             boom(s, b)
-        hud(s, score)
-        frames.append(page(led64(s.im), 'BRIQUES', 'Casse-briques : 6 tableaux qui reviennent en boucle, balle plus rapide.',
+        hud(s, score, 0)
+        life_icons(s, ['.ww..', 'wwww.', 'wwww.', '.ww..'])  # vies : balles blanches
+        frames.append(page(led64(s.im), 'CASSE BRIQUES', 'Casse-briques : 6 tableaux qui reviennent en boucle, balle plus rapide.',
                            ['Commandes :', 'gauche / droite :', '  raquette', 'X : lancer la balle', '', 'Regles :',
                             'argent : 2 ou 3 coups', 'or : incassable', 'capsules : cyan large,', '  orange lente,',
                             '  magenta 3 balles,', '  rouge une vie']))
-    save(frames, 'jeu-briques.gif')
+    save(frames, 'jeu-casse-briques.gif')
 
 
 # ================================================================ BLOCS (une dalle 128x64)
@@ -1746,7 +1567,8 @@ def cruch():
         fill = min(gh - 2, int((gh - 2) * score / goal))
         if fill > 0:
             d.rectangle((px_ + 1, gy + gh - 1 - fill, px_ + 8, gy + gh - 2), fill=PAL['g'] if score >= goal else PAL['p'])
-        hud(s, score)
+        hud(s, score, 0)
+        life_icons(s, ['..g..', '.rrr.', 'rwrrr', '.rrr.'])  # vies : des pommes
         frames.append(page(led64(s.im), 'CRUCH', 'Aligne au moins 3 bonbons identiques : ils disparaissent, les autres tombent.',
                            ['Commandes :', 'croix / stick : curseur', 'X : prendre un bonbon', 'puis une direction :',
                             '  echanger', 'rond : annuler', '', 'Regles :', '4 alignes : bonbon raye', '5 alignes : bombe',
@@ -1754,6 +1576,470 @@ def cruch():
     save(frames, 'jeu-cruch.gif')
 
 
-todo = GIF_ARGS or ['raid', 'course', 'raquettes', 'bulles', 'labyrinthe', 'orbite', 'briques', 'blocs', 'cruch']
+
+
+def life_icons(s, rows, n=3, colors=None):  # vies en haut a droite avec un dessin donne (une couleur par icone si colors)
+    for i in range(n):
+        for r, line in enumerate(rows):
+            for c, ch in enumerate(line):
+                if ch != '.':
+                    col = PAL[colors[i % len(colors)]] if (colors and ch == 'p') else PAL[ch]
+                    s.px(W - 6 - i * 7 + c, 1 + r, col)
+
+
+# ================================================================ TAUPE (une dalle 128x64)
+def taupe():
+    rnd = random.Random(12)
+    HS, TS, Y0 = 64, 5, 14
+    COLS, ROWS = 25, 10
+    X0 = (W - COLS * TS) // 2
+    grid = [[1] * COLS for _ in range(ROWS)]
+    mc = COLS // 2
+    for r in range(ROWS // 2 + 1):
+        grid[r][mc] = 0
+    en = []
+    for i, (r, c, hz) in enumerate(((3, 3, 1), (6, 17, 1), (8, 6, 0), (4, 20, 0))):
+        for k in range(4):
+            if hz:
+                grid[r][c + k] = 0
+            else:
+                grid[min(ROWS - 1, r + k // 2)][c] = 0
+        en.append({'c': c, 'r': r, 'x': X0 + c * TS + 2.5, 'y': Y0 + r * TS + 2.5, 'dx': 1 if hz else 0, 'dy': 0 if hz else 1,
+                   'type': i % 3 == 2, 'stun': 0, 'on': True})
+    rocks = [{'c': 8, 'r': 2, 'y': Y0 + 2 * TS, 'st': 0, 'wob': 0, 'vy': 0}, {'c': 15, 'r': 5, 'y': Y0 + 5 * TS, 'st': 0, 'wob': 0, 'vy': 0}]
+    pc, pr = mc, 0
+    px, py = X0 + pc * TS + 2.5, Y0 + pr * TS + 2.5
+    face, ddx, ddy = 1, 0, 1
+    shot, booms, score, frames = None, [], 0, []
+    SOIL = ((170, 110, 50), (200, 120, 40), (150, 70, 40), (110, 50, 90))
+    MOLE = (("..ooo.", ".oooob", "oooooo", "ooooop", ".w..w."), ("..ooo.", ".oooob", "oooooo", "ooooop", "w..w.."))
+    WORM = ((".ppp..", "pwpppp", "pppppp", "..pp.."), ("..ppp.", "ppwppp", "pppppp", ".p..p."))
+    BAT = (("v.vv.v", "vvwwvv", ".vvvv.", "..vv.."), ("..vv..", ".vwwv.", "vvvvvv", "v....v"))
+    for f in range(480):
+        live = [e for e in en if e['on']]
+        if not live:
+            break
+        tgt = min(live, key=lambda e: abs(e['c'] - pc) + abs(e['r'] - pr))
+        cx, cy = X0 + pc * TS + 2.5, Y0 + pr * TS + 2.5
+        if abs(px - cx) < 0.01 and abs(py - cy) < 0.01:
+            dc, dr = tgt['c'] - pc, tgt['r'] - pr
+            aligned = (dr == 0 and 0 < abs(dc) <= 3) or (dc == 0 and 0 < abs(dr) <= 3)
+            if aligned and shot is None:
+                ddx, ddy = (1 if dc > 0 else -1, 0) if dr == 0 else (0, 1 if dr > 0 else -1)
+                face = ddx or face
+                shot = {'x': px, 'y': py, 'dx': ddx, 'dy': ddy, 'left': TS * 3}
+            elif not aligned:
+                if abs(dc) > abs(dr):
+                    ddx, ddy = (1 if dc > 0 else -1), 0
+                else:
+                    ddx, ddy = 0, (1 if dr > 0 else -1)
+                if ddx:
+                    face = ddx
+                nc, nr = pc + ddx, pr + ddy
+                if 0 <= nc < COLS and 0 <= nr < ROWS and not any(k['c'] == nc and int((k['y'] - Y0) // TS) == nr for k in rocks):
+                    pc, pr = nc, nr
+        sp = 0.55 if grid[pr][pc] else 0.95
+        tx, ty = X0 + pc * TS + 2.5, Y0 + pr * TS + 2.5
+        px += max(-sp, min(sp, tx - px))
+        py += max(-sp, min(sp, ty - py))
+        if grid[pr][pc] and abs(px - tx) + abs(py - ty) < 3:
+            grid[pr][pc] = 0
+            score += 1
+        if shot:
+            for _ in range(2):
+                shot['x'] += shot['dx']; shot['y'] += shot['dy']; shot['left'] -= 1
+                c, r = int((shot['x'] - X0) // TS), int((shot['y'] - Y0) // TS)
+                if shot['left'] <= 0 or not (0 <= c < COLS and 0 <= r < ROWS) or grid[r][c]:
+                    shot = None
+                    break
+                hit = [e for e in en if e['on'] and abs(e['x'] - shot['x']) < 3.5 and abs(e['y'] - shot['y']) < 3.5]
+                if hit:
+                    e = hit[0]
+                    if e['stun']:
+                        e['on'] = False
+                        score += 200 + 100 * (e['r'] * 4 // ROWS)
+                        booms.append([int(e['x']), int(e['y']), 1])
+                    else:
+                        e['stun'] = 140
+                    shot = None
+                    break
+        for e in en:
+            if not e['on']:
+                continue
+            if e['stun']:
+                e['stun'] -= 1
+                continue
+            ex, ey = X0 + e['c'] * TS + 2.5, Y0 + e['r'] * TS + 2.5
+            if abs(e['x'] - ex) < 0.01 and abs(e['y'] - ey) < 0.01:
+                opts = [(dx, dy) for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)) if 0 <= e['c'] + dx < COLS and 0 <= e['r'] + dy < ROWS
+                        and grid[e['r'] + dy][e['c'] + dx] == 0 and (dx, dy) != (-e['dx'], -e['dy'])]
+                if not opts:
+                    opts = [(-e['dx'], -e['dy'])]
+                e['dx'], e['dy'] = rnd.choice(opts)
+                e['c'] += e['dx']; e['r'] += e['dy']
+            e['x'] += max(-0.45, min(0.45, X0 + e['c'] * TS + 2.5 - e['x']))
+            e['y'] += max(-0.45, min(0.45, Y0 + e['r'] * TS + 2.5 - e['y']))
+        for k in rocks:
+            r = int((k['y'] - Y0) // TS)
+            if k['st'] == 0 and r + 1 < ROWS and grid[r + 1][k['c']] == 0 and not (pc == k['c'] and pr == r + 1):
+                k['st'], k['wob'] = 1, 40
+            elif k['st'] == 1:
+                k['wob'] -= 1
+                if k['wob'] <= 0:
+                    k['st'], k['vy'] = 2, 0.3
+            elif k['st'] == 2:
+                k['vy'] = min(k['vy'] + 0.08, 2.5)
+                k['y'] += k['vy']
+                for e in en:
+                    if e['on'] and e['c'] == k['c'] and abs(e['y'] - (k['y'] + TS / 2)) < TS:
+                        e['on'] = False
+                        score += 600
+                        booms.append([int(e['x']), int(e['y']), 1])
+                rr = int((k['y'] + TS - 1 - Y0) // TS)
+                if rr >= ROWS or grid[rr][k['c']]:
+                    k['st'] = 3
+                    booms.append([X0 + k['c'] * TS + 2, int(k['y']) + 2, 1])
+        rocks = [k for k in rocks if k['st'] != 3]
+        for b in booms:
+            b[2] += 1
+        booms = [b for b in booms if b[2] < 12]
+        if f % 2:
+            continue
+        s = Screen(W, HS)
+        d = ImageDraw.Draw(s.im)
+        for y in range(8, Y0 - 1):
+            d.line((0, y, W - 1, y), fill=(20, 40 + (y - 8) * 8, 120 + (y - 8) * 10))
+        d.line((0, Y0 - 1, W - 1, Y0 - 1), fill=(40, 200, 60))
+        d.rectangle((W - 12, 9, W - 9, 12), fill=(255, 220, 60))
+        for r in range(ROWS):
+            so = SOIL[r * 4 // ROWS]
+            dk = tuple(v * 2 // 3 for v in so)
+            for c in range(COLS):
+                x, y = X0 + c * TS, Y0 + r * TS
+                if grid[r][c]:
+                    d.rectangle((x, y, x + TS - 1, y + TS - 1), fill=so)
+                    s.px(x + (r * 3 + c * 7) % TS, y + (r * 5 + c * 3) % TS, dk)
+                    s.px(x + (r * 7 + c * 5 + 2) % TS, y + (r + c * 4 + 1) % TS, dk)
+        for k in rocks:
+            x, y = X0 + k['c'] * TS + (((f // 2) & 1) if k['st'] == 1 else 0), int(k['y'])
+            d.rectangle((x, y + 1, x + TS - 1, y + TS - 1), fill=(130, 130, 140))
+            d.line((x + 1, y, x + TS - 2, y), fill=(130, 130, 140))
+            d.line((x + 1, y + 1, x + 2, y + 1), fill=(220, 220, 230))
+            d.line((x + 1, y + TS - 1, x + TS - 2, y + TS - 1), fill=(60, 60, 70))
+
+        def spr(rows, x, y, flip):
+            for rr, line in enumerate(rows):
+                for cc, ch in enumerate(line[::-1] if flip else line):
+                    if ch != '.':
+                        s.px(x + cc, y + rr, PAL[ch])
+        for e in en:
+            if not e['on']:
+                continue
+            fr = (f // 8) & 1
+            spr((BAT if e['type'] else WORM)[0 if e['stun'] else fr], int(e['x']) - 3, int(e['y']) - 2, e['dx'] < 0)
+            if e['stun'] and f & 4:
+                d.line((int(e['x']) - 2, int(e['y']) - 4, int(e['x']) + 1, int(e['y']) - 4), fill=PAL['y'])
+        if shot:
+            d.rectangle((int(shot['x']) - 1, int(shot['y']) - 1, int(shot['x']), int(shot['y'])), fill=(150, 90, 40))
+        spr(MOLE[(f // 6) & 1], int(px) - 3, int(py) - 2, face < 0)
+        for b in booms:
+            boom(s, b)
+        hud(s, score)
+        frames.append(page(led64(s.im), 'TAUPE', 'Une taupe creuse ses galeries ; jet de boue, rochers qui tombent.',
+                           ['Commandes :', 'croix / stick : creuser', 'X : jet de boue', '', 'Regles :', '1er jet : assommee',
+                            '2e jet : elle eclate', '(plus profond = plus', '  de points)', 'creuser sous un rocher :',
+                            '  il tombe et ecrase', 'tout elimine : stage +1']))
+    save(frames, 'jeu-taupe.gif')
+
+
+# ================================================================ BILLES (une dalle 128x64)
+def billes():
+    rnd = random.Random(8)
+    HS, B, RH, Y0, NC, NR = 64, 6, 5, 9, 8, 14
+    X0 = (W - (NC * B + B // 2)) // 2
+    VIS = (HS - Y0 - B - 6) // RH
+    COLS = [None, (255, 50, 60), (255, 220, 0), (40, 220, 80), (40, 120, 255), (200, 70, 255), (0, 220, 255)]
+    G = [[0] * NC for _ in range(NR)]
+    for r in range(5):
+        for c in range(NC - (r & 1)):
+            G[r][c] = 1 + rnd.randrange(4)
+
+    def rc(r):
+        return NC - (r & 1)
+
+    def cxy(r, c):
+        return X0 + c * B + (B / 2 if r & 1 else 0) + B / 2, Y0 + r * RH + B / 2
+
+    def nbrs(r, c):
+        o = r & 1
+        dd = ((0, -1), (0, 1), (-1, 0), (-1, 1), (1, 0), (1, 1)) if o else ((0, -1), (0, 1), (-1, -1), (-1, 0), (1, -1), (1, 0))
+        return [(r + a, c + b) for a, b in dd if 0 <= r + a < NR and 0 <= c + b < rc(r + a)]
+
+    def flood(r0, c0, col):
+        seen, q = {(r0, c0)}, [(r0, c0)]
+        while q:
+            r, c = q.pop()
+            for nr, nc in nbrs(r, c):
+                if (nr, nc) not in seen and G[nr][nc] and (not col or G[nr][nc] == col):
+                    seen.add((nr, nc))
+                    q.append((nr, nc))
+        return seen
+
+    def trace(ang):
+        x, y, vx, vy = W / 2, HS - B / 2 - 3, math.sin(ang), -math.cos(ang)
+        pts = []
+        for st in range(400):
+            x += vx; y += vy
+            if x < X0 + B / 2:
+                x, vx = X0 + B / 2, -vx
+            if x > X0 + NC * B:
+                x, vx = X0 + NC * B, -vx
+            pts.append((x, y))
+            if y <= Y0 + B / 2 or any(G[r][c] and abs(cxy(r, c)[0] - x) < B * .9 and abs(cxy(r, c)[1] - y) < B * .9
+                                     for r in range(VIS + 1) for c in range(rc(r))):
+                best = min(((r, c) for r in range(NR) for c in range(rc(r)) if not G[r][c]),
+                           key=lambda rc_: (cxy(*rc_)[0] - x) ** 2 + (cxy(*rc_)[1] - y) ** 2)
+                return best, pts
+        return None, pts
+    cur, nxt, ang, target, flying, fb, score, frames, booms, shots = 1 + rnd.randrange(4), 1 + rnd.randrange(4), 0.0, None, None, 0, 0, [], [], 0
+    for f in range(560):
+        if flying is None:
+            if target is None:
+                best = -99
+                for a in range(-70, 71, 4):
+                    land, _ = trace(a * 0.01745)
+                    if not land:
+                        continue
+                    G[land[0]][land[1]] = cur
+                    n = len(flood(land[0], land[1], cur)) * 10 - land[0] + rnd.randrange(5)
+                    G[land[0]][land[1]] = 0
+                    if n > best:
+                        best, target = n, a * 0.01745
+            if abs(target - ang) > 0.03:
+                ang += 0.035 if target > ang else -0.035
+            else:
+                land, pts = trace(ang)
+                flying, fb, target = (land, pts), 0, None
+        else:
+            fb += 3
+            if fb >= len(flying[1]):
+                (r, c), _ = flying
+                G[r][c] = cur
+                grp = flood(r, c, cur)
+                if len(grp) >= 3:
+                    for rr, cc in grp:
+                        G[rr][cc] = 0
+                        if rnd.random() < 0.4:
+                            booms.append([int(cxy(rr, cc)[0]), int(cxy(rr, cc)[1]), 1])
+                    score += 10 * len(grp)
+                    keep = set()
+                    for cc in range(rc(0)):
+                        if G[0][cc]:
+                            keep |= flood(0, cc, 0)
+                    fall = [(rr, cc) for rr in range(NR) for cc in range(rc(rr)) if G[rr][cc] and (rr, cc) not in keep]
+                    for rr, cc in fall:
+                        G[rr][cc] = 0
+                        booms.append([int(cxy(rr, cc)[0]), int(cxy(rr, cc)[1]), 1])
+                    if fall:
+                        score += 20 << min(len(fall), 10)
+                shots += 1
+                cur, nxt, flying = nxt, 1 + rnd.randrange(4), None
+                if not any(G[rr][cc] for rr in range(NR) for cc in range(rc(rr))):
+                    for rr in range(5):
+                        for cc in range(rc(rr)):
+                            G[rr][cc] = 1 + rnd.randrange(4)
+        for b in booms:
+            b[2] += 1
+        booms = [b for b in booms if b[2] < 12]
+        if f % 2:
+            continue
+        s = Screen(W, HS)
+        d = ImageDraw.Draw(s.im)
+        bw = NC * B + B // 2
+        by1 = Y0 + VIS * RH + B // 2
+        d.rectangle((X0, 8, X0 + bw - 1, HS - 1), fill=(10, 12, 30))
+        d.rectangle((X0 - 2, 8, X0 - 1, HS - 1), fill=(90, 100, 160))
+        d.rectangle((X0 + bw, 8, X0 + bw + 1, HS - 1), fill=(90, 100, 160))
+        d.rectangle((X0, 8, X0 + bw - 1, Y0 - 1), fill=(150, 120, 60))
+        for x in range(X0, X0 + bw, 3):
+            s.px(x, by1, (255, 60, 60))
+
+        def ball(cx, cy, col):
+            c = COLS[col]
+            cx, cy = int(cx), int(cy)
+            d.rectangle((cx - 2, cy - 1, cx + 2, cy + 1), fill=c)
+            d.rectangle((cx - 1, cy - 2, cx + 1, cy + 2), fill=c)
+            s.px(cx - 1, cy - 1, (255, 255, 255))
+            s.px(cx + 1, cy + 2, tuple(v // 3 for v in c)); s.px(cx + 2, cy + 1, tuple(v // 3 for v in c))
+        for r in range(NR):
+            for c in range(rc(r)):
+                if G[r][c]:
+                    ball(*cxy(r, c), G[r][c])
+        cx, cy = W // 2, HS - B // 2 - 3
+        if flying is None:
+            _, pts = trace(ang)
+            for i, (x, y) in enumerate(pts):
+                if i % 4 == 0 and i > 6:
+                    s.px(int(x), int(y), (140, 140, 160))
+            ball(cx, cy, cur)
+        else:
+            x, y = flying[1][min(fb, len(flying[1]) - 1)]
+            ball(x, y, cur)
+        d.line((cx, cy, cx + int(math.sin(ang) * (B + 2)), cy - int(math.cos(ang) * (B + 2))), fill=PAL['w'])
+        d.rectangle((cx - 4, HS - 3, cx + 4, HS - 1), fill=(120, 120, 140))
+        pxx = min(X0 + bw + 6, W - 24)
+        s.tiny(pxx, 12, 'APRES', (110, 110, 140))
+        ball(pxx + 6, 25, nxt)
+        for i in range(8 - shots % 8):
+            d.rectangle((pxx + i * 3, HS - 6, pxx + i * 3 + 1, HS - 4), fill=(255, 160, 40))
+        for b in booms:
+            boom(s, b)
+        hud(s, score, 0)
+        frames.append(page(led64(s.im), 'BILLES', 'Vise et tire : 3 billes de meme couleur ou plus eclatent.',
+                           ['Commandes :', 'gauche / droite : viser', 'stick : angle direct', 'X : tirer', '', 'Regles :',
+                            '3 ou plus : eclatent', 'detachees : tombent', '  (gros bonus)', 'tous les 8 tirs, le',
+                            '  plafond descend', 'ligne rouge : fin']))
+    save(frames, 'jeu-billes.gif')
+
+
+# ================================================================ ESCALADE (une dalle 128x64)
+def escalade():
+    rnd = random.Random(5)
+    HS, NF, GAP = 64, 4, 8
+    sp_ = (HS - 14) // NF
+    FY = [HS - 3 - f * sp_ for f in range(NF)]
+    LAD = [[(W // 4 + 6 * f) if f & 1 else (W * 3 // 4 - 6 * f), (W * 2 // 3 + 4 * f) if f & 1 else (W // 3 - 4 * f)] for f in range(NF - 1)]
+
+    def ddir(f):
+        return 1 if f & 1 else -1
+
+    def minx(f):
+        return GAP if (f > 0 and ddir(f) < 0) else 0
+
+    def maxx(f):
+        return W - GAP if (f > 0 and ddir(f) > 0) else W
+    x, y, floor, climb, jump, vy, face = 8.0, float(FY[0]), 0, False, 0, 0.0, True
+    crates, throw, score, frames, booms = [], 30, 0, [], []
+    ROBOT = ("...www...", "..wwwww..", "..wrwrw..", "..wwwww..", "...ccc...", "w.ccccc.w", "wcccbcccw", "..ccccc..", "..c...c..", ".cc...cc.")
+    HERO = ((".yyy.", ".www.", "ggggg", ".ggg.", ".bbb.", ".b.b.", "o...o"), (".yyy.", ".www.", "ggggg", ".ggg.", ".bbb.", "b...b", "o...o"))
+    for f in range(560):
+        k = 0
+        if climb:
+            k = 8
+        else:
+            for c in crates:
+                if c['floor'] == floor and not c['fall'] and abs(c['x'] - x) < 14 and (c['x'] - x) * ddir(floor) < 0:
+                    k |= 4
+            if floor >= NF - 1:
+                k |= 2
+            else:
+                best = min(LAD[floor], key=lambda lx: abs(lx - (x + 2)))
+                k |= 8 if abs(best - (x + 2)) < 2 else (1 if best < x + 2 else 2)
+        if climb:
+            y -= 0.6
+            if y <= FY[floor + 1]:
+                y, floor, climb = float(FY[floor + 1]), floor + 1, False
+                score += 20
+        elif not jump:
+            if k & 1:
+                x -= 0.9; face = False
+            if k & 2:
+                x += 0.9; face = True
+            if k & 8 and floor < NF - 1 and any(abs(x + 2 - lx) < 3 for lx in LAD[floor]):
+                x = min(LAD[floor], key=lambda lx: abs(lx - (x + 2))) - 2
+                climb = True
+            if k & 4 and not climb:
+                jump, vy = 1, -1.6
+        else:
+            x += 0.72 if face else -0.72
+            vy += 0.16
+            y += vy
+            if y >= FY[floor]:
+                y, jump = float(FY[floor]), 0
+        if not climb:
+            x = max(minx(floor), min(maxx(floor) - 5, x))
+        throw -= 1
+        if throw <= 0:
+            throw = 110 + rnd.randrange(40)
+            crates.append({'floor': NF - 1, 'x': 16.0, 'y': float(FY[NF - 1] - 5), 'fall': False, 'lad': -1, 'jumped': False})
+        for c in crates:
+            fl = c['floor']
+            if c['lad'] >= 0:
+                c['y'] += 0.6
+                if c['y'] >= FY[fl - 1] - 5:
+                    c['floor'] -= 1; c['y'] = float(FY[c['floor']] - 5); c['lad'] = -1
+            elif c['fall']:
+                c['y'] += 1.5
+                if fl == 0:
+                    c['gone'] = True
+                elif c['y'] >= FY[fl - 1] - 5:
+                    c['floor'] -= 1; c['y'] = float(FY[c['floor']] - 5); c['fall'] = False
+            else:
+                c['x'] += ddir(fl) * 0.7
+                if fl > 0 and (c['x'] < minx(fl) - 2 or c['x'] > maxx(fl) - 3):
+                    c['fall'] = True
+                if fl == 0 and (c['x'] < -6 or c['x'] > W):
+                    c['gone'] = True
+                if fl > 0:
+                    for i in range(2):
+                        if abs(c['x'] + 2 - LAD[fl - 1][i]) < 0.42 and rnd.random() < 0.25:
+                            c['lad'] = i
+            if not c['jumped'] and jump and abs(c['x'] - x) < 3 and y <= c['y'] + 1:
+                c['jumped'] = True
+                score += 100
+        crates = [c for c in crates if not c.get('gone')]
+        if floor == NF - 1 and not climb and x >= maxx(floor) - 12:
+            score += 2000
+            booms.append([int(x) + 2, int(y) - 4, 1])
+            x, y, floor = 8.0, float(FY[0]), 0
+        for b in booms:
+            b[2] += 1
+        booms = [b for b in booms if b[2] < 12]
+        if f % 2:
+            continue
+        s = Screen(W, HS)
+        d = ImageDraw.Draw(s.im)
+        for fl in range(NF):
+            x0, x1, yy = minx(fl), maxx(fl), FY[fl]
+            d.rectangle((x0, yy, x1 - 1, yy + 1), fill=(220, 60, 60))
+            for xx in range(x0 + 2, x1, 6):
+                s.px(xx, yy, (255, 200, 140))
+        for fl in range(NF - 1):
+            for lx in LAD[fl]:
+                xx, y0, y1 = lx - 2, FY[fl + 1] + 2, FY[fl]
+                d.line((xx, y0, xx, y1 - 1), fill=(80, 200, 255)); d.line((xx + 4, y0, xx + 4, y1 - 1), fill=(80, 200, 255))
+                for yy in range(y0 + 1, y1, 3):
+                    d.line((xx, yy, xx + 4, yy), fill=(80, 200, 255))
+        ry = FY[NF - 1] - 10
+        for r, line in enumerate(ROBOT):
+            for cc, ch in enumerate(line):
+                if ch != '.':
+                    s.px(2 + cc, ry + r, PAL[ch])
+        fx, fy = maxx(NF - 1) - 6, FY[NF - 1] - 8
+        d.line((fx, fy, fx, fy + 7), fill=PAL['w'])
+        d.rectangle((fx + 1, fy, fx + 4, fy + 2), fill=PAL['y'] if f & 16 else PAL['o'])
+        for c in crates:
+            cx_, cy_ = int(c['x']), int(c['y'])
+            d.rectangle((cx_, cy_, cx_ + 4, cy_ + 4), fill=(170, 110, 50), outline=(100, 60, 20))
+            if int(c['x'] / 3) & 1:
+                d.line((cx_, cy_, cx_ + 4, cy_ + 4), fill=(100, 60, 20))
+            else:
+                d.line((cx_ + 4, cy_, cx_, cy_ + 4), fill=(100, 60, 20))
+        fr = (f // 8) & 1 if (climb or int(x / 3) & 1) else 0
+        for r, line in enumerate(HERO[fr]):
+            for cc, ch in enumerate(line):
+                if ch != '.':
+                    s.px(int(x) + cc, int(y) - 7 + r, PAL[ch])
+        for b in booms:
+            boom(s, b)
+        hud(s, score)
+        frames.append(page(led64(s.im), 'ESCALADE', "Grimpe jusqu'au drapeau en sautant les caisses du robot.",
+                           ['Commandes :', 'gauche / droite', 'haut / bas : echelles', 'X ou rond : sauter', '', 'Regles :',
+                            'sauter une caisse : 100', 'drapeau en haut :', '  stage suivant', 'caisses plus rapides',
+                            '  a chaque stage']))
+    save(frames, 'jeu-escalade.gif')
+
+
+todo = GIF_ARGS or ['raid', 'raquettes', 'bulles', 'labyrinthe', 'orbite', 'briques', 'blocs', 'cruch', 'taupe', 'billes', 'escalade']
 for name in todo:
     globals()[name]()

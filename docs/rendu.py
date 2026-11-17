@@ -294,8 +294,8 @@ pages = []
 for page in ('menu', 'scores', 'nom'):
     s = star_screen(11)
     if page == 'menu':  # titre, record avec le nom, puis le menu
-        text_big(s, (128 - 72) // 2, 2, 'ARCADE', SEL)
-        s.text(19, 'GAMES', (0, 220, 255))
+        text_big(s, (128 - 72) // 2, 2, 'ARCADE', (40, 230, 80))
+        s.text(19, 'GAMES', (140, 255, 150))
         s.text(29, 'RECORD 30800 JER', (255, 40, 40))
         y = 64 - 22
         box(s, y - 6, y + 6 * 11 + 16)
