@@ -274,9 +274,15 @@ def raid():
             d.line((10, 13, 10 + (W - 21) * max(0, boss['hp']) // boss['max'], 13),
                    fill=PAL['o'] if boss['hp'] < boss['max'] / 2 else PAL['r'])
         if cap:
-            col = PAL['y'] if f & 4 else {'P': PAL['g'], 'S': PAL['c'], 'B': PAL['r']}[cap[2]]
-            d.rectangle((int(cap[0]) - 1, int(cap[1]) - 1, int(cap[0]) + 7, int(cap[1]) + 8), outline=col)
-            char6(s, int(cap[0]) + 1, int(cap[1]), cap[2], col)
+            col = PAL['w'] if f & 4 else {'P': PAL['y'], 'S': PAL['c'], 'B': PAL['r']}[cap[2]]
+            d.rounded_rectangle((int(cap[0]) - 1, int(cap[1]) - 1, int(cap[0]) + 7, int(cap[1]) + 8), radius=2, outline=col)
+            icon = {'P': ("...y...", "..yyy..", ".y.y.y.", "...y...", "..yyy..", ".y.y.y.", "...y..."),
+                    'S': ("ccccccc", "cwwcccc", "cwccccc", "ccccccc", ".ccccc.", "..ccc..", "...c..."),
+                    'B': ("....o..", "...o.o.", "..rrr..", ".rwrrr.", ".rrrrr.", ".rrrrr.", "..rrr..")}[cap[2]]
+            for r_, line in enumerate(icon):
+                for c_, ch in enumerate(line):
+                    if ch != '.':
+                        s.px(int(cap[0]) + c_, int(cap[1]) + 1 + r_, PAL[ch])
         for sh in shots:
             s.px(int(sh[0]), int(sh[1]), PAL['w']); s.px(int(sh[0]), int(sh[1]) + 1, PAL['y'])
         for b in bombs:
@@ -1228,9 +1234,14 @@ def briques():
             d.line((x, y, x + 8, y), fill=PAL['w'] if t >= 7 and ((f // 4 + c) % 24) == 0 else tuple(min(255, v + 60) for v in cc))
             d.line((x + 1, y + 2, x + 8, y + 2), fill=tuple(v // 3 for v in cc))
         ip, iw = int(px), int(pw)
-        d.rectangle((ip + 1, py, ip + iw - 2, py + 1), fill=(170, 170, 190)); d.line((ip + 2, py, ip + iw - 3, py), fill=PAL['w'])
-        d.rectangle((ip, py, ip + 2, py + 1), fill=PAL['r']); d.rectangle((ip + iw - 3, py, ip + iw - 1, py + 1), fill=PAL['r'])
-        d.line((ip + iw // 2 - 2, py + 1, ip + iw // 2 + 1, py + 1), fill=PAL['c'])
+        d.line((ip + 1, py, ip + iw - 2, py), fill=(225, 230, 245))
+        d.line((ip, py + 1, ip + iw - 1, py + 1), fill=(140, 150, 175))
+        d.line((ip + 1, py + 2, ip + iw - 2, py + 2), fill=(60, 66, 90))
+        for ex in (ip, ip + iw - 4):
+            d.line((ex + 1, py, ex + 3, py), fill=(255, 130, 130))
+            d.line((ex, py + 1, ex + 3, py + 1), fill=(230, 40, 40))
+            d.line((ex + 1, py + 2, ex + 3, py + 2), fill=(120, 20, 20))
+        d.line((ip + iw // 2 - 3, py + 1, ip + iw // 2 + 2, py + 1), fill=PAL['c'] if f & 8 else (120, 255, 255))
         for b in balls:
             d.rectangle((int(b[0]), int(b[1]), int(b[0]) + 1, int(b[1]) + 1), fill=PAL['w'])
         CC = ((0, 220, 255), (255, 140, 0), (220, 60, 220))
@@ -1755,8 +1766,9 @@ def taupe():
 # ================================================================ BILLES (une dalle 128x64)
 def billes():
     rnd = random.Random(8)
-    HS, B, RH, Y0, NC, NR = 64, 6, 5, 9, 8, 14
-    X0 = (W - (NC * B + B // 2)) // 2
+    HS, B, RH, Y0, NC, NR = 64, 6, 5, 9, 15, 14
+    X0 = 4
+    CXL = X0 + (NC * B + B // 2) / 2  # canon au milieu du puits
     VIS = (HS - Y0 - B - 6) // RH
     COLS = [None, (255, 50, 60), (255, 220, 0), (40, 220, 80), (40, 120, 255), (200, 70, 255), (0, 220, 255)]
     G = [[0] * NC for _ in range(NR)]
@@ -1786,7 +1798,7 @@ def billes():
         return seen
 
     def trace(ang):
-        x, y, vx, vy = W / 2, HS - B / 2 - 3, math.sin(ang), -math.cos(ang)
+        x, y, vx, vy = CXL, HS - B / 2 - 3, math.sin(ang), -math.cos(ang)
         pts = []
         for st in range(400):
             x += vx; y += vy
@@ -1875,7 +1887,7 @@ def billes():
             for c in range(rc(r)):
                 if G[r][c]:
                     ball(*cxy(r, c), G[r][c])
-        cx, cy = W // 2, HS - B // 2 - 3
+        cx, cy = int(CXL), HS - B // 2 - 3
         if flying is None:
             _, pts = trace(ang)
             for i, (x, y) in enumerate(pts):
@@ -1887,9 +1899,9 @@ def billes():
             ball(x, y, cur)
         d.line((cx, cy, cx + int(math.sin(ang) * (B + 2)), cy - int(math.cos(ang) * (B + 2))), fill=PAL['w'])
         d.rectangle((cx - 4, HS - 3, cx + 4, HS - 1), fill=(120, 120, 140))
-        pxx = min(X0 + bw + 6, W - 24)
-        s.tiny(pxx, 12, 'APRES', (110, 110, 140))
-        ball(pxx + 6, 25, nxt)
+        pxx = X0 + bw + 6
+        s.tiny(W - 32, 1, 'APRES', (110, 110, 140))  # sur la ligne du score
+        ball(W - 6, 3, nxt)
         for i in range(8 - shots % 8):
             d.rectangle((pxx + i * 3, HS - 6, pxx + i * 3 + 1, HS - 4), fill=(255, 160, 40))
         for b in booms:

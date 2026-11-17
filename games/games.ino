@@ -28,7 +28,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "3.82"
+#define GAMES_VERSION "3.83"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -557,13 +557,14 @@ void gNewWave() {
   if (gWave >= 2 && gWave <= 4) sndMelody(JINGLE_ARME, 4);  // nouvelle arme
   else sndMelody(JINGLE_STAGE, 4);
 }
+int gInv = 0, g2Inv = 0;  // nouveau vaisseau : invincible (il clignote) pendant 4 s
 bool g2On = false;    // SPACE DEFENDER a deux : un 2e vaisseau (vert), vies et score communs
 float g2Px = 0;
 int g2PY = 0, g2Cool = 0, g2Dead = 0;
 void gReset() {
   gLives = (!gDemo && gDiff == 0) ? 5 : 3;  // facile : 5 vies
   gPaused = false;
-  gScore = 0; gWave = 0; gDead = 0; gCool = 0; gBonus = 0; gLifeUp = false;
+  gScore = 0; gWave = 0; gDead = 0; gCool = 0; gBonus = 0; gLifeUp = false; gInv = 0; g2Inv = 0;
   gPx = W / 2 - 4;
   if (gPYBase) gPY = gPYBase;
   g2On = !gDemo && gPlayers == 2 && PAD2.isConnected();
@@ -737,6 +738,8 @@ void gSplit(float x, float y) {
 }
 void gameStep() {
   gFrame++;
+  if (gInv > 0) gInv--;
+  if (g2Inv > 0) g2Inv--;
   float loud = gDemo ? 0.2f : 0.35f;  // vitesse du defilement des etoiles
   for (int i = 0; i < gNStar; i++) {  // etoiles
     GStar &s = gStar[i];
@@ -812,18 +815,18 @@ void gameStep() {
           if (gWorld == 3) b.vx = constrain((shipC - b.x) / max(20.0f, gPY - b.y) * 1.4f, -0.9f, 0.9f);  // orbes : tir vise
           break;
         }
-    if (gDead == 0 && e.state == 1 && e.x + GW - 1 >= gPx && e.x <= gPx + 8 && e.y + GH - 1 >= gPY && e.y <= gPY + 7) {
+    if (gDead == 0 && gInv == 0 && e.state == 1 && e.x + GW - 1 >= gPx && e.x <= gPx + 8 && e.y + GH - 1 >= gPY && e.y <= gPY + 7) {
       e.alive = false;  // collision avec le vaisseau
       gBoomAt(e.x + 4, e.y + 3);
       gHitPlayer();
-    } else if (p2 && e.state == 1 && e.x + GW - 1 >= g2Px && e.x <= g2Px + 8 && e.y + GH - 1 >= g2PY && e.y <= g2PY + 7) {
+    } else if (p2 && g2Inv == 0 && e.state == 1 && e.x + GW - 1 >= g2Px && e.x <= g2Px + 8 && e.y + GH - 1 >= g2PY && e.y <= g2PY + 7) {
       e.alive = false;
       gBoomAt(e.x + 4, e.y + 3);
       gHitPlayer2();
     }
   }
   if (g2On && gLives > 0) {  // joueur 2 : commandes, ou attente avant de revenir
-    if (g2Dead > 0) { if (--g2Dead == 0) g2Px = W * 2 / 3 - 4; }
+    if (g2Dead > 0) { if (--g2Dead == 0) { g2Px = W * 2 / 3 - 4; g2Inv = 160; } }
     else gPlayer2Control();
   }
   // joueur aux commandes, sinon pilote automatique : esquive les tirs, vise un ennemi en pique ou la colonne la plus proche
@@ -867,7 +870,9 @@ void gameStep() {
           gFire();
           break;
         }
-  } else if (--gDead == 0 && gLives <= 0) {
+  } else if (--gDead == 0 && gLives > 0) {
+    gInv = 160;  // le nouveau vaisseau est invincible 4 s
+  } else if (gDead == 0 && gLives <= 0) {
     if (gDemo) gReset();  // demo : on recommence
     else if (gLastRank) startNameEntry();  // score au tableau : saisie du nom
     else toDemo();        // fin de partie du joueur : retour a la demo
@@ -906,8 +911,8 @@ void gameStep() {
     b.y += 1.3f + 0.1f * gWave + (gEffDiff() - 1) * 0.3f;  // tirs plus lents en facile, plus rapides en difficile
     b.x += b.vx;
     if (b.y >= H || b.x < 0 || b.x >= W) { b.on = false; continue; }
-    if (gDead == 0 && b.x >= gPx && b.x <= gPx + 8 && b.y + 2 >= gPY + 2 && b.y <= gPY + 7) { b.on = false; gHitPlayer(); }
-    else if (g2On && g2Dead == 0 && gLives > 0 && b.x >= g2Px && b.x <= g2Px + 8 && b.y + 2 >= g2PY + 2 && b.y <= g2PY + 7) { b.on = false; gHitPlayer2(); }
+    if (gDead == 0 && gInv == 0 && b.x >= gPx && b.x <= gPx + 8 && b.y + 2 >= gPY + 2 && b.y <= gPY + 7) { b.on = false; gHitPlayer(); }
+    else if (g2On && g2Dead == 0 && g2Inv == 0 && gLives > 0 && b.x >= g2Px && b.x <= g2Px + 8 && b.y + 2 >= g2PY + 2 && b.y <= g2PY + 7) { b.on = false; gHitPlayer2(); }
   }
   for (auto &b : gBoom)
     if (b.t) b.t = b.t >= 12 ? 0 : b.t + 1;
@@ -1017,8 +1022,8 @@ void gameDraw() {
     for (int k = 0; k < 8; k++) gPix(b.x + DX[k] * b.t / 2, b.y + DY[k] * b.t / 2, c);
     if (b.t < 6) gPix(b.x, b.y, palFull[0]);
   }
-  if (gDead == 0) gSprite(SPR_SHIP[gTier()], 9, 8, (int)gPx, gPY, palFull, 0, 0);
-  if (g2On && g2Dead == 0 && gLives > 0) gSprite(SPR_SHIP[gTier()], 9, 8, (int)g2Px, g2PY, palFull, 'w', 'g');  // joueur 2 : vaisseau vert
+  if (gDead == 0 && (gInv == 0 || (gFrame & 4))) gSprite(SPR_SHIP[gTier()], 9, 8, (int)gPx, gPY, palFull, 0, 0);  // clignote si invincible
+  if (g2On && g2Dead == 0 && gLives > 0 && (g2Inv == 0 || (gFrame & 4))) gSprite(SPR_SHIP[gTier()], 9, 8, (int)g2Px, g2PY, palFull, 'w', 'g');  // joueur 2 : vaisseau vert
   hudTop(palFull);  // score centre et vies
 }
 
@@ -1535,15 +1540,14 @@ void rDraw() {
   for (auto &e : rEn)
     if (e.on && e.t >= 0) gSprite(SPR_W[w][e.type][(gFrame / 6) & 1], GW, GH, (int)e.x, (int)e.y, e.flash ? white : palFull, 0, 0);
   if (rBoss) rDrawBoss(palFull);
-  if (rCap.on) {  // capsule clignotante avec sa lettre (P, S ou B)
-    static const char CAP[3] = { 'P', 'S', 'B' };
-    uint16_t c = (gFrame & 4) ? palFull[2] : rCap.kind == 1 ? palFull[4] : rCap.kind == 2 ? palFull[1] : palFull[5];
-    gfx->drawRect((int)rCap.x - 1, (int)rCap.y - 1, 9, 10, c);
-    gfx->setFont(NULL);
-    gfx->setTextSize(1);
-    gfx->setTextColor(c);
-    gfx->setCursor((int)rCap.x + 1, (int)rCap.y);
-    gfx->print(CAP[rCap.kind]);
+  if (rCap.on) {  // capsule : cadre qui clignote et icone (double fleche : arme, bouclier, bombe)
+    static const char *const ICON[3][7] = {
+      { "...y...", "..yyy..", ".y.y.y.", "...y...", "..yyy..", ".y.y.y.", "...y..." },
+      { "ccccccc", "cwwcccc", "cwccccc", "ccccccc", ".ccccc.", "..ccc..", "...c..." },
+      { "....o..", "...o.o.", "..rrr..", ".rwrrr.", ".rrrrr.", ".rrrrr.", "..rrr.." } };
+    uint16_t c = (gFrame & 4) ? palFull[0] : rCap.kind == 1 ? palFull[4] : rCap.kind == 2 ? palFull[1] : palFull[2];
+    gfx->drawRoundRect((int)rCap.x - 1, (int)rCap.y - 1, 9, 10, 2, c);
+    gSprite(ICON[rCap.kind], 7, 7, (int)rCap.x, (int)rCap.y + 1, palFull, 0, 0);
     gMark((int)rCap.x - 1, (int)rCap.y - 1, 9, 10);
   }
   for (auto &s : rShot)
@@ -2686,11 +2690,12 @@ uint8_t kBrick[K_MAXR][K_MAXC];  // 0 vide, 1 a 6 couleur, 7 argent (vie dans kH
 uint8_t kHp[K_MAXR][K_MAXC];
 KBall kBall[K_BALLS];
 KCap kCap[K_CAPS];
-int kCols = 12, kRows = 6, kOX = 4, kOY = 11, kLeft = 0, kWide = 0, kSlow = 0, kStuck = 0;
+int kCols = 12, kRows = 6, kOX = 4, kOY = 11, kLeft = 0, kWide = 0, kSlow = 0, kStuck = 0, kLaser = 0, kLzCool = 0;
+struct KLz { float x, y; bool on; } kLz[6];  // tirs de la raquette (capsule jaune)
 float kPX = 0, kPW = 18;
 const uint8_t K_COL[9][3] = { { 0, 0, 0 }, { 255, 50, 50 }, { 255, 150, 0 }, { 255, 220, 0 }, { 40, 220, 80 }, { 0, 200, 255 },
                               { 200, 70, 255 }, { 170, 170, 185 }, { 230, 180, 40 } };
-int kPY() { return H - 4; }
+int kPY() { return H - 4; }  // haut de la raquette (3 rangees)
 void kBuild() {  // dessin du tableau selon le stage
   int pat = (gWave - 1) % 6;
   kLeft = 0;
@@ -2720,7 +2725,8 @@ void kNewBall() {  // une balle posee sur la raquette, lancee avec X
   for (auto &b : kBall) b.on = false;
   kBall[0].on = true;
   kStuck = 1;
-  kWide = kSlow = 0;
+  kWide = kSlow = kLaser = 0;
+  for (auto &z : kLz) z.on = false;
   kPW = W >= 256 ? 26 : 18;
   for (auto &cp : kCap) cp.on = false;
 }
@@ -2767,7 +2773,7 @@ void kHitBrick(int r, int c) {
   gMark(x, y, 9, 3);  // la brique disparait (effacee a la prochaine image)
   if (random(100) < 12)
     for (auto &cp : kCap)
-      if (!cp.on) { cp.on = true; cp.x = x + 2; cp.y = y; cp.type = random(100) < 8 ? 3 : random(3); break; }
+      if (!cp.on) { int r = random(100); cp.on = true; cp.x = x + 2; cp.y = y; cp.type = r < 8 ? 3 : r < 30 ? 4 : random(3); break; }  // 4 : tir
   b = 0;
   kLeft--;
   sfxBoom();
@@ -2797,6 +2803,22 @@ void kStep() {
   kPW = (W >= 256 ? 26 : 18) + (kWide ? 10 : 0);
   kPX = constrain(kPX, 0.0f, W - kPW);
   if (kWide > 0) kWide--;
+  if (kLaser > 0) kLaser--;
+  if (kLzCool > 0) kLzCool--;
+  if (kLaser && !kStuck && (k & 4) && kLzCool == 0) {  // X : les deux canons tirent
+    for (int s = 0; s < 2; s++)
+      for (auto &z : kLz)
+        if (!z.on) { z.on = true; z.x = kPX + (s ? kPW - 2 : 1); z.y = kPY() - 3; break; }
+    kLzCool = 12;
+    sndPlay(1800, 900, 50, 0.25f, false, 1);
+  }
+  for (auto &z : kLz) {
+    if (!z.on) continue;
+    z.y -= 3;
+    int c = (int)floorf((z.x - kOX) / 10), r = (int)floorf((z.y - kOY) / 4);
+    if (z.y < 8) z.on = false;
+    else if (r >= 0 && r < kRows && c >= 0 && c < kCols && kBrick[r][c]) { z.on = false; kHitBrick(r, c); }
+  }
   if (kSlow > 0) kSlow--;
   int py = kPY();
   if (kStuck) {  // balle posee : suit la raquette
@@ -2839,7 +2861,8 @@ void kStep() {
       cp.on = false;
       gScore += 100;
       sndMelody(JINGLE_STAGE, 3);
-      if (cp.type == 0) kWide = 900;
+      if (cp.type == 4) kLaser = 600;  // tir pendant 15 s
+      else if (cp.type == 0) kWide = 900;
       else if (cp.type == 1) kSlow = 600;
       else if (cp.type == 2) {  // 3 balles
         KBall src = kBall[0];
@@ -2877,20 +2900,31 @@ void kDraw() {
       gfx->drawFastHLine(x + 1, y + 2, 8, rgb(cc[0] / 3, cc[1] / 3, cc[2] / 3));
     }
   int py = kPY();
-  // raquette : capsule arrondie, bouts rouges, centre cyan (plus large avec la capsule cyan)
+  // raquette : 3 rangees en degrade (reflet en haut), embouts rouges arrondis, centre cyan lumineux ; canons jaunes avec la capsule de tir
   int px = (int)kPX, pw = (int)kPW;
-  gfx->fillRect(px + 1, py, pw - 2, 2, rgb(170, 170, 190));
-  gfx->drawFastHLine(px + 2, py, pw - 4, palFull[0]);
-  gfx->fillRect(px, py, 3, 2, palFull[1]);
-  gfx->fillRect(px + pw - 3, py, 3, 2, palFull[1]);
-  gfx->drawFastHLine(px + pw / 2 - 2, py + 1, 4, palFull[4]);
-  gMark(px, py, pw, 2);
+  gfx->drawFastHLine(px + 1, py, pw - 2, rgb(225, 230, 245));
+  gfx->drawFastHLine(px, py + 1, pw, rgb(140, 150, 175));
+  gfx->drawFastHLine(px + 1, py + 2, pw - 2, rgb(60, 66, 90));
+  gfx->drawFastHLine(px + 1, py, 3, rgb(255, 130, 130));  // embouts
+  gfx->drawFastHLine(px, py + 1, 4, rgb(230, 40, 40));
+  gfx->drawFastHLine(px + 1, py + 2, 3, rgb(120, 20, 20));
+  gfx->drawFastHLine(px + pw - 4, py, 3, rgb(255, 130, 130));
+  gfx->drawFastHLine(px + pw - 4, py + 1, 4, rgb(230, 40, 40));
+  gfx->drawFastHLine(px + pw - 4, py + 2, 3, rgb(120, 20, 20));
+  gfx->drawFastHLine(px + pw / 2 - 3, py + 1, 6, (gFrame & 8) ? palFull[4] : rgb(120, 255, 255));  // centre qui pulse
+  if (kLaser) {
+    gfx->drawFastVLine(px + 1, py - 2, 2, palFull[2]);
+    gfx->drawFastVLine(px + pw - 2, py - 2, 2, palFull[2]);
+  }
+  gMark(px, py - 2, pw, 5);
+  for (auto &z : kLz)
+    if (z.on) { gfx->drawFastVLine((int)z.x, (int)z.y, 3, palFull[2]); gMark((int)z.x, (int)z.y, 1, 3); }
   for (auto &b : kBall)
     if (b.on && gDead == 0) {
       gfx->fillRect((int)b.x, (int)b.y, 2, 2, palFull[0]);
       gMark((int)b.x, (int)b.y, 2, 2);
     }
-  static const uint8_t CC[4][3] = { { 0, 220, 255 }, { 255, 140, 0 }, { 220, 60, 220 }, { 255, 40, 40 } };
+  static const uint8_t CC[5][3] = { { 0, 220, 255 }, { 255, 140, 0 }, { 220, 60, 220 }, { 255, 40, 40 }, { 255, 220, 0 } };
   for (auto &cp : kCap) {  // capsules qui clignotent
     if (!cp.on) continue;
     int x = (int)cp.x, y = (int)cp.y;
@@ -3789,16 +3823,16 @@ void dDraw() {
 // Tir de billes original : un canon en bas se vise (gauche / droite, ou le stick qui donne l'angle), X tire. La bille
 // rebondit sur les murs et se colle a la grappe ; 3 billes de meme couleur ou plus eclatent, et celles qui ne tiennent
 // plus au plafond tombent (gros bonus). Le plafond descend tous les 8 tirs ; une bille sur la ligne du bas : fin.
-#define P_COLS 8
+#define P_COLS 16  // colonnes au plus (le puits prend la largeur de l'ecran : pNC colonnes)
 #define P_ROWS 14
 uint8_t pG[P_ROWS][P_COLS];  // 0 vide, 1..6 couleur
-int pB = 6, pRH = 5, pX0 = 30, pY0 = 9, pRowsVis = 9, pShots = 0, pDrop = 0, pNColors = 4;
+int pNC = 8, pB = 6, pRH = 5, pX0 = 30, pY0 = 9, pRowsVis = 9, pShots = 0, pDrop = 0, pNColors = 4;
 float pAng = 0, pBX, pBY, pVX, pVY;
 uint8_t pCur = 1, pNext = 2, pPrevK = 0;
 bool pFlying = false;
 int8_t pPopT = 0;
 const uint8_t P_COL[7][3] = { { 0, 0, 0 }, { 255, 50, 60 }, { 255, 220, 0 }, { 40, 220, 80 }, { 40, 120, 255 }, { 200, 70, 255 }, { 0, 220, 255 } };
-int pRowCols(int r) { return (r + pDrop) & 1 ? P_COLS - 1 : P_COLS; }  // une rangee sur deux decalee d'une demi-bille
+int pRowCols(int r) { return (r + pDrop) & 1 ? pNC - 1 : pNC; }  // une rangee sur deux decalee d'une demi-bille
 float pCX(int r, int c) { return pX0 + c * pB + ((r + pDrop) & 1 ? pB / 2.0f : 0) + pB / 2.0f; }
 float pCY(int r) { return pY0 + r * pRH + pB / 2.0f; }
 void pNeighbors(int r, int c, int nb[6][2]) {
@@ -3820,7 +3854,7 @@ uint8_t pPick() {  // couleur parmi celles encore presentes
 void pLevel() {
   memset(pG, 0, sizeof(pG));
   pDrop = 0; pShots = 0;
-  pNColors = min(6, 3 + gWave / 2);
+  pNColors = min(6, 4 + gWave / 3);  // rouge, jaune, vert, bleu des le 1er stage
   int rows = min(pRowsVis - 3, 4 + gWave / 2);
   for (int r = 0; r < rows; r++)
     for (int c = 0; c < pRowCols(r); c++) pG[r][c] = 1 + random(pNColors);
@@ -3838,7 +3872,8 @@ void pReset() {
   pRH = H >= 128 ? 9 : 5;
   pY0 = H >= 128 ? 12 : 9;
   pRowsVis = min(P_ROWS, (H - pY0 - pB - 6) / pRH);
-  pX0 = (W - (P_COLS * pB + pB / 2)) / 2;
+  pNC = min(P_COLS, (W - 32 - pB / 2) / pB);  // place pour le canon a droite
+  pX0 = 4;
   pLevel();
 }
 // trouve les billes de meme couleur reliees (ou toutes celles reliees au plafond si col = 0) ; marque 1 dans mk
@@ -3902,8 +3937,8 @@ void pLand(int r, int c) {
 }
 // trajectoire simulee (demo et pointilles) : renvoie la case d'arrivee
 bool pTrace(float ang, int &lr, int &lc, bool draw, uint16_t col) {
-  float x = W / 2.0f, y = H - pB / 2.0f - 3, vx = sinf(ang), vy = -cosf(ang);
-  float minX = pX0 + pB / 2.0f, maxX = pX0 + P_COLS * pB;
+  float x = pX0 + (pNC * pB + pB / 2) / 2.0f, y = H - pB / 2.0f - 3, vx = sinf(ang), vy = -cosf(ang);
+  float minX = pX0 + pB / 2.0f, maxX = pX0 + pNC * pB;
   for (int s = 0; s < 400; s++) {
     x += vx; y += vy;
     if (x < minX) { x = minX; vx = -vx; }
@@ -3971,13 +4006,13 @@ void pStep() {
   pAng = constrain(pAng, -1.3f, 1.3f);
   if (!pFlying && (edge & (4 | 32) || (gDemo && (k & 4)))) {
     pFlying = true;
-    pBX = W / 2.0f; pBY = H - pB / 2.0f - 3;
+    pBX = pX0 + (pNC * pB + pB / 2) / 2.0f; pBY = H - pB / 2.0f - 3;
     float sp = H >= 128 ? 4.0f : 2.6f;
     pVX = sinf(pAng) * sp; pVY = -cosf(pAng) * sp;
     sfxShot();
   }
   if (pFlying) {
-    float minX = pX0 + pB / 2.0f, maxX = pX0 + P_COLS * pB;
+    float minX = pX0 + pB / 2.0f, maxX = pX0 + pNC * pB;
     for (int s = 0; s < 4 && pFlying; s++) {
       pBX += pVX / 4; pBY += pVY / 4;
       if (pBX < minX) { pBX = minX; pVX = -pVX; }
@@ -4017,7 +4052,7 @@ void pDraw() {
   eraseOld();
   uint16_t palFull[9];
   for (int i = 0; i < 9; i++) palFull[i] = rgb(G_PAL_RGB[i][0], G_PAL_RGB[i][1], G_PAL_RGB[i][2]);
-  int bw = P_COLS * pB + pB / 2, by1 = pY0 + pRowsVis * pRH + pB / 2;
+  int bw = pNC * pB + pB / 2, by1 = pY0 + pRowsVis * pRH + pB / 2;
   jRect(pX0, 8, bw, H - 8, rgb(10, 12, 30));  // fond du puits (redessine a chaque image)
   jRect(pX0 - 2, 8, 2, H - 8, rgb(90, 100, 160));
   jRect(pX0 + bw, 8, 2, H - 8, rgb(90, 100, 160));
@@ -4029,17 +4064,19 @@ void pDraw() {
       if (pG[r][c] && pCY(r) < H) pBall((int)pCX(r, c), (int)pCY(r), pG[r][c]);
   int lr, lc;
   if (!pFlying && gDead == 0) pTrace(pAng, lr, lc, true, rgb(140, 140, 160));  // pointilles de visee
-  int cx = W / 2, cy = H - pB / 2 - 3;  // canon : socle, tube oriente
+  int cx = pX0 + bw / 2, cy = H - pB / 2 - 3;  // canon : socle, tube oriente
   gfx->drawLine(cx, cy, cx + (int)(sinf(pAng) * (pB + 2)), cy - (int)(cosf(pAng) * (pB + 2)), palFull[0]);
   jRect(cx - 4, H - 3, 9, 3, rgb(120, 120, 140));
   if (pFlying) pBall((int)pBX, (int)pBY, pCur);
   else pBall(cx, cy, pCur);
   // a droite : bille suivante, tirs avant que le plafond descende
-  int px = min(pX0 + bw + 6, W - 24);
-  tinyText(*gfx, px, 12, "APRES", rgb(110, 110, 140));
-  pBall(px + 6, 22 + pB / 2, pNext);
-  gMark(px, 12, 24, 14 + pB);
-  for (int i = 0; i < 8 - pShots; i++) jRect(px + i * 3, H - 6, 2, 3, rgb(255, 160, 40));
+  int px = pX0 + bw + 6;
+  tinyText(*gfx, W - 32, 1, "APRES", rgb(110, 110, 140));  // en haut a droite, sur la ligne du score
+  gMark(W - 32, 1, 19, 5);
+  if (pB <= 6) pBall(W - 6, 3, pNext);
+  else pBall(W - 7, 4, pNext);
+  gMark(W - 12, 0, 12, 8);
+  for (int i = 0; i < 8 - pShots; i++) jRect(px + i * 3, H - 6, 2, 3, rgb(255, 160, 40));  // tirs avant que le plafond descende
   gMark(px, H - 6, 26, 3);
   altBooms(palFull);
   altHud(palFull);

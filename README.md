@@ -15,7 +15,7 @@ Les 12 jeux ont en commun les niveaux de difficulté, les stages, les vies, les 
 
 Cette branche remplace la bibliothèque PS4Controller par **Bluepad32** : jusqu'à 4 manettes Bluetooth (PS4, PS5, Xbox...).
 
-- **Installation** : 1er flash avec `firmware/GameHub_V3.82_bp32_complet.bin` à **0x0** (le démarrage change), ensuite `GameHub_V3.82_bp32.bin` à 0x10000. Compilation : `build_bp32.ps1` (carte « ESP32 + Bluepad32 », `esp32-bluepad32:esp32` 4.1.0).
+- **Installation** : 1er flash avec `firmware/GameHub_V3.83_bp32_complet.bin` à **0x0** (le démarrage change), ensuite `GameHub_V3.83_bp32.bin` à 0x10000. Compilation : `build_bp32.ps1` (carte « ESP32 + Bluepad32 », `esp32-bluepad32:esp32` 4.1.0).
 - **Associer une manette** : appuyer sur **Share + PS** jusqu'au clignotement rapide de la barre lumineuse. Plus d'adresse à recopier. La 1re manette connectée est le joueur 1, la 2e le joueur 2. Moniteur série : `a` oublie toutes les manettes associées. Sur la dalle : « MANETTE 2 OK » / « MANETTE 1 PARTIE » à chaque connexion, et dans le menu `JOUEURS <2> **` (une étoile par manette connectée).
 - **Menu « JOUEURS 1 / 2 »** : seuls les jeux à deux joueurs utilisent la 2e manette.
   - **RAQUETTES** : match à deux (raquette de droite pour le joueur 2), **le premier à 7 points gagne**.
@@ -34,7 +34,7 @@ Le jeu principal : un shoot'em up original, repris du mode Jeu du VU-mètre. Une
 
 
 - **Écran :** le **score centré en haut**, sur une ligne. Le record n'est plus affiché pendant le jeu : il est dans le menu et sur la page des scores. Les **vies** sont en haut à droite, avec une petite icône par vie (au-delà de 5 : une icône et le nombre). C'est pareil dans tous les jeux . Le vaisseau est tout en bas de l'écran. Le stage s'affiche dans l'annonce, au début de chaque stage.
-- **Vies :** Chaque stage terminé donne **une vie de plus** (9 au maximum).
+- **Vies :** Chaque stage terminé donne **une vie de plus** (9 au maximum). Après une vie perdue, le nouveau vaisseau est **invincible 4 secondes** (il clignote).
 - **Stages, sans fin :** quand tous les ennemis sont détruits, l'annonce « STAGE n » s'affiche avec le nom du monde et un bonus de 500 points × le numéro du stage.
   - Les ennemis tirent plus souvent à chaque stage, et leurs tirs vont plus vite.
   - Leurs piqués sont de plus en plus fréquents, jusqu'au stage 7 environ.
@@ -86,10 +86,10 @@ Un shoot vertical : tu te déplaces partout dans le bas de l'écran, et les vagu
   - des **tourelles**, qui s'arrêtent en haut et tirent en éventail.
 
   Touchés, ils clignotent en blanc.
-- **Capsules :**
-  - **P** améliore l'arme, sur 3 niveaux, jusqu'à 5 tirs en éventail. Perdre une vie fait baisser l'arme d'un niveau.
-  - **S** donne un bouclier, qui encaisse un tir.
-  - **B** ajoute une bombe. Les bombes restantes s'affichent en bas à gauche.
+- **Capsules** (une icône dans un cadre qui clignote) :
+  - **double flèche jaune** : améliore l'arme, sur 3 niveaux, jusqu'à 5 tirs en éventail. Perdre une vie fait baisser l'arme d'un niveau.
+  - **bouclier cyan** : donne un bouclier, qui encaisse un tir.
+  - **bombe rouge** : ajoute une bombe. Les bombes restantes s'affichent en bas à gauche.
 - **Bombe (○) :** elle détruit les ennemis à l'écran, efface leurs tirs et blesse le boss.
 - **Boss :** après 8 vagues, un boss apparaît, avec sa barre de vie en haut. Il y a 3 boss différents, qui alternent selon le stage : une coque à canons, un crabe à pinces et un noyau à bras tournants.
   - Sous la moitié de sa vie, le boss passe en **2ᵉ phase** : plus rapide, avec des tirs en spirale.
@@ -157,7 +157,8 @@ Un casse-briques original. Une raquette en bas renvoie la balle vers un mur de b
 - **Vies :** de petites balles blanches en haut à droite.
 - **Commandes :** stick ou croix gauche / droite pour la raquette (au **stick**, elle va d'autant plus vite que tu le pousses loin), **✕ pour lancer la balle**.
 - **Briques :** de couleur (1 coup, plus elles sont hautes plus elles rapportent), **d'argent** (2 coups, 3 à partir du stage 6) et **d'or** (incassables, à partir du stage 4). Chaque brique a un reflet et une ombre.
-- **Capsules :** une brique cassée lâche parfois une capsule qui tombe. Cyan : **raquette large**. Orange : **balle lente**. Magenta : **3 balles**. Rouge : **une vie**.
+- **Capsules :** une brique cassée lâche parfois une capsule qui tombe. Cyan : **raquette large**. Orange : **balle lente**. Magenta : **3 balles**. Jaune : **tir** (15 s : deux canons au bout de la raquette, ✕ tire vers les briques). Rouge : **une vie**.
+- **Raquette :** trois rangées en dégradé avec un reflet, embouts rouges arrondis, centre cyan qui pulse.
 - **Tableaux :** 6 dessins (mur plein, damier, pyramide, losange, rangées avec argent, motif) qui reviennent en boucle. Tout casser (sauf l'or) fait passer au suivant, avec une balle plus rapide et une vie en plus.
 
 ### BLOCS
@@ -187,6 +188,7 @@ Un jeu de creusage original : une taupe creuse ses galeries sous terre (4 couche
 
 Un jeu de tir de billes original, dans un puits.
 - **Commandes :** gauche / droite pour viser (au **stick**, l'angle suit directement le stick), **✕ pour tirer**. Des pointillés montrent la trajectoire, rebonds compris.
+- **Écran :** le puits prend toute la largeur ; « APRÈS » et la bille suivante sont en haut à droite, sur la ligne du score ; 4 couleurs dès le 1er stage (dont le bleu).
 - **Règles :** la bille rebondit sur les murs et se colle à la grappe. **3 billes de même couleur ou plus éclatent** ; celles qui ne tiennent plus au plafond **tombent** (gros bonus).
 - **Plafond :** il descend d'un rang **tous les 8 tirs** (les marques orange en bas à droite). Une bille qui dépasse la ligne rouge : partie finie (une seule partie, pas de vies).
 - **Stages :** tout vider fait passer au suivant, avec plus de rangées et plus de couleurs.
@@ -357,8 +359,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V3.82_bp32_complet.bin](firmware/GameHub_V3.82_bp32_complet.bin) | 0x0 | `24469b37f0171a8d60dfeea5ee008a2d` |
-| [firmware/GameHub_V3.82_bp32.bin](firmware/GameHub_V3.82_bp32.bin) | 0x10000 | `eb25fa8b2d298cbebb5501850c0a07af` |
+| [firmware/GameHub_V3.83_bp32_complet.bin](firmware/GameHub_V3.83_bp32_complet.bin) | 0x0 | `4bb18f6786f1b6a03d59763672ff2ec2` |
+| [firmware/GameHub_V3.83_bp32.bin](firmware/GameHub_V3.83_bp32.bin) | 0x10000 | `04bea141adb7b436090a19c6b4abd6cd` |
 
 Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB SPIFFS)** dans Outils → Partition Scheme.
 
