@@ -1925,70 +1925,90 @@ def billes():
 def escadrille():
     rnd = random.Random(11)
     HS, TOP = 64, 10
-    SEA, FOAM, SAND, LEAF, LEAF2 = (0, 30, 90), (50, 110, 190), (200, 180, 90), (30, 140, 50), (20, 90, 35)
-    PLANE = (("...yyy...", "....w....", "...wcw...", ".bwwwwwb.", "bwwwbwwwb", "....w....", "....w....", "..bwwwb..", "....w...."),
-             ("..y...y..", "....w....", "...wcw...", ".bwwwwwb.", "bwwwbwwwb", "....w....", "....w....", "..bwwwb..", "....w...."))
-    ROLL = ("....y....", "....w....", "...wcw...", "..wwwww..", "..bwbwb..", "....w....", "....w....", "...bwb...", "....w....")
-    AF = ((".g...g.", ".ggggg.", "...g...", "ggogogg", ".ggggg.", "...g...", "..yyy.."),
-          (".g...g.", ".ggggg.", "...g...", "ggogogg", ".ggggg.", "...g...", ".y...y."))
-    AB = (".....vvvvv.....", "......vvv......", ".......v.......", ".......v.......", "vvvvvvvwvvvvvvv",
-          "vovvovvwvvovvov", "vvvvvvvwvvvvvvv", ".y..y..v..y..y.", ".......v.......", "......vcv......")
-    LIFE = ("..w..", "bwwwb", "..w..", ".www.")
-    foam = [[rnd.randrange(W), rnd.randrange(TOP, HS)] for _ in range(28)]
-    isles = [[30, 20.0, 8], [95, -20.0, 6]]
-    x, y, score, roll, rolls = 60.0, 52.0, 0, 0, 3
-    en, shots, bombs, booms, frames = [], [], [], [], []
-    spawn, grp = 10, 0
+    SEA, SHAL, SAND, LEAF, LEAF2 = (10, 60, 150), (40, 130, 200), (210, 190, 110), (40, 150, 50), (20, 95, 35)
+    GV = (((90, 170, 40), (40, 100, 20)), ((190, 190, 205), (105, 105, 120)), ((245, 200, 40), (190, 120, 20)))
+    ME = (("....yyy....", ".....B.....", "....BcB....", "BBBBBBBBBBB", "BWBBBbBBBWB", ".bbBBBBBbb.", ".....B.....", "...BBBBB...", "....bBb...."),
+          ("...y...y...", ".....B.....", "....BcB....", "BBBBBBBBBBB", "BWBBBbBBBWB", ".bbBBBBBbb.", ".....B.....", "...BBBBB...", "....bBb...."))
+    ROLL = ("....yyy....", ".....B.....", "....BcB....", "..BBBBBBB..", "..bWBbBWb..", "...bBBBb...", ".....B.....", "...BBBBB...", "....bBb....")
+    FIGHT = (("...gGg...", "....G....", "GGGGGGGGG", "gGGGgGGGg", "...GcG...", "....G....", "...ooo..."),
+             ("...gGg...", "....G....", "GGGGGGGGG", "gGGGgGGGg", "...GcG...", "....G....", "..o...o.."))
+    BOMBER = ("......GGGGG......", "........G........", "........G........", "...g....G....g...", "GGGGGGGGGGGGGGGGG",
+              "gGGGGgGGGGGgGGGGg", "....ggg.G.ggg....", "....ggg.G.ggg....", "....ooo.G.ooo....", "........G........", ".......GcG.......")
+    BOAT = ("..S..", ".SSS.", ".SkS.", "SSSSS", "SSsSS", "SsssS", "SSsSS", "SSSSS", ".SSS.", ".SkS.", ".SSS.", ".www.")
+    DEST = ("...S...", "..SSS..", "..SkS..", ".SSSSS.", ".SSkSS.", "SSSSSSS", "SSsssSS", "SSsssSS", "SSskSSS", "SSsssSS",
+            "SSSSSSS", "SSSkSSS", "SSSSSSS", "SSsssSS", "SSSSSSS", ".SSkSS.", ".SSSSS.", "..SSS..", "..www..", ".w...w.")
+    LIFE = ("..b..", "bwbwb", "..b..", ".bbb.")
+    SIZE = {0: (9, 7), 1: (17, 11), 2: (5, 12), 3: (7, 20), 4: (11, 30)}
 
-    def spr(sc, rows, x0, y0, white=False, swap=None):
+    def col(ch, var):
+        return {'B': (20, 50, 170) if var == 3 else (60, 120, 255), 'b': (20, 50, 170), 'W': (255, 255, 255), 'y': (255, 220, 0),
+                'o': (255, 140, 0), 'c': (120, 220, 255), 'k': (40, 40, 50), 'G': GV[var % 3][0], 'g': GV[var % 3][1],
+                'S': (150, 155, 165), 's': (90, 95, 105), 'n': (160, 105, 55), 'N': (230, 210, 170)}.get(ch, (200, 230, 255))
+
+    def spr(sc, rows, x0, y0, var=0, white=False):
         for r, line in enumerate(rows):
             for cc, ch in enumerate(line):
                 if ch != '.':
-                    if swap and ch == swap[0]:
-                        ch = swap[1]
-                    sc.px(int(x0) + cc, int(y0) + r, PAL['w'] if white else PAL[ch])
-    for f in range(520):
+                    sc.px(int(x0) + cc, int(y0) + r, (255, 255, 255) if white else col(ch, var))
+    waves = [[rnd.randrange(W), rnd.randrange(TOP, HS)] for _ in range(40)]
+    isles = [[30, 22.0, 8], [95, -20.0, 6]]
+    x, y, score, roll, rolls = 60.0, 52.0, 0, 0, 3
+    en, shots, bombs, booms, frames = [], [], [], [], []
+    spawn, grp, cap = 10, 0, None
+    for f in range(560):
         spawn -= 1
         if spawn <= 0:
-            pat = grp % 4
+            pat, var = grp % 5, (grp // 2) % 3
             if pat == 0:
                 for k in range(5):
-                    en.append({'t': 0, 'x': W / 2 - 3 + (k - 2) * 10, 'y': -8 - abs(k - 2) * 6, 'type': 0, 'hp': 1, 'pat': 0, 'fl': 0})
+                    en.append({'t': 0, 'x': W / 2 - 4 + (k - 2) * 11, 'y': -8 - abs(k - 2) * 6, 'type': 0, 'hp': 1, 'pat': 0, 'fl': 0, 'var': var, 'cap': k == 4})
             elif pat == 1:
-                en.append({'t': 0, 'x': W / 2 - 7, 'y': -10, 'type': 1, 'hp': 8, 'pat': 3, 'fl': 0})
+                en.append({'t': 0, 'x': W / 2 - 8, 'y': -12, 'type': 1, 'hp': 8, 'pat': 3, 'fl': 0, 'var': grp % 2, 'cap': True})
             elif pat == 2:
-                for k in range(2):
-                    en.append({'t': 0, 'x': 20 + k * 80, 'y': -17 - k * 20, 'type': 2, 'hp': 4, 'pat': 4, 'fl': 0})
-            else:
+                en.append({'t': 0, 'x': 18, 'y': -21, 'type': 2, 'hp': 4, 'pat': 4, 'fl': 0, 'var': 0, 'cap': False})
+                en.append({'t': 0, 'x': 92, 'y': -40, 'type': 3, 'hp': 6, 'pat': 4, 'fl': 0, 'var': 0, 'cap': False})
+            elif pat == 3:
                 for k in range(5):
-                    en.append({'t': 0, 'x': W / 4, 'y': -8 - k * 10, 'type': 0, 'hp': 1, 'pat': 1, 'fl': 0})
+                    en.append({'t': 0, 'x': W / 4, 'y': -8 - k * 10, 'type': 0, 'hp': 1, 'pat': 1, 'fl': 0, 'var': var, 'cap': False})
+            else:
+                en.append({'t': 0, 'x': 70, 'y': -31, 'type': 4, 'hp': 14, 'pat': 4, 'fl': 0, 'var': 0, 'cap': True})
             grp += 1
-            spawn = 110
-        # pilote automatique : vise l'ennemi le plus proche, tonneau si un tir arrive
-        tgt = min((e for e in en if e['y'] > 8), key=lambda e: abs(e['x'] - x), default=None)
-        if tgt:
-            x += max(-1.6, min(1.6, (tgt['x'] + (5 if tgt['type'] == 1 else 1) - x) * 0.2))
-        x = max(0, min(W - 9, x))
+            spawn = 105
+        tgt = min((e for e in en if e['y'] > 8), key=lambda e: abs(e['x'] + SIZE[e['type']][0] / 2 - x - 5), default=None)
+        if cap:
+            x += max(-1.6, min(1.6, (cap[0] - 2 - x) * 0.2))
+        elif tgt:
+            x += max(-1.6, min(1.6, (tgt['x'] + SIZE[tgt['type']][0] / 2 - 5 - x) * 0.2))
+        x = max(0, min(W - 11, x))
         if roll:
             roll -= 1
-        elif rolls and any(abs(b[0] - x - 4) < 5 and y - 6 < b[1] < y + 2 for b in bombs):
+        elif rolls and any(abs(b[0] - x - 5) < 6 and y - 6 < b[1] < y + 2 for b in bombs):
             roll, rolls = 30, rolls - 1
         if f % 6 == 0 and not roll:
-            shots += [[x + 2, y - 1], [x + 6, y - 1]]
+            shots += [[x + 3, y - 1], [x + 7, y - 1]]
         for sh in shots:
             sh[1] -= 3.8
         shots = [sh for sh in shots if sh[1] > TOP]
-        for fo in foam:
-            fo[1] += f & 1
-            if fo[1] >= HS:
-                fo[0], fo[1] = rnd.randrange(W), TOP
+        for wv in waves:
+            wv[1] += f & 1
+            if wv[1] >= HS:
+                wv[0], wv[1] = rnd.randrange(-2, W), TOP
         for isl in isles:
-            isl[1] += 0.45
+            isl[1] += 0.5
             if isl[1] - isl[2] * 2 > HS:
                 isl[0], isl[1], isl[2] = rnd.randrange(12, W - 12), -30.0, rnd.randrange(5, 10)
+        if cap:
+            cap[1] += 0.6
+            if cap[1] > HS:
+                cap = None
+            elif abs(cap[0] + 3 - x - 5) < 8 and abs(cap[1] + 3 - y - 4) < 8:
+                score += 500
+                booms.append([int(cap[0]) + 3, int(cap[1]) + 3, 1])
+                cap = None
         for e in en:
             e['t'] += 1
             e['fl'] = max(0, e['fl'] - 1)
+            w_, h_ = SIZE[e['type']]
             if e['pat'] == 0:
                 e['y'] += 0.75
             elif e['pat'] == 1:
@@ -1997,30 +2017,40 @@ def escadrille():
                 e['y'] += 0.5 if e['y'] < 14 else 0.18
                 if e['t'] % 50 == 0:
                     for a in (-0.3, 0, 0.3):
-                        bombs.append([e['x'] + 7, e['y'] + 10, math.sin(a) * 1.1, math.cos(a) * 1.1])
+                        bombs.append([e['x'] + 8, e['y'] + 11, math.sin(a) * 1.1, math.cos(a) * 1.1])
+            elif e['pat'] == 5:
+                e['x'] += e['vx']; e['y'] += e['vy']
             else:
-                e['y'] += 0.45
-                if e['t'] % 60 == 30:
-                    dx, dy = x + 4 - e['x'], y + 4 - e['y']
+                e['y'] += 0.5
+                if e['type'] < 4 and e['t'] % 60 == 30 and e['y'] > TOP:
+                    dx, dy = x + 5 - e['x'], y + 4 - e['y']
                     dd = math.hypot(dx, dy) + .01
-                    bombs.append([e['x'] + 2, e['y'] + 6, dx / dd * 1.3, dy / dd * 1.3])
-            w_, h_ = (15, 10) if e['type'] == 1 else (5, 16) if e['type'] == 2 else (7, 7)
+                    bombs.append([e['x'] + w_ // 2, e['y'] + 6, dx / dd * 1.3, dy / dd * 1.3])
+                if e['type'] == 4 and e['t'] % 110 == 60:  # porte-avions : un chasseur decolle et pique
+                    dx, dy = x - e['x'], y - e['y'] - 20
+                    dd = math.hypot(dx, dy) + .01
+                    en.append({'t': 0, 'x': e['x'] + 1, 'y': e['y'] + 20, 'type': 0, 'hp': 1, 'pat': 5, 'fl': 0, 'var': 1, 'cap': False,
+                               'vx': dx / dd * 2, 'vy': dy / dd * 2})
             for sh in shots:
                 if e['x'] <= sh[0] <= e['x'] + w_ and e['y'] <= sh[1] <= e['y'] + h_:
                     sh[1] = -99
                     e['hp'] -= 1
                     e['fl'] = 3
                     if e['hp'] <= 0:
-                        score += 500 if e['type'] == 1 else 400 if e['type'] == 2 else 100
-                        booms.append([int(e['x'] + w_ / 2), int(e['y'] + 4), 1])
+                        score += (100, 500, 300, 600, 1500)[e['type']]
+                        booms.append([int(e['x'] + w_ / 2), int(e['y'] + h_ / 2), 1])
+                        if e['type']:
+                            booms.append([int(e['x'] + w_ / 2) - 3, int(e['y']) + 2, 3])
+                        if e['cap'] and not cap:
+                            cap = [e['x'] + w_ / 2 - 3, e['y'], 2 if e['type'] == 4 else (grp % 2)]
                     break
-        en = [e for e in en if e['hp'] > 0 and e['y'] < HS]
+        en = [e for e in en if e['hp'] > 0 and -40 < e['y'] < HS and -20 < e['x'] < W + 20]
         for b in bombs:
             b[0] += b[2]; b[1] += b[3]
         bombs = [b for b in bombs if TOP <= b[1] < HS and 0 <= b[0] < W]
         for b in booms:
             b[2] += 1
-        booms = [b for b in booms if b[2] < 12]
+        booms = [b for b in booms if b[2] < 15]
         if f % 2:
             continue
         sc = Screen(W, HS)
@@ -2028,46 +2058,69 @@ def escadrille():
         d.rectangle((0, TOP, W - 1, HS - 1), fill=SEA)
         for ix, iy, r in isles:
             iy = int(iy)
-            d.ellipse((ix - r - 1, iy - r - 1, ix + r + 1, iy + r + 1), fill=SAND)
-            ox, oy, r2 = ix + r * 3 // 5, iy + r * 3 // 5, r * 2 // 3
-            d.ellipse((ox - r2 - 1, oy - r2 - 1, ox + r2 + 1, oy + r2 + 1), fill=SAND)
-            d.ellipse((ix - r + 1, iy - r + 1, ix + r - 1, iy + r - 1), fill=LEAF)
-            d.ellipse((ox - r2 + 1, oy - r2 + 1, ox + r2 - 1, oy + r2 - 1), fill=LEAF)
+            x2, y2, r2 = ix + r * 3 // 5, iy + r * 3 // 5, r * 2 // 3
+            for rr, c_ in ((3, SHAL), (1, SAND), (-1, LEAF)):
+                d.ellipse((ix - r - rr, iy - r - rr, ix + r + rr, iy + r + rr), fill=c_)
+                d.ellipse((x2 - r2 - rr, y2 - r2 - rr, x2 + r2 + rr, y2 + r2 + rr), fill=c_)
             d.ellipse((ix - r // 3 - r // 3, iy - r // 3 - r // 3, ix, iy), fill=LEAF2)
-        for fx, fy in foam:
-            d.line((fx, fy, fx + 1, fy), fill=FOAM)
+        for k, (wx, wy) in enumerate(waves):
+            c_ = (190, 225, 255) if k % 4 == 0 else (70, 140, 225)
+            sc.px(wx, wy, c_); sc.px(wx + 3, wy, c_); sc.px(wx + 1, wy - 1, c_); sc.px(wx + 2, wy - 1, c_)
         for e in en:
-            if e['type'] == 2:
-                ex, ey = int(e['x']), int(e['y'])
-                hull = PAL['w'] if e['fl'] else (140, 140, 150)
-                d.rectangle((ex + 1, ey, ex + 3, ey + 15), fill=hull)
-                d.rectangle((ex, ey + 3, ex + 4, ey + 12), fill=hull)
-                d.rectangle((ex + 1, ey + 7, ex + 3, ey + 9), fill=(80, 80, 90))
-                d.line((ex + 1, ey - 1, ex + 3, ey - 1), fill=(150, 200, 255))
+            ex, ey = int(e['x']), int(e['y'])
+            if e['type'] == 4:
+                hull = (255, 255, 255) if e['fl'] else col('S', 0)
+                d.rectangle((ex + 1, ey, ex + 9, ey + 29), fill=hull)
+                d.rectangle((ex, ey + 3, ex + 10, ey + 26), fill=hull)
+                d.rectangle((ex + 1, ey + 2, ex + 8, ey + 27), fill=hull if e['fl'] else col('n', 0))
+                for j in range(ey + 4, ey + 26, 4):
+                    d.line((ex + 5, j, ex + 5, j + 1), fill=col('N', 0))
+                d.rectangle((ex + 9, ey + 11, ex + 10, ey + 17), fill=col('s', 0))
+                for p in range(2):
+                    py = ey + 20 + p * 4
+                    d.line((ex + 1, py, ex + 3, py), fill=col('G', 1)); sc.px(ex + 2, py - 1, col('G', 1)); sc.px(ex + 2, py + 1, col('G', 1))
+                d.line((ex + 3, ey + 30, ex + 7, ey + 30), fill=col('w', 0))
+            elif e['type'] >= 2:
+                spr(sc, BOAT if e['type'] == 2 else DEST, ex, ey, 0, e['fl'] > 0)
         d.rectangle((0, 0, W - 1, TOP - 1), fill=(0, 0, 0))
+        if cap:
+            cx_, cy_ = int(cap[0]), int(cap[1])
+            fillc = ((255, 200, 0), (60, 120, 255), (230, 30, 30))[cap[2]]
+            d.rectangle((cx_, cy_, cx_ + 6, cy_ + 6), fill=fillc, outline=(255, 255, 255) if f & 4 else (160, 90, 20))
+            L = (("kk.", "k.k", "kk.", "k..", "k.."), ("kkk", ".k.", ".k.", ".k.", ".k."), ("...", ".k.", "kkk", ".k.", "..."))[cap[2]]
+            for r, line in enumerate(L):
+                for q, ch in enumerate(line):
+                    if ch == 'k':
+                        sc.px(cx_ + 2 + q, cy_ + 1 + r, (90, 40, 0) if cap[2] == 0 else (255, 255, 255))
         for e in en:
             if e['type'] == 0:
-                spr(sc, AF[(f // 3) & 1], e['x'], e['y'], e['fl'] > 0)
+                spr(sc, FIGHT[(f // 3) & 1], e['x'], e['y'], e['var'], e['fl'] > 0)
             elif e['type'] == 1:
-                spr(sc, AB, e['x'], e['y'], e['fl'] > 0)
+                spr(sc, BOMBER, e['x'], e['y'], e['var'] % 2, e['fl'] > 0)
         for sh in shots:
             sc.px(int(sh[0]), int(sh[1]), PAL['y']); sc.px(int(sh[0]), int(sh[1]) + 1, PAL['o'])
         for b in bombs:
             bx_, by_ = int(b[0]), int(b[1])
             sc.px(bx_, by_, PAL['r']); sc.px(bx_ + 1, by_, PAL['r']); sc.px(bx_, by_ + 1, PAL['o']); sc.px(bx_ + 1, by_ + 1, PAL['w'])
-        for b in booms:
-            boom(sc, b)
+        for bx_, by_, t in booms:  # boules de feu
+            r = 1 + t // 2 if t < 5 else 3 + (t - 5) // 3 if t < 10 else 4
+            out = (255, 230, 120) if t < 4 else (255, 140, 0) if t < 8 else (220, 40, 20) if t < 11 else (90, 80, 80)
+            inn = (255, 255, 255) if t < 4 else (255, 230, 60) if t < 8 else (255, 140, 0) if t < 11 else (60, 55, 55)
+            d.ellipse((bx_ - r, by_ - r, bx_ + r, by_ + r), fill=out)
+            ri = r - 2 + (t & 1)
+            if r > 1 and ri >= 0:
+                d.ellipse((bx_ - ri, by_ - ri, bx_ + ri, by_ + ri), fill=inn)
         if roll:
-            spr(sc, ROLL, x, y, swap=('w', 'c') if (roll >> 2) & 1 else None)
+            spr(sc, ROLL, x, y, 3 if (roll >> 2) & 1 else 0)
         else:
-            spr(sc, PLANE[(f >> 1) & 1], x, y)
-        for i in range(rolls):
-            d.ellipse((1 + i * 7, HS - 6, 5 + i * 7, HS - 2), outline=PAL['c'])
+            spr(sc, ME[(f >> 1) & 1], x, y)
+        for k in range(rolls):
+            d.ellipse((1 + k * 7, HS - 6, 5 + k * 7, HS - 2), outline=PAL['c'])
         hud(sc, score, 3, LIFE)
         frames.append(page(led64(sc.im), 'ESCADRILLE', 'Shoot vertical au-dessus de la mer : chasseurs, bombardiers, navires.',
                            ['Commandes :', 'croix / stick : voler', 'X, R1, R2 : tirer', 'rond : tonneau', '  (invincible, 3 par stage)',
-                            'Regles :', 'capsules : arme, tonneau', '10 vagues puis', "  l'hydravion geant", 'bombardier : 500',
-                            'navire : 400']))
+                            'Regles :', 'capsules : P arme,', '  T tonneau, + vie', '10 vagues puis', '  le grand quadrimoteur',
+                            'porte-avions : 1500']))
     save(frames, 'jeu-escadrille.gif')
 
 

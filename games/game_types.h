@@ -14,4 +14,4 @@ struct KBall { float x, y, vx, vy; bool on; };  // BRIQUES : balle
 struct KCap { float x, y; uint8_t type; bool on; };  // BRIQUES : capsule (0 large, 1 lente, 2 trois balles, 3 vie)
 struct DEn { float x, y; int8_t c, r, dx, dy; uint8_t type, stun, ghost; int16_t t; bool on; };  // TAUPE : ver (0) ou chauve-souris (1)
 struct DRock { float y, vy; int8_t c; uint8_t wob, state; bool on; };                         // TAUPE : rocher (0 pose, 1 tremble, 2 tombe)
-struct AEn { float x, y, vx, vy; int16_t t; uint8_t type, pat; int8_t hp, flash; bool on, carrier; };  // ESCADRILLE : chasseur (0), bombardier (1), navire (2)
+struct AEn { float x, y, vx, vy; int16_t t; uint8_t type, pat, var; int8_t hp, flash; bool on, carrier; };  // ESCADRILLE : chasseur (0), bombardier (1), vedette (2), destroyer (3), porte-avions (4) ; var : couleur

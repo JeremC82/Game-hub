@@ -18,7 +18,7 @@ Depuis la V3.84, le Game-hub utilise **Bluepad32** : jusqu'à **4 manettes Bluet
 - **Menu « JOUEURS 1 / 2 »** (2e ligne, une étoile par manette connectée) : seuls les jeux à deux joueurs utilisent la 2e manette.
   - **RAQUETTES** : match à deux (raquette de droite pour le joueur 2), **le premier à 7 points gagne**.
   - **SPACE DEFENDER** : coopération, un 2e vaisseau **vert** pour le joueur 2, vies et score communs ; les ennemis piquent sur l'un ou l'autre ; la manette du joueur touché vibre.
-- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V3.85_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
+- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V3.86_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
 - **Mémoire** : environ 81 Ko libres avec 2 dalles en 3 bits et deux manettes connectées.
 
 # SPACE DEFENDER
@@ -197,12 +197,14 @@ Un jeu de tir de billes original, dans un puits.
 
 ![ESCADRILLE](docs/jeu-escadrille.gif)
 
-Un shoot vertical original au-dessus de la mer (V3.85, remplace ESCALADE). Ton chasseur à hélice, blanc et bleu, survole les îles.
+Un shoot vertical original au-dessus de la mer (V3.85, remplace ESCALADE ; nouveaux sprites et fond marin en V3.86).
+- **Décor :** la mer défile avec ses vagues et son écume, des îles entourées de hauts-fonds clairs.
 - **Commandes :** croix ou stick pour voler dans le bas de l'écran, **✕ (ou carré, R1, R2) pour tirer**, **○ pour un tonneau** : l'avion tourne sur lui-même, il est invincible pendant 1 s mais ne tire pas. 3 tonneaux par stage (les ronds cyan en bas à gauche).
-- **Ennemis :** des escadrilles de chasseurs verts (en V, en vague sinueuse, par le côté, en piqué sur toi), des **bombardiers lourds** qui tirent en éventail et des **navires** sur la mer qui visent ton avion.
-- **Capsules :** double flèche jaune = arme (2, 3, 4 puis 5 tirs en éventail), anneau cyan = un tonneau de plus. Une vie perdue fait baisser l'arme d'un niveau.
-- **Boss :** après 10 vagues, un **hydravion géant à quatre moteurs** ; sous la moitié de sa vie, il bouge plus vite et tire en spirale.
-- **Points :** chasseur 100, piqueur 150, navire 400, bombardier 500, boss 2000 × le stage.
+- **Ton avion :** un chasseur bleu à étoiles blanches, hélice qui tourne.
+- **Ennemis :** des chasseurs (verts, argent ou jaunes) en V, en vague sinueuse, par le côté ou en piqué ; des **bombardiers bimoteurs** qui tirent en éventail ; des **navires** sur la mer : vedette, destroyer à deux canons, et **porte-avions** qui fait décoller des chasseurs.
+- **Capsules :** **P** jaune = arme (2, 3, 4 puis 5 tirs en éventail), **T** bleue = un tonneau de plus, **+** rouge = une vie (laissée par le porte-avions). Une vie perdue fait baisser l'arme d'un niveau.
+- **Boss :** après 10 vagues, un **grand quadrimoteur vert** ; sous la moitié de sa vie, il bouge plus vite et tire en spirale.
+- **Points :** chasseur 100, piqueur 150, vedette 300, bombardier 500, destroyer 600, porte-avions 1500, boss 2000 × le stage.
 
 ### CRUCH
 
@@ -352,8 +354,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V3.85_complet.bin](firmware/GameHub_V3.85_complet.bin) | 0x0 | `82c6d62bfc2a1198ab604af4fef7208b` |
-| [firmware/GameHub_V3.85.bin](firmware/GameHub_V3.85.bin) | 0x10000 | `e0d5ecc0e7d8a6b1ab4f77c4685bc0e9` |
+| [firmware/GameHub_V3.86_complet.bin](firmware/GameHub_V3.86_complet.bin) | 0x0 | `dc451b01c498df647da822a1427a1a5e` |
+| [firmware/GameHub_V3.86.bin](firmware/GameHub_V3.86.bin) | 0x10000 | `ee1945d390b91eb82240245a1e52821f` |
 
 Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB SPIFFS)** dans Outils → Partition Scheme.
 
