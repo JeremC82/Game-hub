@@ -1,14 +1,14 @@
-# Compile Game hub (ESP32 classique, manette PS4 Bluetooth, sans wifi) avec les bibliotheques de l'horloge.
-# Partition unique de 3 Mo (Huge APP). Produit :
-#   GameHub_V<version>.bin         -> mise a jour, a flasher a 0x10000
+# Compile Game hub avec Bluepad32 : jusqu'a 4 manettes Bluetooth (PS4, PS5, Xbox...).
+# Carte "ESP32 + Bluepad32" (esp32-bluepad32:esp32, installee avec build\bp32\arduino-cli.yaml), partition Huge APP.
+#   GameHub_V<version>.bin       -> a flasher a 0x10000 (sur une carte deja en Huge APP)
 #   GameHub_V<version>_complet.bin -> 1er flash (demarrage + table des partitions + programme), a 0x0
-param([string]$Fqbn = "esp32:esp32:esp32:PartitionScheme=huge_app,DebugLevel=error")
+param([string]$Fqbn = "esp32-bluepad32:esp32:esp32:PartitionScheme=huge_app,DebugLevel=error")
 $proj = $PSScriptRoot
 $cli = "$env:LOCALAPPDATA\Programs\Arduino IDE\resources\app\lib\backend\resources\arduino-cli.exe"
-$yaml = "C:\Users\Jeremy\Documents\projet vscode\clockV1\build\arduino-cli.yaml"
-$core = "$env:LOCALAPPDATA\Arduino15\packages\esp32\hardware\esp32\2.0.17"
+$yaml = "$proj\build\bp32\arduino-cli.yaml"
+$core = "$env:LOCALAPPDATA\Arduino15\packages\esp32-bluepad32\hardware\esp32\4.1.0"
 $esptool = "$env:LOCALAPPDATA\Arduino15\packages\esp32\tools\esptool_py\4.6\esptool.exe"
-$out = "$proj\build\games"
+$out = "$proj\build\games_bp32"
 & $cli --config-file $yaml compile --fqbn $Fqbn --warnings default --output-dir $out "$proj\games" 2>&1 | Tee-Object "$proj\build\compile.log" | Select-String -Pattern "games\.ino:\d+:\d+: (warning|error)|error:|Le croquis|Les variables|Error during"
 if ($LASTEXITCODE -ne 0) { "ECHEC compilation"; exit 1 }
 $ver = (Select-String -Path "$proj\games\games.ino" -Pattern '#define GAMES_VERSION "([^"]+)"').Matches[0].Groups[1].Value

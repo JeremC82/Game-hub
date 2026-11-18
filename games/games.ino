@@ -28,7 +28,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "3.83"
+#define GAMES_VERSION "3.84"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -193,6 +193,7 @@ void onPadConnected(ControllerPtr c) {
       Serial.printf("Manette %d connectee : %s, memoire libre %u\n", i + 1, c->getModelName().c_str(), ESP.getFreeHeap());
       snprintf(padToast, sizeof(padToast), "MANETTE %d OK", i + 1);
       padToastUntil = millis() + 3000;
+      pairStop("manette connectee");
       return;
     }
 }
@@ -1098,6 +1099,7 @@ void drawMenu() {
 void gOverlay() {
   gfx->setFont(NULL);
   gfx->setTextSize(1);
+  pairOverlay();
   if (padToastUntil && millis() < padToastUntil) gText(H - 10, padToast, rgb(0, 220, 255));  // manette connectee / partie
   if (gLives <= 0 && gDead > 0 && !gDemo) {
     gText(H / 2 - 4, "GAME OVER", rgb(255, 40, 40));
@@ -4400,7 +4402,7 @@ void menuScreen() {
   }
   gfx->setTextSize(1);
   if (gNameEntry) drawNameEntry();
-  else { drawMenu(); drawPadBattery(); }
+  else { drawMenu(); drawPadBattery(); pairOverlay(); }
   if (padToastUntil && millis() < padToastUntil) gText(H - 9, padToast, rgb(0, 220, 255));  // manette connectee / partie
 }
 
@@ -4531,6 +4533,27 @@ void gameUpdate() {
 uint32_t restartAt = 0;
 uint32_t brightSaveAt = 0;  // luminosite changee : enregistree 2 s plus tard
 
+uint32_t pairUntil = 0;  // mode association en cours jusqu'a (millis), 0 : non
+void pairStart(uint32_t ms) {
+  pairUntil = millis() + ms;
+  if (sndTimer) timerAlarmDisable(sndTimer);  // son coupe : tout le coeur 0 pour le Bluetooth pendant l'association
+  ledcWrite(SND_LEDC, 128);
+  BP32.enableNewBluetoothConnections(true);
+  Serial.printf("Mode association %lu s : Share + PS sur la manette (PS5 : Create + PS), son coupe\n", (unsigned long)(ms / 1000));
+}
+void pairStop(const char *why) {
+  if (!pairUntil) return;
+  pairUntil = 0;
+  if (sndTimer) timerAlarmEnable(sndTimer);
+  Serial.printf("Fin du mode association : %s\n", why);
+}
+void pairOverlay() {  // sur la dalle : ASSOCIATION 45 / SHARE + PS
+  if (!pairUntil) return;
+  char b[20];
+  snprintf(b, sizeof(b), "ASSOCIATION %lu", (unsigned long)((pairUntil - millis()) / 1000 + 1));
+  gText(H / 2 - 9, b, rgb(255, 220, 0));
+  gText(H / 2 + 1, "SHARE + PS", rgb(0, 220, 255));
+}
 // Bluepad32 : association simple, PS + Share sur la manette (la barre lumineuse clignote vite), plus d'adresse a recopier
 void ps4Begin() {
   BP32.setup(&onPadConnected, &onPadDisconnected);
@@ -4544,6 +4567,7 @@ void ps4Begin() {
 // lecture de la manette a chaque tour de boucle ; barre lumineuse selon le stage, vibration quand on est touche
 void ps4Poll() {
   BP32.update();  // nouvelles donnees des manettes (Bluepad32)
+  if (pairUntil && (long)(millis() - pairUntil) > 0) pairStop("temps ecoule");
   static uint32_t scanAt = 0;
   if (!PAD2.isConnected() && millis() - scanAt > 5000) { scanAt = millis(); BP32.enableNewBluetoothConnections(true); }  // cherche encore une manette
   static bool was = false;
@@ -4634,6 +4658,14 @@ void ps4Poll() {
     dma->setBrightness8(bright);
     brightSaveAt = millis() + 2000;
   }
+  {  // Share seul maintenu 3 s : mode association 60 s (pour ajouter une manette)
+    static uint32_t shareSince = 0;
+    static bool shareUsed = false;
+    bool alone = PS4.Share() && !PS4.Options() && !PS4.Up() && !PS4.Down();
+    if (!alone) { shareSince = 0; shareUsed = false; }
+    else if (!shareSince) shareSince = millis();
+    else if (!shareUsed && millis() - shareSince > 3000) { shareUsed = true; pairStart(60000); sfxMenu(); }
+  }
   if (PS4.Share() && PS4.Options()) {  // Share + Options 3 s : redemarrage
     if (!combo) combo = millis();
     else if (millis() - combo > 3000) restartAt = millis();
@@ -4718,6 +4750,7 @@ void serialMenu() {
   Serial.printf("Dalles : %u, disposition %u, retourne %u, serpentin %u -> ecran %dx%d, couleurs %u bits\n", nPanels, arrange, flipAll,
                 serpent, W, H, colorBits);
   Serial.println("  a : oublier les manettes associees (pour en associer d'autres : PS + Share)");
+  Serial.println("  m : mode association 60 s (son coupe ; aussi : Share maintenu 3 s, et 60 s au demarrage)");
   Serial.println("  c NDFS : dalles. N nombre 1-4, D 0 l'une sous l'autre / 1 cote a cote / 2 carre,");
   Serial.println("           F ecran retourne 0/1, S une dalle sur deux retournee 0/1. Ex. : c 2000");
   Serial.println("  p N : couleurs des dalles sur N bits (3 a 6, redemarre). 3 = le plus sur pour le Bluetooth,");
@@ -4745,6 +4778,8 @@ void handleSerial() {
     if (cmd == 'a') {
       BP32.forgetBluetoothKeys();
       Serial.println("Manettes associees oubliees : PS + Share sur chaque manette pour l'associer de nouveau");
+    } else if (cmd == 'm') {
+      pairStart(60000);
     } else if (cmd == 'c') {
       if (strlen(arg) == 4 && arg[0] >= '1' && arg[0] <= '4' && arg[1] >= '0' && arg[1] <= '2') {
         prefs.putUChar("nb", arg[0] - '0');
@@ -4857,6 +4892,7 @@ void setup() {
   gGame = 0;  // demarrage toujours sur ESSAIM (choix d'un autre jeu : gauche / droite dans le menu)
   ps4Begin();
   audioBegin();
+  pairStart(60000);  // 60 s pour associer une manette, son coupe (le Bluetooth a tout son temps)
   serialMenu();
   while (millis() - bootT0 < 2000) delay(10);  // la version reste 2 s a l'ecran
 

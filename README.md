@@ -11,16 +11,15 @@ Jeux d'arcade sur 1 à 4 dalles LED 128x64, avec un ESP32 classique et une **man
 Les 12 jeux ont en commun les niveaux de difficulté, les stages, les vies, les meilleurs scores avec les noms et la démo automatique.
 
 
-## Branche bluepad32 : deux manettes (essai)
+## Deux manettes (Bluepad32)
 
-Cette branche remplace la bibliothèque PS4Controller par **Bluepad32** : jusqu'à 4 manettes Bluetooth (PS4, PS5, Xbox...).
+Depuis la V3.84, le Game-hub utilise **Bluepad32** : jusqu'à **4 manettes Bluetooth** en même temps (PS3, PS4, PS5, Xbox, Switch Pro...).
 
-- **Installation** : 1er flash avec `firmware/GameHub_V3.83_bp32_complet.bin` à **0x0** (le démarrage change), ensuite `GameHub_V3.83_bp32.bin` à 0x10000. Compilation : `build_bp32.ps1` (carte « ESP32 + Bluepad32 », `esp32-bluepad32:esp32` 4.1.0).
-- **Associer une manette** : appuyer sur **Share + PS** jusqu'au clignotement rapide de la barre lumineuse. Plus d'adresse à recopier. La 1re manette connectée est le joueur 1, la 2e le joueur 2. Moniteur série : `a` oublie toutes les manettes associées. Sur la dalle : « MANETTE 2 OK » / « MANETTE 1 PARTIE » à chaque connexion, et dans le menu `JOUEURS <2> **` (une étoile par manette connectée).
-- **Menu « JOUEURS 1 / 2 »** : seuls les jeux à deux joueurs utilisent la 2e manette.
+- **Menu « JOUEURS 1 / 2 »** (2e ligne, une étoile par manette connectée) : seuls les jeux à deux joueurs utilisent la 2e manette.
   - **RAQUETTES** : match à deux (raquette de droite pour le joueur 2), **le premier à 7 points gagne**.
   - **SPACE DEFENDER** : coopération, un 2e vaisseau **vert** pour le joueur 2, vies et score communs ; les ennemis piquent sur l'un ou l'autre ; la manette du joueur touché vibre.
-- **Mémoire** : environ 87 Ko libres avec 2 dalles en 3 bits et une manette connectée (une manette en plus : environ 4 Ko).
+- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V3.84_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
+- **Mémoire** : environ 81 Ko libres avec 2 dalles en 3 bits et deux manettes connectées.
 
 # SPACE DEFENDER
 
@@ -218,7 +217,7 @@ Des bonbons à aligner sur un plateau de 8 × 8. Six sortes, chacune avec sa cou
 
 Au démarrage, la dalle affiche **ARCADE GAMES** (en vert) et la **version** (par exemple V3.70) pendant 2 s, le temps que le Bluetooth et le son démarrent.
 
-Sans partie en cours, le jeu tourne tout seul en démo, sans son. **La démo change de jeu au hasard toutes les 5 minutes** (au retour au menu, le jeu choisi est remis). **Sans manette connectée**, la démo affiche seulement une petite indication, « MANETTE : BOUTON PS », avec l'adresse Bluetooth de l'ESP32. Dès que la manette est connectée, le menu s'affiche **sur son propre écran**, sans la démo derrière. On y voit un fond d'étoiles, le titre ARCADE GAMES et le record avec le nom de son détenteur :
+Sans partie en cours, le jeu tourne tout seul en démo, sans son. **La démo change de jeu au hasard toutes les 5 minutes** (au retour au menu, le jeu choisi est remis). **Sans manette connectée**, la démo affiche seulement une petite indication, « MANETTE : PS + SHARE ». Dès que la manette est connectée, le menu s'affiche **sur son propre écran**, sans la démo derrière. On y voit un fond d'étoiles, le titre ARCADE GAMES et le record avec le nom de son détenteur :
 
 **Batterie de la manette :** en haut à droite du menu, un pourcentage et une petite pile (verte, orange, puis rouge qui clignote quand elle est faible). En charge, la pile est jaune, avec un éclair et une jauge qui se remplit en boucle.
 
@@ -231,6 +230,7 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. **La démo cha
 | **LUMINOSITE** | 0 à 100 % par pas de 10 % (gauche / droite ou ✕), visible tout de suite et gardée en mémoire. À 0 %, les dalles restent très faiblement allumées pour qu'on voie encore le menu. |
 | **VOLUME** | volume du son, 0 à 100 % par pas de 10 % (gauche / droite ou ✕). Un bip fait entendre le niveau. 0 % = muet. C'est le rapport cyclique du PWM : le potentiomètre de l'ampli règle le maximum. |
 | **SCORES** | les 5 meilleurs scores **du jeu choisi** : rang, **nom**, score, niveau (F/N/D) et stage atteint. Chaque jeu a son propre tableau. |
+| **JOUEURS** | **1 ou 2 joueurs** (gauche / droite ou ✕), une étoile par manette connectée ; seuls les jeux à deux joueurs utilisent la 2e manette |
 | **DEMO** | lance **la démo du jeu choisi** : il tourne tout seul avec un pilote automatique, sans texte par-dessus (seules les annonces de stage s'affichent) |
 
 | Réglage du volume | Réglage de la luminosité |
@@ -256,9 +256,7 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. **La démo cha
 | Normal | 3 | — |
 | Difficile | 3 | tirent plus, piquent plus souvent, tirs plus rapides |
 
-## Manette PS4
-
-![Connexion de la manette PS4](docs/manette-ps4.gif)
+## Manettes
 
 | Manette | Action |
 |---|---|
@@ -275,21 +273,14 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. **La démo cha
 - **Vibration :** la manette vibre quand ton vaisseau est touché.
 - **Barre lumineuse :** bleu sombre au menu et en démo ; **pendant une partie, elle change de couleur à chaque stage** (bleu, vert, jaune, cyan, rouge, violet, en boucle), dans tous les jeux.
 
-**Connexion, une seule fois.** Une manette PS4 ne se connecte qu'à l'adresse Bluetooth qu'elle a enregistrée. Il y a deux façons de faire.
+**Associer une manette, une seule fois.** Ensuite, le bouton **PS** suffit pour la reconnecter.
 
-**Méthode 1 (la plus simple) : écrire l'adresse de l'ESP32 dans la manette.**
-1. Sans manette, la dalle affiche l'adresse Bluetooth de l'ESP32 sous « MANETTE : BOUTON PS ». Le moniteur série l'affiche aussi.
-2. Branche la manette en USB sur le PC et lance **SixaxisPairTool**. Tape l'adresse de l'ESP32 dans « Change Master », puis clique sur Update.
-3. Débranche la manette et appuie sur **PS**.
+1. **Mode association** : il est actif **60 s après chaque démarrage**. On peut aussi le relancer en maintenant **Share 3 s** sur une manette déjà connectée, ou avec la commande `m` du moniteur série. La dalle affiche « ASSOCIATION 45 / SHARE + PS » ; le son est coupé pendant ce temps (le Bluetooth a tout le processeur pour lui).
+2. Sur la manette : **PS4** : maintenir **Share puis PS** jusqu'au clignotement rapide de la barre lumineuse. **PS5** : **Create + PS**. **Xbox** : le bouton d'association sur le dessus.
+3. La dalle affiche « MANETTE 1 OK » (puis « MANETTE 2 OK » pour la suivante). La 1re manette connectée est le joueur 1 (barre bleue), la 2e le joueur 2 (rouge).
 
-Pour rejouer sur la PS4 ensuite, il suffit de rebrancher la manette en USB sur la console et d'appuyer sur PS.
-
-**Méthode 2 : l'ESP32 prend l'adresse de la console.** La manette continue alors de marcher sur la PS4 sans rien refaire.
-1. Avec SixaxisPairTool, lis l'adresse « Current Master » de la manette : c'est celle de la console.
-2. Dans le moniteur série de l'ESP32, tape `a 1a:2b:3c:4d:5e:6f` (avec cette adresse), puis Entrée. L'ESP32 redémarre.
-3. Appuie sur **PS**.
-
-La commande `a` seule rend à l'ESP32 son adresse d'origine.
+- **Une manette PS4 qui refuse toujours** : écrire l'adresse Bluetooth de l'ESP32 dedans avec **SixaxisPairTool** (manette en USB sur un PC, « Change Master »), puis appuyer sur PS. L'adresse s'affiche dans le moniteur série au démarrage (« Bluepad32 ... pret, adresse ... »). C'est aussi la seule méthode pour une **manette PS3**.
+- **Oublier toutes les manettes associées** : commande `a` du moniteur série.
 
 ## Son (option) : une broche PWM
 
@@ -359,24 +350,21 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V3.83_bp32_complet.bin](firmware/GameHub_V3.83_bp32_complet.bin) | 0x0 | `4bb18f6786f1b6a03d59763672ff2ec2` |
-| [firmware/GameHub_V3.83_bp32.bin](firmware/GameHub_V3.83_bp32.bin) | 0x10000 | `04bea141adb7b436090a19c6b4abd6cd` |
+| [firmware/GameHub_V3.84_complet.bin](firmware/GameHub_V3.84_complet.bin) | 0x0 | `d7aaecde58a18b74bbfea854b5306beb` |
+| [firmware/GameHub_V3.84.bin](firmware/GameHub_V3.84.bin) | 0x10000 | `703d09b70489b661cfceb7887c4d0502` |
 
 Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB SPIFFS)** dans Outils → Partition Scheme.
 
 ## Compilation
 
 ```powershell
-./build.ps1    # arduino-cli, ESP32 classique, core 2.0.17, partition Huge APP
+./build.ps1    # arduino-cli, carte "ESP32 + Bluepad32" (esp32-bluepad32:esp32 4.1.0), partition Huge APP
                # -> GameHub_V<version>.bin et GameHub_V<version>_complet.bin
 ```
 
-- **Bibliothèques :** ESP32-HUB75-MatrixPanel-I2S-DMA et Adafruit GFX.
-- **PS4Controller 1.1.0 :** une copie corrigée est incluse dans `games/src/PS4Controller/` (licence GPL-3, modification signalée dans `ps4_l2cap.c`).
-  - Avec le core ESP32 2.0.17, la bibliothèque d'origine lisait les paquets de la manette décalés d'un octet : seul « haut » était détecté et la batterie était fausse.
-  - La copie corrigée cherche l'en-tête du paquet avant de le lire.
-  - Elle demande aussi à la manette un rapport toutes les 4 ms. Avec 0, elle n'en envoyait qu'environ un toutes les 2 s, et les appuis brefs étaient perdus.
-  - Le jeu interdit enfin le mode veille Bluetooth (sniff) et force le lien de la manette en mode actif dès le premier rapport. Le moniteur série affiche le nombre de paquets reçus par seconde.
-- **Plans, aperçus et GIF :** `python docs/branchement.py`, `python docs/rendu.py`, `python docs/gif_manette_ps4.py`, `python docs/gif_arrivee.py`, `python docs/gif_menus.py`, `python docs/gif_jeux.py [raid course raquettes bulles labyrinthe]`, `python docs/branchement_son.py` (Pillow).
+- **Carte :** installée avec la configuration `build/bp32/arduino-cli.yaml` (adresse du paquet Bluepad32 ajoutée). Le programme d'essai `bp32test/` affiche l'état des manettes et la mémoire libre.
+- **Bibliothèques :** ESP32-HUB75-MatrixPanel-I2S-DMA et Adafruit GFX ; Bluepad32 est fourni avec la carte.
+- **Manettes :** une petite couche d'adaptation (`PadShim`) garde les noms `PS4.Cross()`, `PS4.LStickX()`... utilisés par les jeux ; `PAD2` lit la 2e manette. L'ancienne bibliothèque PS4Controller (une seule manette, adresse de la console à recopier) reste dans l'historique Git (V3.70, commit `11e9556`).
+- **Plans, aperçus et GIF :** `python docs/branchement.py`, `python docs/rendu.py`, `python docs/gif_manette_ps4.py`, `python docs/gif_arrivee.py`, `python docs/gif_menus.py`, `python docs/gif_jeux.py [raid raquettes bulles labyrinthe orbite briques blocs cruch taupe billes escalade]`, `python docs/branchement_son.py` (Pillow).
 
 L'ancienne version avec wifi, page web et manette ESP-NOW reste disponible dans l'historique Git, jusqu'au commit `fb11367`.
