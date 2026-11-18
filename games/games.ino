@@ -28,7 +28,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "3.84"
+#define GAMES_VERSION "3.85"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -125,11 +125,11 @@ bool gAttract = false;              // mode demo : menu cache (ligne DEMO, ou 30
 #define MENU_IDLE_MS 30000UL        // menu sans activite : passage en mode demo
 bool menuScores = false;            // page des meilleurs scores affichee
 // numeros des jeux (ordre du menu)
-enum GameId : uint8_t { G_SPACE, G_RAID, G_RAQ, G_BUL, G_LAB, G_ORB, G_BRI, G_BLO, G_CRU, G_TAU, G_BIL, G_ESC };
+enum GameId : uint8_t { G_SPACE, G_RAID, G_RAQ, G_BUL, G_LAB, G_ORB, G_BRI, G_BLO, G_CRU, G_TAU, G_BIL, G_ESQ };
 #define N_GAMES 12
-const char *const GAME_NAME[N_GAMES] = { "SPACE DEFENDER", "RAID", "RAQUETTES", "BULLES", "LABYRINTHE", "ORBITUS", "CASSE BRIQUES", "BLOCS", "CRUCH", "TAUPE", "BILLES", "ESCALADE" };
+const char *const GAME_NAME[N_GAMES] = { "SPACE DEFENDER", "RAID", "RAQUETTES", "BULLES", "LABYRINTHE", "ORBITUS", "CASSE BRIQUES", "BLOCS", "CRUCH", "TAUPE", "BILLES", "ESCADRILLE" };
 uint8_t gGame = 0;                  // jeu choisi dans le menu (gauche / droite sur la ligne JOUER)
-const char *topKey() { static const char *const K[N_GAMES] = { "top", "top1", "top3", "top4", "top5", "top7", "top8", "top9", "top10", "top11", "top12", "top13" }; return K[gGame % N_GAMES]; }  // top2 (COURSE) et top6 (SAUTERELLE) : jeux retires
+const char *topKey() { static const char *const K[N_GAMES] = { "top", "top1", "top3", "top4", "top5", "top7", "top8", "top9", "top10", "top11", "top12", "top14" }; return K[gGame % N_GAMES]; }  // top2 (COURSE), top6 (SAUTERELLE), top13 (ESCALADE) : jeux retires
 #define TOP_N 5
 HiScore gBest[TOP_N];                // meilleurs scores (gardes en memoire)
 uint8_t gLastRank = 0;              // place obtenue a la derniere partie (0 : hors tableau)
@@ -464,6 +464,7 @@ const char *const SPR_LIFE_BALL[4] = { ".ww..", "wwww.", "wwww.", ".ww.." };    
 const char *const SPR_LIFE_FRUIT[4] = { "..g..", ".rrr.", "rwrrr", ".rrr." };     // CRUCH : une pomme
 const char *const SPR_LIFE_BLOB[4] = { ".ccc.", "cwcwc", "ccccc", "c.c.c" };    // BULLES : le blob
 const char *const SPR_LIFE[4] = { "..c..", ".ccc.", "bcwcb", "b...b" };
+const char *const SPR_LIFE_PLANE[4] = { "..w..", "bwwwb", "..w..", ".www." };  // ESCADRILLE : ton avion
 // palette : w blanc, r rouge, y jaune, b bleu, c cyan, g vert, p magenta, o orange, v violet
 const char G_PAL_CH[] = "wrybcgpov";
 const uint8_t G_PAL_RGB[9][3] = { { 255, 255, 255 }, { 255, 40, 40 }, { 255, 220, 0 }, { 40, 90, 255 }, { 0, 220, 255 },
@@ -951,7 +952,7 @@ void hudTop(uint16_t *palFull) {
   gMark(x, 1, tw, 5);
   if (gGame == G_RAQ || gGame == G_BLO || gGame == G_BIL) return;  // RAQUETTES, BLOCS, BILLES : pas de vies affichees
   const char *const *life = gGame == G_BUL ? SPR_LIFE_BLOB : gGame == G_BRI ? SPR_LIFE_BALL : gGame == G_CRU ? SPR_LIFE_FRUIT
-                          : gGame == G_LAB ? SPR_LIFE_CREATURE : SPR_LIFE;
+                          : gGame == G_LAB ? SPR_LIFE_CREATURE : gGame == G_ESQ ? SPR_LIFE_PLANE : SPR_LIFE;
   static const char LABC[6] = { 'p', 'o', 'g', 'c', 'y', 'r' };  // LABYRINTHE : une couleur par icone
   int lives = max(0, gLives);
   if (lives <= 5) {
@@ -1573,12 +1574,13 @@ void rDraw() {
 // celle de l'ordinateur a droite. L'angle depend de l'endroit ou la balle touche ; elle accelere a chaque echange.
 // Point gagne : des points ; point perdu : une vie. 5 points gagnes : stage suivant (ordinateur plus fort).
 float qBX, qBY, qVX, qVY, qPY, qCY, qTrail[4][2];
-int qWon = 0, qPH = 10, qServe = 0, qStartLives = 3, qP1 = 0, qP2 = 0, qWinner = 0;
+int qWon = 0, qPH = 10, qServe = 0, qStartLives = 3, qP1 = 0, qP2 = 0, qWinner = 0, qFP = 0, qFC = 0;
+float qPV = 0, qCV = 0;  // vitesse des raquettes (effet donne a la balle)
 bool q2p = false;  // match a deux joueurs (2e manette sur la raquette de droite)
 bool qToPlayer = true;
 int qTop() { return 9; }
 int qPX() { return 3; }          // raquette du joueur (gauche)
-int qCX() { return W - 5; }      // raquette de l'ordinateur (droite)
+int qCX() { return W - 6; }      // raquette de l'ordinateur (droite)
 void qServeBall() {
   qBX = W / 2; qBY = (qTop() + H) / 2;
   float sp = 1.2f + 0.12f * gWave + 0.15f * (gEffDiff() - 1);
@@ -1623,7 +1625,9 @@ void qStep() {
     }
     return;
   }
-  float sp = H >= 128 ? 3.2f : 2.2f;
+  float sp = H >= 128 ? 3.2f : 2.2f, oldP = qPY, oldC = qCY;
+  if (qFP > 0) qFP--;
+  if (qFC > 0) qFC--;
   if (!gDemo && padStickY) qPY -= sp * 1.3f * padStickY / 127.0f;  // stick : vitesse selon l'inclinaison
   else {
     if (k & 8) qPY -= sp;
@@ -1641,23 +1645,25 @@ void qStep() {
     if (fabsf(target - cc) > 2) qCY += constrain(target - cc, -cs, cs);
   }
   qCY = constrain(qCY, (float)qTop(), (float)(H - qPH));
+  qPV = qPY - oldP; qCV = qCY - oldC;
   if (qServe > 0) { qServe--; if (gStageT > 0) gStageT--; return; }
   for (int i = 3; i > 0; i--) { qTrail[i][0] = qTrail[i - 1][0]; qTrail[i][1] = qTrail[i - 1][1]; }
   qTrail[0][0] = qBX; qTrail[0][1] = qBY;
   qBX += qVX; qBY += qVY;
   if (qBY < qTop()) { qBY = qTop(); qVY = fabsf(qVY); sfxMenu(); }
   if (qBY > H - 2) { qBY = H - 2; qVY = -fabsf(qVY); sfxMenu(); }
-  auto bounce = [&](float padY, bool right) {  // rebond : angle selon le point d'impact, balle plus rapide
+  auto bounce = [&](float padY, float padV, bool right) {  // rebond : angle selon le point d'impact et le mouvement de la raquette
     float rel = (qBY + 1 - (padY + qPH / 2.0f)) / (qPH / 2.0f);
     float speed = min(sqrtf(qVX * qVX + qVY * qVY) * 1.06f, 3.6f);
-    float a = constrain(rel, -1.0f, 1.0f) * 0.95f;
+    float a = constrain(rel + padV * 0.12f, -1.0f, 1.0f) * 0.95f;
+    (right ? qFP : qFC) = 6;
     qVY = sinf(a) * speed;
     qVX = (right ? 1 : -1) * max(0.7f, cosf(a)) * speed;
     sfxShot();
   };
   int px = qPX(), cx = qCX();
-  if (qVX < 0 && qBX <= px + 2 && qBX >= px - 1 && qBY + 2 >= qPY && qBY <= qPY + qPH) { qBX = px + 2; bounce(qPY, true); }
-  if (qVX > 0 && qBX + 2 >= cx && qBX + 2 <= cx + 3 && qBY + 2 >= qCY && qBY <= qCY + qPH) { qBX = cx - 2; bounce(qCY, false); }
+  if (qVX < 0 && qBX <= px + 3 && qBX >= px - 1 && qBY + 2 >= qPY && qBY <= qPY + qPH) { qBX = px + 3; bounce(qPY, qPV, true); }
+  if (qVX > 0 && qBX + 2 >= cx && qBX + 2 <= cx + 4 && qBY + 2 >= qCY && qBY <= qCY + qPH) { qBX = cx - 2; bounce(qCY, qCV, false); }
   if (q2p && (qBX < -2 || qBX > W)) {  // match a deux : un point pour celui qui n'a pas rate, 7 points pour gagner
     bool p1 = qBX > W;
     if (p1) qP1++; else qP2++;
@@ -1700,15 +1706,22 @@ void qDraw() {
   for (int y = qTop(); y < H; y += 6) gfx->drawFastVLine(mid, y, 3, rgb(50, 50, 80));  // filet vertical en pointilles
   gMark(mid, qTop(), 1, H - qTop());
   int px = qPX(), cx = qCX(), py = (int)qPY, cy = (int)qCY;
-  // raquettes en relief : bord clair, centre de couleur, bouts arrondis
-  gfx->fillRect(px, py + 1, 2, qPH - 2, palFull[4]);
-  gfx->drawFastVLine(px, py + 1, qPH - 2, rgb(180, 255, 255));
-  gfx->drawPixel(px + 1, py, palFull[4]); gfx->drawPixel(px + 1, py + qPH - 1, palFull[4]);
-  gfx->fillRect(cx, cy + 1, 2, qPH - 2, palFull[1]);
-  gfx->drawFastVLine(cx + 1, cy + 1, qPH - 2, rgb(255, 170, 170));
-  gfx->drawPixel(cx, cy, palFull[1]); gfx->drawPixel(cx, cy + qPH - 1, palFull[1]);
-  gMark(px, py, 2, qPH);
-  gMark(cx, cy, 2, qPH);
+  // raquettes en relief sur 3 colonnes : ombre cote mur, couleur, reflet cote balle ; bouts arrondis,
+  // poignee au milieu, eclair blanc au contact de la balle
+  auto paddle = [&](int x, int y, bool left, int flash, uint8_t r, uint8_t g, uint8_t b) {
+    uint16_t dark = rgb(r / 4, g / 4, b / 4), main = rgb(r, g, b), lite = rgb(min(255, r / 2 + 140), min(255, g / 2 + 140), min(255, b / 2 + 140));
+    if (flash) main = lite = rgb(255, 255, 255);
+    int xo = left ? x : x + 2, xi = left ? x + 2 : x;  // colonne cote mur, colonne cote balle
+    gfx->drawFastVLine(xo, y + 2, qPH - 4, dark);
+    gfx->drawFastVLine(x + 1, y + 1, qPH - 2, main);
+    gfx->drawFastVLine(xi, y + 1, qPH - 2, lite);
+    gfx->drawPixel(x + 1, y, lite);                     // bouts arrondis
+    gfx->drawPixel(x + 1, y + qPH - 1, dark);
+    gfx->drawFastVLine(x + 1, y + qPH / 2 - 1, 2, flash ? main : dark);  // poignee
+    gMark(x, y, 3, qPH);
+  };
+  paddle(px, py, true, qFP, 0, 220, 255);
+  paddle(cx, cy, false, qFC, 255, 50, 50);
   if (gDead == 0) {
     for (int i = 3; i >= 1; i--) {  // trainee de la balle
       uint8_t v = 40 + 30 * (3 - i);
@@ -4084,182 +4097,403 @@ void pDraw() {
   altHud(palFull);
 }
 
-// ---------------------------------------------------------------- ESCALADE
-// Jeu de plateformes original : un robot geant, en haut a gauche, lance des caisses qui roulent sur les poutres et
-// tombent d'un etage a l'autre (parfois par une echelle). L'explorateur monte les echelles, saute (X ou rond) par-dessus
-// les caisses (points) et doit atteindre le drapeau en haut a droite. Stage suivant : caisses plus rapides et nombreuses.
-#define E_FLOORS 4
-#define E_CRATES 8
-int eFY[E_FLOORS], eLadX[E_FLOORS - 1][2], eGap = 8;
-float eX, eY, eVY;
-int eFloor = 0, eJump = 0, eThrowT = 0;
-bool eClimb = false, ePrevJump = false, eFace = true;
-ECrate eCr[E_CRATES];
-int eDir(int f) { return (f & 1) ? 1 : -1; }  // sens de roulement : etage 3 vers la droite, 2 vers la gauche...
-int eMinX(int f) { return (f > 0 && eDir(f) < 0) ? eGap : 0; }       // trou du cote ou les caisses tombent
-int eMaxX(int f) { return (f > 0 && eDir(f) > 0) ? W - eGap : W; }
-void eLevel() {
-  int sp = (H - 14) / E_FLOORS;
-  for (int f = 0; f < E_FLOORS; f++) eFY[f] = H - 3 - f * sp;  // haut de chaque poutre
-  for (int f = 0; f < E_FLOORS - 1; f++) {  // deux echelles par etage, a des places differentes
-    eLadX[f][0] = (f & 1) ? W / 4 + 6 * f : W * 3 / 4 - 6 * f;
-    eLadX[f][1] = (f & 1) ? W * 2 / 3 + 4 * f : W / 3 - 4 * f;
-  }
-  eX = 8; eY = eFY[0]; eFloor = 0; eClimb = false; eJump = 0; eVY = 0; eFace = true;
-  for (auto &c : eCr) c.on = false;
-  eThrowT = 60;
+// ---------------------------------------------------------------- ESCADRILLE
+// Shoot vertical original au-dessus de la mer : ton chasseur a helice (blanc et bleu) affronte des escadrilles de
+// chasseurs verts (en V, en vague sinueuse, par le cote, en pique), des bombardiers lourds et des navires qui tirent
+// depuis la mer. Capsules : arme (double fleche) et tonneau (+1). Rond : tonneau (invincible, sans tirer, 3 par stage).
+// Apres 10 vagues : un hydravion geant a quatre moteurs, plus rapide et en spirale sous la moitie de sa vie.
+#define A_EN 24
+#define A_SHOTS 18
+#define A_BOMBS 32
+#define A_FOAM 28
+#define A_GROUPS 10
+#define A_TOP 10  // bande du score (noire), la mer en dessous
+AEn aEn[A_EN];
+RDot aShot[A_SHOTS], aBomb[A_BOMBS];
+RCap aCap;  // kind 0 : arme, 1 : tonneau
+int16_t aFoam[A_FOAM][2];
+float aIsY[2], aX, aY;
+int8_t aIsX[2], aIsR[2];
+int aTier = 0, aCool = 0, aGroups = 0, aSpawnT = 0, aInv = 0, aRoll = 0, aRolls = 3;
+bool aBoss = false, aPrevRoll = false, aPaint = true;
+float aBX, aBY;
+int aBHp, aBMax, aBT = 0, aBFlash = 0;
+const char *const SPR_PLANE[3][9] = {  // ton chasseur (helice qui tourne), puis en tonneau
+  { "...yyy...", "....w....", "...wcw...", ".bwwwwwb.", "bwwwbwwwb", "....w....", "....w....", "..bwwwb..", "....w...." },
+  { "..y...y..", "....w....", "...wcw...", ".bwwwwwb.", "bwwwbwwwb", "....w....", "....w....", "..bwwwb..", "....w...." },
+  { "....y....", "....w....", "...wcw...", "..wwwww..", "..bwbwb..", "....w....", "....w....", "...bwb...", "....w...." } };
+const char *const SPR_AF[2][7] = {  // chasseur ennemi, nez vers le bas
+  { ".g...g.", ".ggggg.", "...g...", "ggogogg", ".ggggg.", "...g...", "..yyy.." },
+  { ".g...g.", ".ggggg.", "...g...", "ggogogg", ".ggggg.", "...g...", ".y...y." } };
+const char *const SPR_AB[10] = {  // bombardier lourd
+  ".....vvvvv.....", "......vvv......", ".......v.......", ".......v.......", "vvvvvvvwvvvvvvv",
+  "vovvovvwvvovvov", "vvvvvvvwvvvvvvv", ".y..y..v..y..y.", ".......v.......", "......vcv......" };
+
+void aNewStage() {
+  gWave++;
+  gStageT = 100;
+  sndMelody(JINGLE_STAGE, 4);
+  aGroups = 0; aSpawnT = 40; aBoss = false; aRolls = 3;
 }
-void eReset() {
+void aIsle(int i, float y) { aIsY[i] = y; aIsX[i] = random(10, W - 10); aIsR[i] = random(5, H >= 128 ? 14 : 10); }
+void aReset() {
   gLives = (!gDemo && gDiff == 0) ? 5 : 3;
   gPaused = false;
-  gScore = 0; gWave = 1; gDead = 0; gBonus = 0; gLifeUp = false;
-  gStageT = 90;
-  sndMelody(JINGLE_STAGE, 4);
+  gScore = 0; gWave = 0; gDead = 0; gBonus = 0; gLifeUp = false;
+  aTier = 0; aCool = 0; aInv = 0; aRoll = 0;
+  aX = W / 2 - 4; aY = H - 12;
+  for (auto &e : aEn) e.on = false;
+  for (auto &s : aShot) s.on = false;
+  for (auto &b : aBomb) b.on = false;
+  aCap.on = false;
   for (auto &b : gBoom) b.t = 0;
-  eGap = H >= 128 ? 12 : 8;
-  eLevel();
+  for (auto &f : aFoam) { f[0] = random(W); f[1] = random(A_TOP, H); }
+  aIsle(0, H / 3); aIsle(1, -H / 2);
+  aPaint = true;
+  aNewStage();
 }
-int eLadderAt(int f, float x, bool up) {  // echelle sous les pieds (vers le haut) ou vers le bas, -1 sinon
-  int lf = up ? f : f - 1;
-  if (lf < 0 || lf >= E_FLOORS - 1) return -1;
-  for (int k = 0; k < 2; k++) if (fabsf(x + 2 - eLadX[lf][k]) < 3) return eLadX[lf][k];
-  return -1;
+void aBombAt(float x, float y, float vx, float vy) {
+  for (auto &b : aBomb)
+    if (!b.on) { b = { x, y, vx, vy, true }; return; }
 }
-uint8_t eAuto() {  // demo : va vers une echelle qui monte, la grimpe, saute les caisses qui arrivent
-  uint8_t k = 0;
-  if (eClimb) return 8;
-  for (auto &c : eCr)
-    if (c.on && c.floor == eFloor && !c.fall && fabsf(c.x - eX) < 14 && (c.x - eX) * eDir(eFloor) < 0) k |= 4;
-  if (eFloor >= E_FLOORS - 1) return k | 2;
-  int best = -1, bd = 9999;
-  for (int i = 0; i < 2; i++) { int d = abs(eLadX[eFloor][i] - (int)(eX + 2)); if (d < bd) { bd = d; best = eLadX[eFloor][i]; } }
-  if (bd < 2) return k | 8;
-  return k | (best < eX + 2 ? 1 : 2);
+void aAimed(float x, float y, float speed) {
+  float dx = aX + 4 - x, dy = aY + 4 - y, d = sqrtf(dx * dx + dy * dy) + 0.01f;
+  aBombAt(x, y, dx / d * speed, dy / d * speed);
 }
-void eStep() {
-  gFrame++;
-  uint8_t k = gDemo ? eAuto() : keysPs4;
-  if (gDead > 0) {
-    if (--gDead == 0) {
-      if (gLives <= 0) {
-        if (gDemo) eReset();
-        else if (gLastRank) startNameEntry();
-        else toDemo();
-        return;
+void aSpread(float x, float y, int n, float speed) {
+  for (int i = 0; i < n; i++) {
+    float a = PI / 2 + (i - (n - 1) / 2.0f) * 0.3f;
+    aBombAt(x, y, cosf(a) * speed, sinf(a) * speed);
+  }
+}
+// une vague : V, ligne sinueuse, passage par le cote, bombardier(s), navires, piqueurs
+void aSpawnGroup() {
+  uint8_t pat = aGroups % 6;
+  int n = pat == 3 ? (gWave >= 3 ? 2 : 1) : pat == 4 ? 2 : pat == 5 ? 4 : 5;
+  bool left = aGroups & 2;
+  for (int k = 0; k < n; k++)
+    for (auto &e : aEn)
+      if (!e.on) {
+        e = {};
+        e.on = true; e.pat = pat; e.t = 0;
+        e.type = pat == 3 ? 1 : pat == 4 ? 2 : 0;
+        e.hp = e.type == 1 ? 10 + 2 * gWave : e.type == 2 ? 6 + gWave : 1 + (gWave >= 4);
+        e.carrier = k == n - 1 && (pat == 0 || pat == 2 || pat == 3);
+        if (pat == 0) { e.x = W / 2 - 3 + (k - 2) * 10; e.y = -8 - abs(k - 2) * 6; }                 // en V
+        else if (pat == 1) { e.x = left ? W / 4 : W * 3 / 4; e.y = -8 - k * 10; }                      // ligne sinueuse
+        else if (pat == 2) { e.x = left ? -8 - k * 10 : W + 1 + k * 10; e.y = 16 + k * 3; e.vx = left ? 1.2f : -1.2f; }
+        else if (pat == 3) { e.x = n == 1 ? W / 2 - 7 : W * (k + 1) / 3 - 7; e.y = -10; }               // bombardier
+        else if (pat == 4) { e.x = random(4, W - 9); e.y = -17 - k * 30; }                              // navire
+        else { e.x = W * (k + 1) / (n + 1) - 3; e.y = -8 - k * 8; }                                     // piqueurs
+        break;
       }
-      eLevel();
+  aGroups++;
+}
+void aHit() {
+  altLoseLife(aX + 4, aY + 4);
+  aTier = max(0, aTier - 1);
+}
+uint8_t aAuto() {  // demo : suit une cible, esquive les tirs (et fait un tonneau si un tir arrive trop pres)
+  static float tx = 0;
+  static uint8_t hold = 0, dodgeT = 0;
+  static int8_t dodge = 0;
+  if (hold) hold--;
+  else {
+    float best = 1e9;
+    tx = aX;
+    for (auto &e : aEn)
+      if (e.on && e.y > 10) {
+        float d = fabsf(e.x - aX) + (H - e.y) * 0.2f;
+        if (d < best) { best = d; tx = e.x; }
+      }
+    if (aBoss) tx = aBX + 12;
+    if (aCap.on) tx = aCap.x;
+    hold = 20;
+  }
+  uint8_t k = 4;
+  if (dodgeT) dodgeT--;
+  else
+    for (auto &b : aBomb)
+      if (b.on && b.y > aY - 24 && b.y < aY + 4 && fabsf(b.x - (aX + 4)) < 7) {
+        dodge = b.x < aX + 4 ? 1 : -1; dodgeT = 15;
+        if (b.y > aY - 8 && aRolls > 1) k |= 32;
+        break;
+      }
+  float t = dodgeT ? aX + dodge * 14 : tx;
+  if (t < aX - 3) k |= 1;
+  else if (t > aX + 3) k |= 2;
+  if (aY < H - 14) k |= 16;
+  return k;
+}
+bool aBox(float x, float y, const AEn &e) {  // point dans l'ennemi
+  int w = e.type == 1 ? 15 : e.type == 2 ? 5 : 7, h = e.type == 1 ? 10 : e.type == 2 ? 16 : 7;
+  return x >= e.x && x <= e.x + w && y >= e.y && y <= e.y + h;
+}
+void aStep() {
+  gFrame++;
+  uint8_t k = gDemo ? aAuto() : keysPs4;
+  float diff = 1 + 0.25f * (gEffDiff() - 1), sea = 0.45f;
+  if (gDead == 0) {
+    float sp = W > 128 ? 2.5f : 2;
+    if (k & 1) aX -= sp;
+    if (k & 2) aX += sp;
+    if (k & 8) aY -= sp;
+    if (k & 16) aY += sp;
+    aX = constrain(aX, 0.0f, (float)(W - 9));
+    aY = constrain(aY, (float)(H * 4 / 10), (float)(H - 10));
+    if (aCool > 0) aCool--;
+    if ((k & 4) && aCool == 0 && !aRoll) {  // deux mitrailleuses, puis tirs en eventail selon l'arme
+      static const int8_t N[4] = { 2, 3, 4, 5 };
+      int n = N[aTier];
+      for (int i = 0; i < n; i++)
+        for (auto &s : aShot)
+          if (!s.on) {
+            float vx = 0, x = aX + 4;
+            if (i < 2) x += i ? 2 : -2;
+            else vx = (i & 1 ? -1 : 1) * (i < 4 ? 0.6f : 0.0f);
+            s = { x, aY - 1, vx, -3.8f, true };
+            break;
+          }
+      aCool = 6;
+      sfxShot();
     }
+    bool rollKey = k & 32;
+    if (rollKey && !aPrevRoll && aRolls > 0 && !aRoll) { aRoll = 40; aRolls--; sfxDive(); }
+    aPrevRoll = rollKey;
+    if (aRoll > 0) aRoll--;
+    if (aInv > 0) aInv--;
+  } else if (--gDead == 0) {
+    if (gLives <= 0) {
+      if (gDemo) aReset();
+      else if (gLastRank) startNameEntry();
+      else toDemo();
+      return;
+    }
+    aX = W / 2 - 4; aY = H - 12; aInv = 90; aRolls = max(aRolls, 2);
+  }
+  bool safe = aInv > 0 || aRoll > 0 || gDead > 0;
+  // mer : ecume et iles qui defilent
+  for (auto &f : aFoam)
+    if ((f[1] += (gFrame & 1)) >= H) { f[1] = A_TOP; f[0] = random(W); }
+  for (int i = 0; i < 2; i++) {
+    aIsY[i] += sea;
+    if (aIsY[i] - aIsR[i] * 2 > H) aIsle(i, aIsY[1 - i] - H * 0.7f - random(H / 2));
+  }
+  // vagues puis boss
+  if (gStageT == 0 && !aBoss) {
+    bool any = false;
+    for (auto &e : aEn) any |= e.on;
+    if (aGroups < A_GROUPS) {
+      if (--aSpawnT <= 0) { aSpawnGroup(); aSpawnT = 120; }
+    } else if (!any) {
+      aBoss = true; aBX = W / 2 - 16; aBY = -20; aBT = 0;
+      aBMax = aBHp = (50 + 25 * gWave) * (gEffDiff() + 1) / 2;
+      sfxDive();
+    }
+  }
+  for (auto &s : aShot) {
+    if (!s.on) continue;
+    s.x += s.vx; s.y += s.vy;
+    if (s.y < A_TOP || s.x < 0 || s.x >= W) s.on = false;
+  }
+  for (auto &e : aEn) {
+    if (!e.on) continue;
+    e.t++;
+    if (e.flash > 0) e.flash--;
+    if (e.pat == 0) e.y += 0.75f * diff;
+    else if (e.pat == 1) { e.y += 0.7f * diff; e.x += sinf(e.t * 0.06f) * 1.1f; }
+    else if (e.pat == 2) { e.x += e.vx * diff; e.y += 0.3f * diff + (e.t > 60 ? 0.4f : 0); }
+    else if (e.pat == 3) { e.y += (e.y < 16 ? 0.5f : 0.22f) * diff; e.x += sinf(e.t * 0.02f) * 0.3f; }
+    else if (e.pat == 4) e.y += sea;  // navire : avance avec la mer
+    else {  // piqueur : descend, puis pique sur toi
+      if (e.t < 45) e.y += 0.6f;
+      else {
+        if (e.t == 45) { float dx = aX - e.x, dy = aY - e.y, d = sqrtf(dx * dx + dy * dy) + .01f; e.vx = dx / d * 2.2f * diff; e.vy = dy / d * 2.2f * diff; }
+        e.x += e.vx; e.y += e.vy;
+      }
+    }
+    if (e.y > H || e.x < -20 || e.x > W + 20) { e.on = false; continue; }
+    if (e.y > A_TOP && e.y < H * 0.7f && gDead == 0) {  // tirs
+      if (e.type == 0 && e.pat != 5 && random(1000) < 5 * diff) aAimed(e.x + 3, e.y + 7, 1.2f * diff);
+      if (e.type == 1 && e.t % max(35, int(60 / diff)) == 0) aSpread(e.x + 7, e.y + 10, 3, 1.1f * diff);
+      if (e.type == 2 && e.t % max(45, int(75 / diff)) == 0) aAimed(e.x + 2, e.y + 6, 1.3f * diff);
+    }
+    for (auto &s : aShot)
+      if (s.on && aBox(s.x, s.y, e)) {
+        s.on = false;
+        e.flash = 3;
+        if (--e.hp > 0) break;
+        e.on = false;
+        gScore += e.type == 1 ? 500 : e.type == 2 ? 400 : e.pat == 5 ? 150 : 100;
+        if (!gDemo && gScore > gHi) gHi = gScore;
+        int bw = e.type == 1 ? 15 : e.type == 2 ? 5 : 7;
+        gBoomAt(e.x + bw / 2, e.y + 4);
+        if (e.type) gBoomAt(e.x + bw / 2 + 3, e.y + 9);
+        sfxBoom();
+        if (e.carrier && !aCap.on) aCap = { e.x, e.y, (uint8_t)(random(3) == 0 ? 1 : 0), true };
+        break;
+      }
+    // collision avec ton avion (les navires sont sur la mer : pas de choc)
+    if (e.on && e.type != 2 && !safe && aBox(aX + 2, aY + 2, e) | aBox(aX + 7, aY + 2, e) | aBox(aX + 4, aY + 7, e)) {
+      e.on = false;
+      gBoomAt(e.x + 4, e.y + 4);
+      aHit();
+      safe = true;
+    }
+  }
+  if (aCap.on) {
+    aCap.y += 0.6f;
+    if (aCap.y > H) aCap.on = false;
+    else if (gDead == 0 && aCap.x + 6 >= aX && aCap.x <= aX + 8 && aCap.y + 6 >= aY && aCap.y <= aY + 8) {
+      aCap.on = false;
+      if (aCap.kind == 0) aTier = min(3, aTier + 1);
+      else aRolls = min(5, aRolls + 1);
+      gScore += 500;
+      sndMelody(JINGLE_ARME, 4);
+    }
+  }
+  if (aBoss) {  // hydravion geant
+    aBT++;
+    if (aBFlash > 0) aBFlash--;
+    bool phase2 = aBHp < aBMax / 2;
+    if (aBY < 14) aBY += 0.4f;
+    else aBX = W / 2 - 16 + sinf(aBT * (phase2 ? 0.03f : 0.018f)) * (W / 2 - 20);
+    if (aBY >= 14) {
+      if (aBT % max(20, int((phase2 ? 34 : 48) / diff)) == 0) aSpread(aBX + 16, aBY + 16, phase2 ? 7 : 5, 1.15f * diff);
+      if (aBT % 40 == 0) { aAimed(aBX + 5, aBY + 10, 1.5f * diff); aAimed(aBX + 27, aBY + 10, 1.5f * diff); }
+      if (phase2 && aBT % 7 == 0) {
+        float a = aBT * 0.29f;
+        aBombAt(aBX + 16, aBY + 9, cosf(a) * 1.1f * diff, fabsf(sinf(a)) * 1.1f * diff + 0.3f);
+      }
+    }
+    for (auto &s : aShot)
+      if (s.on && s.x >= aBX && s.x <= aBX + 32 && s.y >= aBY && s.y <= aBY + 17) {
+        s.on = false;
+        aBHp--;
+        aBFlash = 2;
+        if (gFrame & 1) gBoomAt(s.x, s.y);
+        break;
+      }
+    if (aBHp <= 0) {
+      aBoss = false;
+      for (int i = 0; i < 10; i++) gBoomAt(aBX + random(33), aBY + random(18));
+      sfxHit();
+      gScore += 2000UL * gWave;
+      altStageClear(1000UL * gWave);
+      for (auto &b : aBomb) b.on = false;
+      aNewStage();
+    }
+    if (aBoss && !safe && aBX + 32 >= aX + 2 && aBX <= aX + 7 && aBY + 15 >= aY + 1 && aBY <= aY + 8) { aHit(); safe = true; }
+  }
+  for (auto &b : aBomb) {
+    if (!b.on) continue;
+    b.x += b.vx; b.y += b.vy;
+    if (b.y >= H || b.y < A_TOP || b.x < 0 || b.x >= W) { b.on = false; continue; }
+    if (!safe && b.x >= aX + 1 && b.x <= aX + 7 && b.y >= aY + 1 && b.y <= aY + 8) {
+      b.on = false;
+      aHit();
+      safe = true;
+    }
+  }
+  if (gStageT > 0) gStageT--;
+}
+// efface l'image precedente : noir dans la bande du score, bleu de la mer en dessous
+void aErase(uint16_t sea) {
+  if (gOverflow || aPaint) {
+    gOverflow = false; aPaint = false; gNOld = 0;
+    gfx->fillRect(0, 0, W, A_TOP, 0);
+    gfx->fillRect(0, A_TOP, W, H - A_TOP, sea);
     return;
   }
-  if (gStageT > 0) { gStageT--; return; }
-  float sp = H >= 128 ? 1.2f : 0.9f;
-  bool jumpKey = k & (4 | 32);
-  if (eClimb) {  // sur une echelle : haut / bas
-    if (k & 8) eY -= 0.6f;
-    if (k & 16) eY += 0.6f;
-    int top = eFY[eFloor + 1], bot = eFY[eFloor];
-    if (eY <= top) { eY = top; eFloor++; eClimb = false; gScore += 20; }
-    else if (eY >= bot) { eY = bot; eClimb = false; }
-  } else {
-    if (!eJump) {
-      if (k & 1) { eX -= sp; eFace = false; }
-      if (k & 2) { eX += sp; eFace = true; }
-      if ((k & 8) && eLadderAt(eFloor, eX, true) >= 0) { eX = eLadderAt(eFloor, eX, true) - 2; eClimb = true; }
-      else if ((k & 16) && eLadderAt(eFloor, eX, false) >= 0) { eX = eLadderAt(eFloor, eX, false) - 2; eFloor--; eY = eFY[eFloor + 1]; eClimb = true; }
-      if (jumpKey && !ePrevJump && !eClimb) { eJump = 1; eVY = -1.6f; sndPlay(600, 1100, 80, 0.25f, false, 1); }
-    } else {  // saut : un peu d'elan dans la direction
-      eX += eFace ? sp * 0.8f : -sp * 0.8f;
-      eVY += 0.16f;
-      eY += eVY;
-      if (eY >= eFY[eFloor]) { eY = eFY[eFloor]; eJump = 0; }
-    }
-    eX = constrain(eX, (float)eMinX(eFloor), (float)(eMaxX(eFloor) - 5));
+  for (int i = 0; i < gNOld; i++) {
+    GRect &rc = gOld[i];
+    int x0 = max(0, (int)rc.x), y0 = max(0, (int)rc.y), x1 = min(W, rc.x + rc.w), y1 = min(H, rc.y + rc.h);
+    if (x1 <= x0 || y1 <= y0) continue;
+    if (y0 < A_TOP) gfx->fillRect(x0, y0, x1 - x0, min(y1, A_TOP) - y0, 0);
+    if (y1 > A_TOP) gfx->fillRect(x0, max(y0, A_TOP), x1 - x0, y1 - max(y0, A_TOP), sea);
   }
-  ePrevJump = jumpKey;
-  // le robot lance des caisses
-  if (--eThrowT <= 0) {
-    eThrowT = max(45, 140 - 12 * gWave - 20 * (gEffDiff() - 1)) + random(40);
-    for (auto &c : eCr)
-      if (!c.on) { c.on = true; c.floor = E_FLOORS - 1; c.x = 16; c.y = eFY[E_FLOORS - 1] - 5; c.fall = false; c.jumped = false; c.ladder = -1; break; }
-  }
-  float cs = (0.7f + 0.08f * min(gWave, 8) + 0.1f * (gEffDiff() - 1)) * (H >= 128 ? 1.4f : 1);
-  for (auto &c : eCr) {
-    if (!c.on) continue;
-    int f = c.floor;
-    if (c.ladder >= 0) {  // descend par une echelle
-      c.y += cs * 0.8f;
-      if (c.y >= eFY[f - 1] - 5) { c.floor--; c.y = eFY[c.floor] - 5; c.ladder = -1; }
-    } else if (c.fall) {  // tombe dans le trou vers l'etage du dessous
-      c.y += 1.5f;
-      if (f == 0 || c.y >= eFY[f - 1] - 5) { if (f == 0) { c.on = false; continue; } c.floor--; c.y = eFY[c.floor] - 5; c.fall = false; }
-    } else {
-      c.x += eDir(f) * cs;
-      if (f > 0 && (c.x < eMinX(f) - 2 || c.x > eMaxX(f) - 3)) c.fall = true;
-      if (f == 0 && (c.x < -6 || c.x > W)) c.on = false;
-      for (int i = 0; i < 2 && f > 0; i++)  // parfois, prend l'echelle qui descend
-        if (fabsf(c.x + 2 - eLadX[f - 1][i]) < cs * 0.6f && random(100) < 25) c.ladder = i;
-    }
-    // collision avec l'explorateur (7 de haut) ; saute par-dessus : points
-    bool sameLevel = fabsf((c.y + 5) - eY) < 6;
-    if (sameLevel && fabsf(c.x - eX) < 4.5f && eY > c.y + 1) { altLoseLife(eX + 2, eY - 3); return; }
-    if (!c.jumped && eJump && fabsf(c.x - eX) < 3 && eY <= c.y + 1) { c.jumped = true; gScore += 100; sndPlay(1500, 2000, 60, 0.25f, false, 1); }
-  }
-  if (!gDemo && gScore > gHi) gHi = gScore;
-  if (eFloor == E_FLOORS - 1 && !eClimb && eX >= eMaxX(eFloor) - 12) {  // drapeau atteint
-    gWave++;
-    gStageT = 90;
-    altStageClear(1000UL * gWave);
-    sndMelody(JINGLE_STAGE, 4);
-    eLevel();
-  }
+  gNOld = 0;
 }
-void eDraw() {
-  eraseOld();
-  uint16_t palFull[9];
-  altBackground(0.03f, palFull);
-  uint16_t girder = rgb(220, 60, 60), rivet = rgb(255, 200, 140), lad = rgb(80, 200, 255);
-  for (int f = 0; f < E_FLOORS; f++) {  // poutres rouges a rivets (avec un trou pour les etages 1 a 3)
-    int x0 = eMinX(f), x1 = eMaxX(f), y = eFY[f];
-    gfx->fillRect(x0, y, x1 - x0, 2, girder);
-    for (int x = x0 + 2; x < x1; x += 6) gfx->drawPixel(x, y, rivet);
-    gMark(x0, y, x1 - x0, 2);
+void aDrawBoss(uint16_t *palFull) {  // hydravion a quatre moteurs (coque, ailes, flotteurs, helices qui tournent)
+  int x = aBX, y = aBY;
+  uint16_t body = aBFlash ? palFull[0] : rgb(150, 150, 170), dark = rgb(70, 70, 95), wing = aBFlash ? palFull[0] : rgb(110, 115, 140);
+  gfx->fillRect(x + 13, y, 7, 18, body);       // coque
+  gfx->fillRect(x + 11, y + 1, 11, 3, wing);   // empennage
+  gfx->fillRect(x, y + 7, 33, 5, wing);        // ailes
+  gfx->drawFastHLine(x, y + 7, 33, rgb(190, 190, 210));
+  gfx->fillRect(x + 1, y + 12, 3, 3, dark);    // flotteurs
+  gfx->fillRect(x + 29, y + 12, 3, 3, dark);
+  gfx->fillRect(x + 15, y + 15, 3, 2, palFull[4]);  // vitrage
+  for (int m = 0; m < 4; m++) {  // moteurs et helices
+    int mx = x + (m < 2 ? 4 + m * 5 : 24 + (m - 2) * 5);
+    gfx->fillRect(mx, y + 9, 3, 5, dark);
+    bool f = ((gFrame >> 1) + m) & 1;
+    gfx->drawFastHLine(mx - 1 + f, y + 14, 3 + (f ? 0 : 2) - f, palFull[2]);
   }
-  for (int f = 0; f < E_FLOORS - 1; f++)  // echelles
-    for (int i = 0; i < 2; i++) {
-      int x = eLadX[f][i] - 2, y0 = eFY[f + 1] + 2, y1 = eFY[f];
-      gfx->drawFastVLine(x, y0, y1 - y0, lad);
-      gfx->drawFastVLine(x + 4, y0, y1 - y0, lad);
-      for (int y = y0 + 1; y < y1; y += 3) gfx->drawFastHLine(x, y, 5, lad);
-      gMark(x, y0, 5, y1 - y0);
+  gfx->fillRect(x + 15, y + 9, 3, 2, aBHp < aBMax / 2 ? palFull[1] : palFull[7]);  // tourelle
+  gMark(x - 1, y - 1, 35, 19);
+  int bw = W - 20, fill = bw * max(0, aBHp) / aBMax;
+  gfx->drawRect(10, A_TOP + 1, bw, 3, rgb(90, 90, 110));
+  gfx->fillRect(10, A_TOP + 2, fill, 1, aBHp < aBMax / 2 ? palFull[7] : palFull[1]);
+  gMark(10, A_TOP + 1, bw, 3);
+}
+void aDraw() {
+  uint16_t sea = rgb(0, 30, 90), palFull[9];
+  for (int i = 0; i < 9; i++) palFull[i] = rgb(G_PAL_RGB[i][0], G_PAL_RGB[i][1], G_PAL_RGB[i][2]);
+  aErase(sea);
+  for (int i = 0; i < 2; i++) {  // iles : sable puis vegetation
+    int x = aIsX[i], y = aIsY[i], r = aIsR[i];
+    if (y + r * 2 < A_TOP || y - r - 2 > H) continue;
+    gfx->fillCircle(x, y, r + 1, rgb(200, 180, 90));
+    gfx->fillCircle(x + r * 3 / 5, y + r * 3 / 5, r * 2 / 3 + 1, rgb(200, 180, 90));
+    gfx->fillCircle(x, y, r - 1, rgb(30, 140, 50));
+    gfx->fillCircle(x + r * 3 / 5, y + r * 3 / 5, r * 2 / 3 - 1, rgb(30, 140, 50));
+    gfx->fillCircle(x - r / 3, y - r / 3, r / 3, rgb(20, 90, 35));
+    gMark(x - r - 2, y - r - 2, r * 2 + r * 3 / 5 + 5, r * 2 + r * 3 / 5 + 5);
+  }
+  for (auto &f : aFoam)
+    if (f[1] >= A_TOP) { gfx->drawFastHLine(f[0], f[1], 2, rgb(50, 110, 190)); gMark(f[0], f[1], 2, 1); }
+  for (auto &e : aEn)  // navires (sur la mer)
+    if (e.on && e.type == 2) {
+      int x = e.x, y = e.y;
+      uint16_t hull = e.flash ? palFull[0] : rgb(140, 140, 150);
+      gfx->fillRect(x + 1, y, 3, 16, hull);
+      gfx->fillRect(x, y + 3, 5, 10, hull);
+      gfx->fillRect(x + 1, y + 7, 3, 3, rgb(80, 80, 90));
+      gfx->drawPixel(x + 2, y + 5 + ((gFrame >> 3) & 1), palFull[7]);  // canon
+      gfx->drawFastHLine(x + 1, y - 1, 3, rgb(150, 200, 255));          // sillage
+      gMark(x, y - 1, 5, 17);
     }
-  // robot geant (original) : tete grise, yeux rouges, bras qui lancent
-  int ry = eFY[E_FLOORS - 1] - 10, arm = (eThrowT < 15) ? -2 : 0;
-  static const char *const ROBOT[10] = { "...www...", "..wwwww..", "..wrwrw..", "..wwwww..", "...ccc...", "w.ccccc.w", "wcccbcccw",
-                                         "..ccccc..", "..c...c..", ".cc...cc." };
-  gSprite(ROBOT, 9, 10, 2, ry, palFull, 0, 0);
-  gfx->drawPixel(1, ry + 5 + arm, palFull[0]);
-  gfx->drawPixel(11, ry + 5 + arm, palFull[0]);
-  gMark(1, ry - 2, 11, 12);
-  // drapeau d'arrivee
-  int fx = eMaxX(E_FLOORS - 1) - 6, fy = eFY[E_FLOORS - 1] - 8;
-  gfx->drawFastVLine(fx, fy, 8, palFull[0]);
-  gfx->fillRect(fx + 1, fy, 4, 3, (gFrame & 16) ? palFull[2] : palFull[7]);
-  gMark(fx, fy, 5, 8);
-  for (auto &c : eCr) {  // caisses en bois qui roulent (planche qui tourne)
-    if (!c.on) continue;
-    int x = (int)c.x, y = (int)c.y;
-    gfx->fillRect(x, y, 5, 5, rgb(170, 110, 50));
-    gfx->drawRect(x, y, 5, 5, rgb(100, 60, 20));
-    if ((int)(c.x / 3) & 1) gfx->drawLine(x, y, x + 4, y + 4, rgb(100, 60, 20)); else gfx->drawLine(x + 4, y, x, y + 4, rgb(100, 60, 20));
-    gMark(x, y, 5, 5);
+  gfx->fillRect(0, 0, W, A_TOP, 0);  // rien sur la bande du score (iles qui entrent)
+  if (aCap.on) {
+    static const char *const ICON[2][7] = {
+      { "...y...", "..yyy..", ".y.y.y.", "...y...", "..yyy..", ".y.y.y.", "...y..." },
+      { "..ccc..", ".c...c.", "c..w..c", "c.www.c", "c..w..c", ".c...c.", "..ccc.." } };
+    uint16_t c = (gFrame & 4) ? palFull[0] : aCap.kind ? palFull[4] : palFull[2];
+    gfx->drawRoundRect((int)aCap.x - 1, (int)aCap.y - 1, 9, 10, 2, c);
+    gfx->fillRect((int)aCap.x, (int)aCap.y, 7, 8, 0);
+    gSprite(ICON[aCap.kind], 7, 7, (int)aCap.x, (int)aCap.y + 1, palFull, 0, 0);
+    gMark((int)aCap.x - 1, (int)aCap.y - 1, 9, 10);
   }
-  if (gDead == 0) {  // explorateur : casque jaune, veste verte, jambes qui bougent
-    static const char *const HERO[2][7] = { { ".yyy.", ".www.", "ggggg", ".ggg.", ".bbb.", ".b.b.", "o...o" },
-                                            { ".yyy.", ".www.", "ggggg", ".ggg.", ".bbb.", "b...b", "o...o" } };
-    int fr = (eClimb || ((int)(eX / 3) & 1)) ? (gFrame / 8) & 1 : 0;
-    gSprite(HERO[fr], 5, 7, (int)eX, (int)eY - 7, palFull, 0, 0);
-  }
+  uint16_t white[9];
+  for (auto &c : white) c = palFull[0];
+  for (auto &e : aEn)
+    if (e.on && e.type == 0) gSprite(SPR_AF[(gFrame / 3) & 1], 7, 7, (int)e.x, (int)e.y, e.flash ? white : palFull, 0, 0);
+    else if (e.on && e.type == 1) gSprite(SPR_AB, 15, 10, (int)e.x, (int)e.y, e.flash ? white : palFull, 0, 0);
+  if (aBoss) aDrawBoss(palFull);
+  for (auto &s : aShot)
+    if (s.on) { gPix(s.x, s.y, palFull[2]); gPix(s.x, s.y + 1, palFull[7]); }
+  for (auto &b : aBomb)
+    if (b.on) { gPix(b.x, b.y, palFull[1]); gPix(b.x + 1, b.y, palFull[1]); gPix(b.x, b.y + 1, palFull[7]); gPix(b.x + 1, b.y + 1, palFull[0]); }
   altBooms(palFull);
+  if (gDead == 0 && !(aInv > 0 && (gFrame & 4))) {
+    if (aRoll) gSprite(SPR_PLANE[2], 9, 9, (int)aX, (int)aY, palFull, (aRoll >> 2) & 1 ? 'w' : 0, 'c');  // tonneau
+    else gSprite(SPR_PLANE[(gFrame >> 1) & 1], 9, 9, (int)aX, (int)aY, palFull, 0, 0);
+  }
+  for (int i = 0; i < aRolls; i++) {  // tonneaux restants en bas a gauche
+    gfx->drawCircle(3 + i * 7, H - 4, 2, palFull[4]);
+    gMark(1 + i * 7, H - 6, 5, 5);
+  }
   altHud(palFull);
 }
 
@@ -4276,7 +4510,7 @@ void altReset() {
     case G_CRU: yReset(); break;
     case G_TAU: dReset(); break;
     case G_BIL: pReset(); break;
-    default: eReset(); break;
+    default: aReset(); break;
   }
 }
 void altStep() {
@@ -4291,7 +4525,7 @@ void altStep() {
     case G_CRU: yStep(); break;
     case G_TAU: dStep(); break;
     case G_BIL: pStep(); break;
-    default: eStep(); break;
+    default: aStep(); break;
   }
 }
 void altDraw() {
@@ -4306,7 +4540,7 @@ void altDraw() {
     case G_CRU: yDraw(); break;
     case G_TAU: dDraw(); break;
     case G_BIL: pDraw(); break;
-    default: eDraw(); break;
+    default: aDraw(); break;
   }
 }
 // remise a zero du jeu choisi (partie ou demo)
@@ -4338,33 +4572,34 @@ void toDemo() {
 
 // Ecran du menu : fond d'etoiles qui defile, titre ARCADE GAMES, record, puis le menu.
 // La demo ne tourne plus derriere (sprites, annonces et scores de la demo melanges au menu).
-// batterie de la manette, en haut a droite du menu : pourcentage + petite pile (verte, orange, rouge qui clignote) ;
-// en charge : la jauge se remplit en boucle en jaune, avec un eclair. Niveau envoye par la manette : 0 a 10 (11 = pleine, en charge).
-void drawPadBattery() {
-  if (!PS4.isConnected()) return;
-  int lvl = PS4.Battery();
-  bool chg = PS4.Charging();
-  int pct = min(100, lvl * 10);
-  uint16_t col = pct > 50 ? rgb(40, 230, 80) : pct > 20 ? rgb(255, 160, 0) : rgb(255, 40, 40);
-  int bx = W - 10, by = 0;
+// batteries des manettes en haut du menu : manette 1 a gauche, manette 2 a droite. Pourcentage + petite pile
+// (verte, orange, rouge qui clignote) ; en charge : la jauge se remplit en boucle en jaune, avec un eclair.
+void drawBat(uint8_t idx) {
+  PadShim &p = idx ? PAD2 : PS4;
+  if (!p.isConnected()) return;
+  int pct = min(100, p.Battery() * 10);
+  bool chg = p.Charging(), right = idx;
+  uint16_t col = chg ? rgb(255, 220, 0) : pct > 50 ? rgb(40, 230, 80) : pct > 20 ? rgb(255, 160, 0) : rgb(255, 40, 40);
+  char b[8];
+  snprintf(b, sizeof(b), "%d%%", pct);
+  int tw = tinyWidth(b), bx = right ? W - 10 : 0, by = 0;
   gfx->drawRect(bx, by, 8, 5, rgb(150, 150, 170));  // pile
   gfx->drawFastVLine(bx + 8, by + 1, 3, rgb(150, 150, 170));
   int fill = chg && pct < 100 ? (int)((gFrame / 6) % 7) : (pct * 6 + 50) / 100;
-  if (chg) col = rgb(255, 220, 0);
   if (fill > 0 && (chg || pct > 20 || (gFrame & 16))) gfx->fillRect(bx + 1, by + 1, fill, 3, col);
-  char b[8];
-  snprintf(b, sizeof(b), "%d%%", pct);
-  int tw = tinyWidth(b), tx = bx - 3 - tw;
-  tinyText(*gfx, tx, by, b, chg ? rgb(255, 220, 0) : rgb(200, 200, 210));
+  int tx = right ? bx - 3 - tw : bx + 12;
+  tinyText(*gfx, tx, by, b, chg ? rgb(255, 220, 0) : idx ? rgb(255, 150, 150) : rgb(150, 200, 255));  // couleur du joueur
+  int x0 = min(tx, bx), x1 = max(tx + tw, bx + 9);
   if (chg) {  // eclair
-    int ex = tx - 5;
+    int ex = right ? tx - 5 : tx + tw + 1;
     gfx->drawPixel(ex + 2, by, rgb(255, 220, 0)); gfx->drawPixel(ex + 1, by + 1, rgb(255, 220, 0));
     gfx->drawFastHLine(ex, by + 2, 3, rgb(255, 220, 0)); gfx->drawPixel(ex + 1, by + 3, rgb(255, 220, 0));
     gfx->drawPixel(ex, by + 4, rgb(255, 220, 0));
-    tx = ex;
+    x0 = min(x0, ex); x1 = max(x1, ex + 3);
   }
-  gMark(tx, by, W - tx, 5);
+  gMark(x0, by, x1 - x0, 5);
 }
+void drawPadBattery() { drawBat(0); drawBat(1); }
 void menuScreen() {
   gFrame++;
   for (int i = 0; i < gNStar; i++) {  // etoiles qui defilent doucement

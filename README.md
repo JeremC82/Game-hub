@@ -18,7 +18,7 @@ Depuis la V3.84, le Game-hub utilise **Bluepad32** : jusqu'à **4 manettes Bluet
 - **Menu « JOUEURS 1 / 2 »** (2e ligne, une étoile par manette connectée) : seuls les jeux à deux joueurs utilisent la 2e manette.
   - **RAQUETTES** : match à deux (raquette de droite pour le joueur 2), **le premier à 7 points gagne**.
   - **SPACE DEFENDER** : coopération, un 2e vaisseau **vert** pour le joueur 2, vies et score communs ; les ennemis piquent sur l'un ou l'autre ; la manette du joueur touché vibre.
-- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V3.84_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
+- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V3.85_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
 - **Mémoire** : environ 81 Ko libres avec 2 dalles en 3 bits et deux manettes connectées.
 
 # SPACE DEFENDER
@@ -143,10 +143,11 @@ Ton vaisseau **tourne sur le bord de l'écran** et tire **vers le centre**. Les 
 Une balle et deux raquettes, **à l'horizontale** : la tienne à gauche, celle de l'ordinateur à droite.
 - **Commandes :** haut / bas pour déplacer ta raquette. Avec le **stick analogique**, elle va d'autant plus vite que tu le pousses loin.
 - **La balle :** son angle dépend de l'endroit où elle touche la raquette, et elle accélère à chaque échange. Elle rebondit en haut et en bas.
-- **Raquettes** plus courtes (10 pixels sur une dalle 128x64, 16 en 128x128).
+- **Raquettes** (V3.85) : en relief sur 3 colonnes (ombre côté mur, couleur, reflet côté balle), bouts arrondis, poignée au milieu ; elles **s'éclairent en blanc** quand la balle les touche. 10 pixels de haut sur une dalle 128x64, 16 en 128x128.
+- **Effet :** une raquette qui bouge au moment du contact donne de l'effet à la balle (elle part plus en haut ou plus en bas).
 - **Points :** un point gagné rapporte 100 × le stage. Près du filet : tes points du stage (cyan) à gauche, ceux de l'ordinateur (rouge) à droite. Au 3e point de l'ordinateur, la partie est finie (pas d'icônes de vies en haut).
 - **Stages :** 5 points gagnés font passer au stage suivant. L'ordinateur devient plus rapide, les raquettes un peu plus petites.
-- **À deux manettes :** pas possible pour l'instant. La bibliothèque de la manette n'en gère qu'une à la fois ; il faudrait passer à une autre bibliothèque (Bluepad32).
+- **À deux manettes :** menu JOUEURS 2, la 2e manette tient la raquette de droite ; le premier à 7 points gagne.
 
 ### CASSE BRIQUES
 
@@ -192,15 +193,16 @@ Un jeu de tir de billes original, dans un puits.
 - **Plafond :** il descend d'un rang **tous les 8 tirs** (les marques orange en bas à droite). Une bille qui dépasse la ligne rouge : partie finie (une seule partie, pas de vies).
 - **Stages :** tout vider fait passer au suivant, avec plus de rangées et plus de couleurs.
 
-### ESCALADE
+### ESCADRILLE
 
-![ESCALADE](docs/jeu-escalade.gif)
+![ESCADRILLE](docs/jeu-escadrille.gif)
 
-Un jeu de plateformes original : un robot géant, en haut à gauche, lance des caisses qui roulent sur les poutres.
-- **Commandes :** gauche / droite pour marcher, haut / bas pour monter ou descendre les échelles, **✕ ou ○ pour sauter**.
-- **Les caisses :** elles roulent d'un bout à l'autre de chaque poutre, tombent par le trou à l'étage du dessous, et prennent parfois une échelle.
-- **Points :** sauter par-dessus une caisse rapporte 100 points ; monter un étage, 20.
-- **But :** atteindre le **drapeau** en haut à droite : stage suivant, avec des caisses plus rapides et plus nombreuses.
+Un shoot vertical original au-dessus de la mer (V3.85, remplace ESCALADE). Ton chasseur à hélice, blanc et bleu, survole les îles.
+- **Commandes :** croix ou stick pour voler dans le bas de l'écran, **✕ (ou carré, R1, R2) pour tirer**, **○ pour un tonneau** : l'avion tourne sur lui-même, il est invincible pendant 1 s mais ne tire pas. 3 tonneaux par stage (les ronds cyan en bas à gauche).
+- **Ennemis :** des escadrilles de chasseurs verts (en V, en vague sinueuse, par le côté, en piqué sur toi), des **bombardiers lourds** qui tirent en éventail et des **navires** sur la mer qui visent ton avion.
+- **Capsules :** double flèche jaune = arme (2, 3, 4 puis 5 tirs en éventail), anneau cyan = un tonneau de plus. Une vie perdue fait baisser l'arme d'un niveau.
+- **Boss :** après 10 vagues, un **hydravion géant à quatre moteurs** ; sous la moitié de sa vie, il bouge plus vite et tire en spirale.
+- **Points :** chasseur 100, piqueur 150, navire 400, bombardier 500, boss 2000 × le stage.
 
 ### CRUCH
 
@@ -219,13 +221,13 @@ Au démarrage, la dalle affiche **ARCADE GAMES** (en vert) et la **version** (pa
 
 Sans partie en cours, le jeu tourne tout seul en démo, sans son. **La démo change de jeu au hasard toutes les 5 minutes** (au retour au menu, le jeu choisi est remis). **Sans manette connectée**, la démo affiche seulement une petite indication, « MANETTE : PS + SHARE ». Dès que la manette est connectée, le menu s'affiche **sur son propre écran**, sans la démo derrière. On y voit un fond d'étoiles, le titre ARCADE GAMES et le record avec le nom de son détenteur :
 
-**Batterie de la manette :** en haut à droite du menu, un pourcentage et une petite pile (verte, orange, puis rouge qui clignote quand elle est faible). En charge, la pile est jaune, avec un éclair et une jauge qui se remplit en boucle.
+**Batterie des manettes :** en haut du menu, **la manette 1 à gauche** (chiffres bleus) et **la manette 2 à droite** (chiffres rouges) : un pourcentage et une petite pile (verte, orange, puis rouge qui clignote quand elle est faible). En charge, la pile est jaune, avec un éclair et une jauge qui se remplit en boucle.
 
 ![Menu, meilleurs scores avec les noms, saisie du nom](docs/rendu-menu.png)
 
 | Ligne | Action |
 |---|---|
-| **JOUER** | **gauche / droite : choix du jeu** (SPACE DEFENDER, RAID, RAQUETTES, BULLES, LABYRINTHE, ORBITUS, CASSE BRIQUES, BLOCS, CRUCH, TAUPE, BILLES, ESCALADE). Au démarrage : SPACE DEFENDER. ✕ ou OPTIONS lance la partie. |
+| **JOUER** | **gauche / droite : choix du jeu** (SPACE DEFENDER, RAID, RAQUETTES, BULLES, LABYRINTHE, ORBITUS, CASSE BRIQUES, BLOCS, CRUCH, TAUPE, BILLES, ESCADRILLE). Au démarrage : SPACE DEFENDER. ✕ ou OPTIONS lance la partie. |
 | **NIVEAU** | Facile / Normal / Difficile (gauche / droite ou ✕), choix gardé en mémoire |
 | **LUMINOSITE** | 0 à 100 % par pas de 10 % (gauche / droite ou ✕), visible tout de suite et gardée en mémoire. À 0 %, les dalles restent très faiblement allumées pour qu'on voie encore le menu. |
 | **VOLUME** | volume du son, 0 à 100 % par pas de 10 % (gauche / droite ou ✕). Un bip fait entendre le niveau. 0 % = muet. C'est le rapport cyclique du PWM : le potentiomètre de l'ampli règle le maximum. |
@@ -262,7 +264,7 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. **La démo cha
 |---|---|
 | stick gauche ou croix gauche / droite | bouger |
 | stick gauche ou croix haut / bas | avancer / reculer (dans le bas de l'écran, environ 45 %) |
-| croix, carré, triangle, R1, L1 ou R2 | tirer (SPACE DEFENDER, RAID, ORBITUS, BILLES), jet de boue (TAUPE), sauter (ESCALADE), lancer la balle (CASSE BRIQUES), tourner la pièce (BLOCS), prendre un bonbon (CRUCH) |
+| croix, carré, triangle, R1, L1 ou R2 | tirer (SPACE DEFENDER, RAID, ORBITUS, BILLES, ESCADRILLE), jet de boue (TAUPE), lancer la balle (CASSE BRIQUES), tourner la pièce (BLOCS), prendre un bonbon (CRUCH) |
 | ○ (rond) | bombe dans RAID, saut dans BULLES, tourner dans l'autre sens (BLOCS), annuler (CRUCH) ; dans les menus : retour |
 | OPTIONS | jouer depuis le menu, pause en partie |
 | ○ (rond), pendant la pause | quitter la partie et revenir au menu |
@@ -350,8 +352,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V3.84_complet.bin](firmware/GameHub_V3.84_complet.bin) | 0x0 | `d7aaecde58a18b74bbfea854b5306beb` |
-| [firmware/GameHub_V3.84.bin](firmware/GameHub_V3.84.bin) | 0x10000 | `703d09b70489b661cfceb7887c4d0502` |
+| [firmware/GameHub_V3.85_complet.bin](firmware/GameHub_V3.85_complet.bin) | 0x0 | `82c6d62bfc2a1198ab604af4fef7208b` |
+| [firmware/GameHub_V3.85.bin](firmware/GameHub_V3.85.bin) | 0x10000 | `e0d5ecc0e7d8a6b1ab4f77c4685bc0e9` |
 
 Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB SPIFFS)** dans Outils → Partition Scheme.
 
@@ -365,6 +367,6 @@ Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB S
 - **Carte :** installée avec la configuration `build/bp32/arduino-cli.yaml` (adresse du paquet Bluepad32 ajoutée). Le programme d'essai `bp32test/` affiche l'état des manettes et la mémoire libre.
 - **Bibliothèques :** ESP32-HUB75-MatrixPanel-I2S-DMA et Adafruit GFX ; Bluepad32 est fourni avec la carte.
 - **Manettes :** une petite couche d'adaptation (`PadShim`) garde les noms `PS4.Cross()`, `PS4.LStickX()`... utilisés par les jeux ; `PAD2` lit la 2e manette. L'ancienne bibliothèque PS4Controller (une seule manette, adresse de la console à recopier) reste dans l'historique Git (V3.70, commit `11e9556`).
-- **Plans, aperçus et GIF :** `python docs/branchement.py`, `python docs/rendu.py`, `python docs/gif_manette_ps4.py`, `python docs/gif_arrivee.py`, `python docs/gif_menus.py`, `python docs/gif_jeux.py [raid raquettes bulles labyrinthe orbite briques blocs cruch taupe billes escalade]`, `python docs/branchement_son.py` (Pillow).
+- **Plans, aperçus et GIF :** `python docs/branchement.py`, `python docs/rendu.py`, `python docs/gif_manette_ps4.py`, `python docs/gif_arrivee.py`, `python docs/gif_menus.py`, `python docs/gif_jeux.py [raid raquettes bulles labyrinthe orbite briques blocs cruch taupe billes escadrille]`, `python docs/branchement_son.py` (Pillow).
 
 L'ancienne version avec wifi, page web et manette ESP-NOW reste disponible dans l'historique Git, jusqu'au commit `fb11367`.
