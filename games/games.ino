@@ -28,7 +28,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "4.02"
+#define GAMES_VERSION "4.03"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -4530,10 +4530,12 @@ void aErase(uint16_t sea) {
 // dessin limite a la mer (jamais dans la bande du score, meme un instant)
 // Couleurs de 1945 choisies pour une dalle a 3 bits : chaque composante est eteinte ou au niveau 2 et plus (le niveau 1,
 // trop faible, scintille ou disparait). La mer est au niveau 2, tramee (1 point sur 4 noir) : moins intense, sans scintiller.
-uint16_t aSea() { return rgb(10, 60, 150); }
-void aSeaFill(int x0, int y0, int x1, int y1) {  // remplit de mer tramee le rectangle [x0, x1[ x [y0, y1[
-  static const uint8_t B4[4][4] = { { 0, 8, 2, 10 }, { 12, 4, 14, 6 }, { 3, 11, 1, 9 }, { 15, 7, 13, 5 } };
+// En 4 bits et plus, la dalle a assez de niveaux : mer unie, bleu nuit (le tramage y donnait un grain vilain).
+uint16_t aSea() { return colorBits >= 4 ? rgb(8, 50, 125) : rgb(10, 60, 150); }
+void aSeaFill(int x0, int y0, int x1, int y1) {  // remplit de mer le rectangle [x0, x1[ x [y0, y1[
   uint16_t sea = aSea();
+  if (colorBits >= 4) { if (x1 > x0 && y1 > y0) gfx->fillRect(x0, y0, x1 - x0, y1 - y0, sea); return; }
+  static const uint8_t B4[4][4] = { { 0, 8, 2, 10 }, { 12, 4, 14, 6 }, { 3, 11, 1, 9 }, { 15, 7, 13, 5 } };
   for (int y = y0; y < y1; y++)
     for (int x = x0; x < x1; x++) gfx->drawPixel(x, y, B4[y & 3][x & 3] < 4 ? 0 : sea);
 }
@@ -6920,7 +6922,7 @@ void serialMenu() {
   Serial.println("  c NDFS : dalles. N nombre 1-4, D 0 l'une sous l'autre / 1 cote a cote / 2 carre,");
   Serial.println("           F ecran retourne 0/1, S une dalle sur deux retournee 0/1. Ex. : c 2000");
   Serial.println("  p N : couleurs des dalles sur N bits (3 a 6, redemarre). 3 = le plus sur pour le Bluetooth,");
-  Serial.println("        4 = plus de nuances. 2 plantages de suite : retour automatique a 3.");
+  Serial.println("        4 = plus de nuances (par defaut). 2 plantages de suite : retour automatique a 3.");
   Serial.printf("  v N : volume du son, 0 (muet) a 10. Actuel : %u\n", volume);
   Serial.printf("  l N : luminosite des dalles, 0 a 100 %%. Actuelle : %d %%\n", (bright * 100 + 127) / 255);
   Serial.printf("  j N : test, demo du jeu N (0 a %d)\n", N_GAMES - 1);
@@ -7013,7 +7015,11 @@ void setup() {
   // profondeur de couleur choisie, en laissant assez de memoire au Bluetooth
   // Couleurs choisies au moniteur serie (p 3 a p 6), 3 bits par defaut : au-dela, le Bluetooth peut manquer de
   // memoire a la connexion de la manette (assert hci_hal_h4.c:553). 2 plantages de suite : retour a 3 bits.
-  uint8_t wantBits = constrain(prefs.getUChar("bits", 3), 3, 6);
+  if (!prefs.isKey("bits4")) {  // V4.03 : demarrage en 4 bits (une seule fois ; ensuite la commande p et le retour a 3 bits restent)
+    prefs.putUChar("bits", 4);
+    prefs.putBool("bits4", true);
+  }
+  uint8_t wantBits = constrain(prefs.getUChar("bits", 4), 3, 6);
   esp_reset_reason_t why = esp_reset_reason();
   if (why == ESP_RST_PANIC || why == ESP_RST_INT_WDT || why == ESP_RST_TASK_WDT) {
     uint8_t crashes = prefs.getUChar("crash", 0) + 1;
@@ -7066,6 +7072,20 @@ void setup() {
     gfx->setTextSize(1);
     gText(y + 18, "GAMES", rgb(140, 255, 150));
     gText(y + 28, "V" GAMES_VERSION, rgb(150, 150, 170));
+    // reglages en cours : ecran, couleurs, luminosite, volume
+    char l1[24], l2[24], l3[28];
+    snprintf(l1, sizeof(l1), "ECRAN %dX%d", W, H);
+    snprintf(l2, sizeof(l2), "COULEURS %d BITS", colorBits);
+    snprintf(l3, sizeof(l3), "LUMI %d%%  VOL %d%%", (bright * 100 + 127) / 255, constrain(prefs.getUChar("vol", 6), 0, 10) * 10);
+    uint16_t gc = rgb(0, 200, 255);
+    if (H >= 128) {
+      tinyText(*gfx, (W - tinyWidth(l1)) / 2, y + 42, l1, gc);
+      tinyText(*gfx, (W - tinyWidth(l2)) / 2, y + 50, l2, gc);
+      tinyText(*gfx, (W - tinyWidth(l3)) / 2, y + 58, l3, gc);
+    } else {  // petit ecran : une seule ligne
+      snprintf(l1, sizeof(l1), "%d BITS LUMI %d%%", colorBits, (bright * 100 + 127) / 255);
+      tinyText(*gfx, (W - tinyWidth(l1)) / 2, y + 40, l1, gc);
+    }
   }
 
   gDiff = prefs.getUChar("diff", 1) % 3;

@@ -18,7 +18,7 @@ Depuis la V3.84, le Game-hub utilise **Bluepad32** : jusqu'à **4 manettes Bluet
 - **Menu « JOUEURS 1 / 2 »** (2e ligne, une étoile par manette connectée) : seuls les jeux à deux joueurs utilisent la 2e manette.
   - **RAQUETTES** : match à deux (raquette de droite pour le joueur 2), **le premier à 7 points gagne**.
   - **SPACE DEFENDER** : coopération, un 2e vaisseau **vert** pour le joueur 2, vies et score communs ; les ennemis piquent sur l'un ou l'autre ; la manette du joueur touché vibre.
-- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V4.02_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
+- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V4.03_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
 - **Mémoire** : environ 81 Ko libres avec 2 dalles en 3 bits et deux manettes connectées.
 
 # SPACE DEFENDER
@@ -206,7 +206,7 @@ Un shoot vertical original au-dessus de la mer (V3.85, remplace ESCALADE ; nouve
 - **Navires (V3.99) :** coque en relief (bord éclairé, bord dans l'ombre, bastingage, ombre portée), passerelles vitrées, **radars qui tournent**, cheminées à bande rouge, canots orange ; porte-avions au pont gris avec axe jaune, piste en biais, ascenseur et îlot.
 - **Mer plus sombre et îles sans clignotement (V3.97) :** les sprites ressortent mieux ; l'île n'est plus effacée à chaque image. Couleurs choisies pour rester visibles sur une dalle à 3 bits.
 - **Hélices qui tournent (V4.02)** sur ton avion, les chasseurs et les bombardiers ; tes tirs en trait blanc et jaune.
-- **Dalle à 3 ou 4 bits (V4.01) :** toutes les couleurs de 1945 évitent le niveau le plus faible (qui scintille ou disparaît) ; la mer est tramée (1 point sur 4 noir) pour être moins intense sans disparaître.
+- **Dalle à 3 ou 4 bits (V4.01) :** toutes les couleurs de 1945 évitent le niveau le plus faible (qui scintille ou disparaît). Mer : **unie bleu nuit en 4 bits** (V4.03), tramée (1 point sur 4 noir) seulement en 3 bits.
 - **Ton avion :** un chasseur **vert foncé** à étoiles blanches (V3.93 ; les chasseurs ennemis sont rouge brique), hélice qui tourne, avec un **contour sombre** et une **ombre sur la mer** pour bien le voir. Les avions ennemis ont aussi leur ombre.
 - **Ennemis :** des chasseurs (verts, argent ou jaunes) en V, en vague sinueuse, par le côté ou en piqué ; des **bombardiers bimoteurs** qui tirent en éventail ; des **navires** qui avancent sur la mer (vague d'étrave, sillage d'écume, tourelles qui suivent ton avion) : vedette, destroyer à cheminées qui fument, et **porte-avions** (pont en bois, îlot, avions posés) qui fait décoller des chasseurs.
 - **Capsules :** **P** jaune = arme (2, 3, 4 puis 5 tirs en éventail), **T** bleue = un tonneau de plus, **+** rouge = une vie (laissée par le porte-avions). Une vie perdue fait baisser l'arme d'un niveau.
@@ -261,7 +261,7 @@ Des bonbons à aligner sur un plateau de 8 × 8. Six sortes, chacune avec sa cou
 
 ## Menu
 
-Au démarrage, la dalle affiche **ARCADE GAMES** (en vert) et la **version** (par exemple V3.70) pendant 2 s, le temps que le Bluetooth et le son démarrent.
+Au démarrage, la dalle affiche **ARCADE GAMES** (en vert), la **version** et les **réglages en cours** (taille de l'écran, couleurs en bits, luminosité, volume) pendant 2 s, le temps que le Bluetooth et le son démarrent.
 
 Sans partie en cours, le jeu tourne tout seul en démo, sans son. **La démo change de jeu au hasard toutes les 5 minutes** (au retour au menu, le jeu choisi est remis). **Sans manette connectée**, la démo affiche seulement une petite indication, « MANETTE : PS + SHARE ». Dès que la manette est connectée, le menu s'affiche **sur son propre écran**, sans la démo derrière. On y voit un fond d'étoiles, le titre ARCADE GAMES et le record avec le nom de son détenteur :
 
@@ -383,7 +383,7 @@ De la V2.01 à la V2.22, le son passait par un ampli I2S MAX98357A (GPIO 22, 21,
 | `?` | aide et état (adresse Bluetooth, dalles, couleurs, volume) |
 | `a xx:xx:xx:xx:xx:xx` | adresse Bluetooth que prend l'ESP32, celle de la console. `a` seule revient à l'adresse d'origine |
 | `c NDFS` | dalles. N : nombre (1 à 4). D : disposition (0 l'une sous l'autre, 1 côte à côte, 2 carré). F : écran retourné (0/1). S : serpentin (0/1) |
-| `p N` | couleurs des dalles sur N bits (3 à 6). Rafraîchissement visé : 120 images/s (V4.02), moins de scintillement en 4 bits et plus |
+| `p N` | couleurs des dalles sur N bits (3 à 6). **4 bits par défaut** (V4.03 : chaque borne y passe une fois au premier démarrage ; 2 plantages de suite : retour à 3). Rafraîchissement visé : 120 images/s |
 | `v N` | volume du son, de 0 à 10 |
 | `l N` | luminosité des dalles, de 0 à 100 % (gardée en mémoire, comme la ligne LUMINOSITE du menu) ; `l` seul affiche la valeur actuelle |
 | `e 0` / `e 1` / `e x` | test des pertes Bluetooth : LED éteintes / rallumées / transfert vers les dalles arrêté (jusqu'au redémarrage) |
@@ -406,8 +406,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V4.02_complet.bin](firmware/GameHub_V4.02_complet.bin) | 0x0 | `d4b3abf9f6fadcad79fd6d8939922b8d` |
-| [firmware/GameHub_V4.02.bin](firmware/GameHub_V4.02.bin) | 0x10000 | `ddd6f12f71b7de50adeb803671f5f583` |
+| [firmware/GameHub_V4.03_complet.bin](firmware/GameHub_V4.03_complet.bin) | 0x0 | `2034d975358a6cadf9c5ac1a56dfdba2` |
+| [firmware/GameHub_V4.03.bin](firmware/GameHub_V4.03.bin) | 0x10000 | `18a52925d73d61af7714c1a1b03c1b60` |
 | [firmware/GameHub_V3.86_complet.bin](firmware/GameHub_V3.86_complet.bin) | 0x0 | `dc451b01c498df647da822a1427a1a5e` |
 | [firmware/GameHub_V3.86.bin](firmware/GameHub_V3.86.bin) | 0x10000 | `ee1945d390b91eb82240245a1e52821f` |
 
