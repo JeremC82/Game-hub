@@ -28,7 +28,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "4.03"
+#define GAMES_VERSION "4.06"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -125,8 +125,8 @@ bool gAttract = false;              // mode demo : menu cache (ligne DEMO, ou 30
 #define MENU_IDLE_MS 30000UL        // menu sans activite : passage en mode demo
 bool menuScores = false;            // page des meilleurs scores affichee
 // numeros des jeux (ordre du menu)
-enum GameId : uint8_t { G_SPACE, G_RAID, G_RAQ, G_BUL, G_LAB, G_ORB, G_BRI, G_BLO, G_CRU, G_TAU, G_BIL, G_ESQ, G_BUN, G_CAR };
-#define N_GAMES 14
+enum GameId : uint8_t { G_SPACE, G_RAID, G_RAQ, G_BUL, G_LAB, G_ORB, G_BRI, G_BLO, G_CRU, G_TAU, G_BIL, G_ESQ, G_BUN, G_CAR, G_PIN };
+#define N_GAMES 15
 // ===== NOMS DES JEUX : a modifier ici, ils s'affichent dans le menu, les scores et la demo =====
 // Majuscules, sans accents (la police n'en a pas), 14 caracteres au plus. Garder l'ordre : il suit la liste GameId ci-dessus.
 // Au-dela de 10 caracteres, le menu affiche le nom seul (sans le mot JOUER devant).
@@ -145,9 +145,10 @@ const char *const GAME_NAME[N_GAMES] = {
   "1945",      // G_ESQ
   "BUNKER 3D",       // G_BUN
   "TURBO ROUTE",     // G_CAR
+  "PINCAB",          // G_PIN
 };
 uint8_t gGame = 0;                  // jeu choisi dans le menu (gauche / droite sur la ligne JOUER)
-const char *topKey() { static const char *const K[N_GAMES] = { "top", "top1", "top3", "top4", "top5", "top7", "top8", "top9", "top10", "top11", "top12", "top14", "top15", "top16" }; return K[gGame % N_GAMES]; }  // top2 (COURSE), top6 (SAUTERELLE), top13 (ESCALADE) : jeux retires
+const char *topKey() { static const char *const K[N_GAMES] = { "top", "top1", "top3", "top4", "top5", "top7", "top8", "top9", "top10", "top11", "top12", "top14", "top15", "top16", "top17" }; return K[gGame % N_GAMES]; }  // top2 (COURSE), top6 (SAUTERELLE), top13 (ESCALADE) : jeux retires
 #define TOP_N 5
 HiScore gBest[TOP_N];                // meilleurs scores (gardes en memoire)
 uint8_t gLastRank = 0;              // place obtenue a la derniere partie (0 : hors tableau)
@@ -4530,14 +4531,10 @@ void aErase(uint16_t sea) {
 // dessin limite a la mer (jamais dans la bande du score, meme un instant)
 // Couleurs de 1945 choisies pour une dalle a 3 bits : chaque composante est eteinte ou au niveau 2 et plus (le niveau 1,
 // trop faible, scintille ou disparait). La mer est au niveau 2, tramee (1 point sur 4 noir) : moins intense, sans scintiller.
-// En 4 bits et plus, la dalle a assez de niveaux : mer unie, bleu nuit (le tramage y donnait un grain vilain).
+// Mer unie : bleu d'origine en 3 bits (comme avant), bleu nuit en 4 bits et plus (la dalle y a plus de niveaux).
 uint16_t aSea() { return colorBits >= 4 ? rgb(8, 50, 125) : rgb(10, 60, 150); }
 void aSeaFill(int x0, int y0, int x1, int y1) {  // remplit de mer le rectangle [x0, x1[ x [y0, y1[
-  uint16_t sea = aSea();
-  if (colorBits >= 4) { if (x1 > x0 && y1 > y0) gfx->fillRect(x0, y0, x1 - x0, y1 - y0, sea); return; }
-  static const uint8_t B4[4][4] = { { 0, 8, 2, 10 }, { 12, 4, 14, 6 }, { 3, 11, 1, 9 }, { 15, 7, 13, 5 } };
-  for (int y = y0; y < y1; y++)
-    for (int x = x0; x < x1; x++) gfx->drawPixel(x, y, B4[y & 3][x & 3] < 4 ? 0 : sea);
+  if (x1 > x0 && y1 > y0) gfx->fillRect(x0, y0, x1 - x0, y1 - y0, aSea());
 }
 // un point (x, y) est-il sur une ile ? (les vagues n'y sont pas dessinees : elles y feraient des trous qui clignotent)
 bool aOnIsle(int x, int y) {
@@ -5868,6 +5865,7 @@ int vCop = 0, vCopT = 0, vMsgT = 0;
 const char *vMsg = "";
 int vTime = 0, vTimeMax = 1;  // chrono du stage (images), temps accorde
 #define V_KM 2400.0f  // points de route par km (180 km/h a vitesse normale)
+int vBump = 0;  // touche sur le cote : ralenti pendant 1 s (images restantes)
 int vS = 1;  // echelle : 2 sur un grand ecran (128x128 et plus), tout est dessine en double taille
 bool vPaint = true;
 struct VTheme { uint8_t grass[3], tuft[3], road[3]; };
@@ -5976,7 +5974,7 @@ void vReset() {
   vLW = vS == 2 ? 24 : W >= 96 ? 18 : 13;
   vRoadL = (W - vLanes * vLW) / 2;
   vX = vLaneX(vLanes / 2); vSpd = 1.5f; vScroll = 0; vGap = 30; vAcc = 0;
-  vInv = 0; vSpin = 0; vNitro = 1; vNitroT = 0;
+  vInv = 0; vSpin = 0; vNitro = 1; vNitroT = 0; vBump = 0;
   for (auto &c : vCar) c.on = false;
   for (auto &b : gBoom) b.t = 0;
   vNewStage();
@@ -6063,6 +6061,7 @@ void vStep() {
   }
   if ((k & 32) && vNitro > 0 && !vNitroT) { vNitro--; vNitroT = 120; sndPlay(200, 900, 400, 0.4f, true, 1); }
   if (vSpin > 0) { vSpin--; steer = sinf(vSpin * 0.55f) * 0.9f; gas = false; }  // tete-a-queue sur l'huile
+  if (vBump > 0) { vBump--; gas = false; vNitroT = 0; }  // accroche sur le cote : 1 s au ralenti
   if (vNitroT > 0) { vNitroT--; vSpd = min(vSpd + 0.08f, 4.2f); }
   else if (gas) vSpd = min(vSpd + 0.035f * gasK, 3.0f);
   else if (brake) vSpd = max(vSpd - 0.09f * brakeK, 0.5f);
@@ -6144,7 +6143,18 @@ void vStep() {
       if (c.type == 4) { c.on = false; gScore += 250; sndPlay(1800, 2600, 90, 0.3f, false, 1); }
       else if (c.type == 5) { c.on = false; vNitro = min(3, vNitro + 1); sndMelody(JINGLE_ARME, 4); }
       else if (c.type == 3) { if (!vSpin && !vInv) { vSpin = 32; vSpd *= 0.8f; sndPlay(2600, 1500, 350, 0.3f, true, 1); } }
-      else if (!vInv) { altLoseLife((int)vX, py + 5); c.on = false; vSpd = 0.6f; vNitroT = 0; }
+      else if (!vInv) {
+        // ton avant dans son arriere (en face) : accident, une vie ; sur le cote (ou elle te touche) : 1 s au ralenti
+        float dx = vX - c.x;
+        bool rear = c.type == 2 || (fabsf(dx) < 4.5f * vS && py >= c.y + h - 5 * vS);
+        if (rear) { altLoseLife((int)vX, py + 5 * vS); c.on = false; vSpd = 0.6f; vNitroT = 0; vBump = 0; }
+        else {
+          if (!vBump) { sndPlay(220, 80, 140, 0.45f, true, 1); if (!gDemo) rumbleReq = true; }
+          vBump = 40;
+          vSpd = min(vSpd, 1.3f);
+          vX += (dx > 0 ? 1.5f : -1.5f) * vS;  // on est repousse sur le cote
+        }
+      }
     }
   }
   if (!gDemo && gScore > gHi) gHi = gScore;
@@ -6347,6 +6357,376 @@ void vDraw() {
   altHud(palFull);
 }
 
+// ---------------------------------------------------------------- PINCAB
+// Flipper original : table vue de dessus (virtuelle 64 x 96, mise a l'echelle de l'ecran). 2 flippers (gauche / L1,
+// droite / R1), 3 bumpers, 2 rebonds triangulaires, 3 cibles qui tombent (toutes : bonus et multiplicateur x2 a x5),
+// lanceur a droite (maintenir X puis relacher). Balle perdue dans les 4 s apres le lancement : rendue. Deux series de
+// cibles : stage suivant. 3 balles.
+#define PB_R 1.7f  // rayon de la balle (table virtuelle)
+const float PB_SEG[][4] = {  // murs (x0, y0, x1, y1)
+  { 0, 88, 0, 14 }, { 0, 14, 8, 4 }, { 8, 4, 16, 1 }, { 16, 1, 48, 1 }, { 48, 1, 56, 4 }, { 56, 4, 64, 12 }, { 64, 12, 64, 96 },
+  { 56, 96, 56, 24 },                                  // couloir du lanceur
+  { 0, 74, 13, 82.6f }, { 56, 74, 43, 82.6f },         // guides vers les flippers (au ras de leur surface : pas de marche)
+  { 5, 58, 5, 70 }, { 5, 70, 11, 76 }, { 51, 58, 51, 70 }, { 51, 70, 45, 76 },  // rebonds (cotes passifs)
+  { 56, 95, 64, 95 } };                                // fond du couloir
+const float PB_KICK[2][4] = { { 11, 76, 5, 58 }, { 45, 76, 51, 58 } };  // rebonds : cote qui renvoie la balle
+const float PB_BUMP[3][3] = { { 18, 26, 4 }, { 38, 26, 4 }, { 28, 40, 4 } };
+const float PB_TGT[3][4] = { { 17, 14, 23, 14 }, { 25, 14, 31, 14 }, { 33, 14, 39, 14 } };
+const float PB_PIV[2][2] = { { 13, 84 }, { 43, 84 } };
+#define PB_FL 13.0f        // longueur d'un flipper
+#define PB_REST 0.45f      // angle au repos (vers le bas)
+#define PB_UP -0.45f       // angle leve
+float pbBX = 60, pbBY = 92, pbVX = 0, pbVY = 0, pbAL = PB_REST, pbAR = PB_REST, pbPow = 0, pbK = 1;
+int pbTX = 0, pbTY = 10, pbSave = 0, pbMsgT = 0, pbMult = 1, pbClears = 0, pbLaunchHold = 0;
+uint8_t pbFlash[6] = {};  // bumpers 0-2, rebonds 3-4
+bool pbTgt[3] = { true, true, true };
+const char *pbMsg = "";
+// affichage : grand plateau qui defile (la vue suit la balle), fronton au-dessus de la table sur un grand ecran.
+// Chaque image est dessinee dans un tampon (32 Ko, reserve seulement pendant PINCAB) puis envoyee d'un bloc : pas de
+// scintillement malgre le defilement.
+int pbPY0 = 0, pbPH = 96, pbGlassH = 0, pbSceneH = 96;
+float pbST = 1, pbSB = 1, pbCam = 0;  // echelle horizontale en haut et en bas du plateau, position de la vue
+bool pbGlass = false;
+GFXcanvas16 *pbCv = nullptr;
+uint8_t pbLogo[16][10];  // logo PINCAB (1 bit par point), prepare une fois
+float pbS(float y) { return pbST + (pbSB - pbST) * y / 96.0f; }
+int pbSX(float x, float y) { return W / 2 + (int)lroundf((x - 32) * pbS(y)); }
+int pbSY(float y) { return pbPY0 + (int)lroundf(y * pbPH / 96.0f) - (int)pbCam; }  // a l'ecran (vue comprise)
+int pbX(float x) { return pbSX(x, 60); }
+int pbY(float y) { return pbSY(y); }
+const uint16_t PB_BLUE_RGB[3] = { 0, 30, 180 };  // plateau bleu (niveau franc sur une dalle a 3 bits)
+void pbRelease() { if (pbCv) { delete pbCv; pbCv = nullptr; } }
+void pbNewBall() { pbBX = 60; pbBY = 92; pbVX = pbVY = 0; pbPow = 0; pbLaunchHold = 0; }
+void pbReset() {
+  gLives = (!gDemo && gDiff == 0) ? 5 : 3;
+  gPaused = false;
+  gScore = 0; gWave = 1; gDead = 0; gBonus = 0; gLifeUp = false;
+  pbGlass = H >= 128 && W >= 96;
+  pbGlassH = pbGlass ? 34 : 0;
+  pbSB = min((W - 4) / 64.0f, 1.7f * H / 96.0f);  // table large : elle depasse l'ecran en hauteur, la vue defile
+  pbST = pbSB * 0.86f;                            // un peu de perspective (plus etroit en haut)
+  pbPY0 = pbGlassH + 1;
+  pbPH = (int)(96 * pbSB * 0.95f);
+  pbSceneH = pbPY0 + pbPH + 1;
+  pbCam = max(0, pbSceneH - H);  // on commence en bas, sur le lanceur
+  pbK = (pbST + pbSB) / 2;
+  pbTX = pbSX(0, 60); pbTY = pbPY0;
+  if (!pbCv) {
+    pbCv = new GFXcanvas16(W, H);
+    if (!pbCv->getBuffer()) { delete pbCv; pbCv = nullptr; Serial.println("PINCAB : memoire insuffisante"); }
+  }
+  {  // logo : texte double taille, garde en 1 bit par point
+    GFXcanvas1 lg(80, 16);
+    lg.fillScreen(0);
+    lg.setTextSize(2);
+    lg.setCursor(4, 1);
+    lg.print("PINCAB");
+    for (int r = 0; r < 16; r++)
+      for (int x = 0; x < 80; x++) {
+        if (x % 8 == 0) pbLogo[r][x / 8] = 0;
+        if (lg.getPixel(x, r)) pbLogo[r][x / 8] |= 0x80 >> (x % 8);
+      }
+  }
+  pbMult = 1; pbClears = 0; pbSave = 0; pbMsgT = 0;
+  for (auto &t : pbTgt) t = true;
+  for (auto &f : pbFlash) f = 0;
+  pbAL = pbAR = PB_REST;
+  gStageT = 100;
+  pbNewBall();
+  gNOld = 0;
+  gfx->fillScreen(0);
+}
+// collision balle / segment (rayon rr) ; (svx, svy) : vitesse de la surface (flipper) ; renvoie la normale si choc
+bool pbHit(float x0, float y0, float x1, float y1, float rr, float e, float svx, float svy, float &nx, float &ny) {
+  float dx = x1 - x0, dy = y1 - y0, l2 = dx * dx + dy * dy;
+  float t = l2 > 0 ? constrain(((pbBX - x0) * dx + (pbBY - y0) * dy) / l2, 0.0f, 1.0f) : 0;
+  float qx = x0 + dx * t, qy = y0 + dy * t, cx = pbBX - qx, cy = pbBY - qy, d = sqrtf(cx * cx + cy * cy);
+  if (d >= rr || d < 1e-4f) return false;
+  nx = cx / d; ny = cy / d;
+  pbBX = qx + nx * rr; pbBY = qy + ny * rr;
+  float rvx = pbVX - svx, rvy = pbVY - svy, vn = rvx * nx + rvy * ny;
+  if (vn < 0) { pbVX -= (1 + e) * vn * nx; pbVY -= (1 + e) * vn * ny; }
+  return true;
+}
+// demo : leve le flipper quand la balle arrive dessus, lance la balle
+uint8_t pbAuto() {
+  uint8_t k = 0;
+  if (pbBY > 72 && pbVY > -0.5f && pbBX < 56) {
+    if (pbBX < 29 && pbBX > 8) k |= 1;
+    if (pbBX >= 27 && pbBX < 50) k |= 2;
+  }
+  return k;
+}
+void pbStep() {
+  gFrame++;
+  if (pbMsgT > 0) pbMsgT--;
+  for (auto &f : pbFlash) if (f) f--;
+  if (gDead > 0) {
+    if (--gDead == 0) {
+      if (gLives <= 0) {
+        if (gDemo) pbReset();
+        else if (gLastRank) startNameEntry();
+        else toDemo();
+        return;
+      }
+      pbNewBall();
+    }
+    return;
+  }
+  uint8_t k = gDemo ? pbAuto() : keysPs4;
+  bool fl = (k & 1) || (!gDemo && PS4.L1()), fr = (k & 2) || (!gDemo && PS4.R1());
+  // lanceur : X maintenu tend le ressort, relache : la balle part (demo : tout seul)
+  bool inLane = pbBX > 56.5f && pbBY > 85 && fabsf(pbVY) < 0.4f;
+  if (inLane && gStageT < 60) {
+    bool hold = gDemo ? (++pbLaunchHold < 30 + (gFrame % 25)) : (PS4.Cross() || (k & 16));
+    if (hold) pbPow = min(1.0f, pbPow + 0.025f);
+    else if (pbPow > 0.05f || gDemo) {
+      pbVY = -(5.2f + 2.3f * max(pbPow, gDemo ? 0.5f : 0.0f));
+      pbPow = 0; pbLaunchHold = 0; pbSave = 160;
+      sndPlay(300, 1200, 180, 0.35f, true, 1);
+    }
+  }
+  if (pbSave > 0) pbSave--;
+  // flippers : montent vite, redescendent moins vite ; son au depart
+  float tL = fl ? PB_UP : PB_REST, tR = fr ? PB_UP : PB_REST;
+  float dL = constrain(tL - pbAL, -0.33f, 0.18f), dR = constrain(tR - pbAR, -0.33f, 0.18f);
+  if (dL < -0.2f && pbAL > 0.3f) sndPlay(500, 200, 30, 0.3f, true, 0);
+  if (dR < -0.2f && pbAR > 0.3f) sndPlay(500, 200, 30, 0.3f, true, 0);
+  for (int sub = 0; sub < 4; sub++) {
+    pbAL += dL / 4; pbAR += dR / 4;
+    pbVY += 0.06f / 4;  // pente de la table
+    float sp = sqrtf(pbVX * pbVX + pbVY * pbVY);
+    if (sp > 7) { pbVX *= 7 / sp; pbVY *= 7 / sp; }
+    pbBX += pbVX / 4; pbBY += pbVY / 4;
+    float nx, ny;
+    for (auto &s : PB_SEG) pbHit(s[0], s[1], s[2], s[3], PB_R, 0.5f, 0, 0, nx, ny);
+    for (int i = 0; i < 2; i++) {  // rebonds : la balle repart plus vite
+      const float *s = PB_KICK[i];
+      if (pbHit(s[0], s[1], s[2], s[3], PB_R, 0.5f, 0, 0, nx, ny) && pbFlash[3 + i] == 0) {
+        pbVX += nx * 2.4f; pbVY += ny * 2.4f;
+        pbFlash[3 + i] = 6; gScore += 10 * pbMult;
+        sndPlay(1200, 700, 40, 0.3f, false, 0);
+      }
+    }
+    for (int i = 0; i < 3; i++) {  // bumpers : la balle est repoussee fort
+      const float *b = PB_BUMP[i];
+      float cx = pbBX - b[0], cy = pbBY - b[1], d = sqrtf(cx * cx + cy * cy), rr = b[2] + PB_R;
+      if (d < rr && d > 1e-3f) {
+        nx = cx / d; ny = cy / d;
+        pbBX = b[0] + nx * rr; pbBY = b[1] + ny * rr;
+        pbVX = nx * 3.6f; pbVY = ny * 3.6f;
+        if (!pbFlash[i]) { gScore += 100 * pbMult; sndPlay(900, 500, 70, 0.35f, false, 1); }
+        pbFlash[i] = 8;
+      }
+    }
+    for (int i = 0; i < 3; i++) {  // cibles
+      if (!pbTgt[i]) continue;
+      const float *t = PB_TGT[i];
+      if (pbHit(t[0], t[1], t[2], t[3], PB_R + 0.5f, 0.6f, 0, 0, nx, ny)) {
+        pbTgt[i] = false;
+        gScore += 250 * pbMult;
+        sndPlay(1500, 2000, 60, 0.35f, false, 1);
+        if (!pbTgt[0] && !pbTgt[1] && !pbTgt[2]) {  // les 3 cibles : bonus, multiplicateur, cibles relevees
+          gScore += 2000UL * pbMult;
+          pbMult = min(5, pbMult + 1);
+          for (auto &tt : pbTgt) tt = true;
+          pbMsg = "CIBLES ! BONUS"; pbMsgT = 80;
+          sndMelody(JINGLE_ARME, 4);
+          if (++pbClears >= 2) {  // deux series : stage suivant
+            pbClears = 0;
+            altStageClear(3000UL * gWave);
+            gWave++;
+            gStageT = 100;
+            sndMelody(JINGLE_STAGE, 4);
+          }
+        }
+      }
+    }
+    for (int f = 0; f < 2; f++) {  // flippers : segments qui tournent, ils frappent la balle
+      float a = f ? pbAR : pbAL, w = (f ? dR : dL);  // vitesse de rotation (par image)
+      float px = PB_PIV[f][0], py = PB_PIV[f][1], ux = f ? -cosf(a) : cosf(a), uy = sinf(a);
+      float tx = px + ux * PB_FL, ty = py + uy * PB_FL;
+      // vitesse de la surface au point le plus proche
+      float dx = tx - px, dy = ty - py, l2 = dx * dx + dy * dy;
+      float t = constrain(((pbBX - px) * dx + (pbBY - py) * dy) / l2, 0.0f, 1.0f), s = t * PB_FL;
+      float svx = f ? s * w * sinf(a) : -s * w * sinf(a), svy = f ? s * w * cosf(a) : s * w * cosf(a);
+      pbHit(px, py, tx, ty, PB_R + 1.2f, 0.35f, svx, svy, nx, ny);
+    }
+  }
+  {  // securite : balle immobile plus de 2 s hors du lanceur -> petit coup sur la table
+    static int still = 0;
+    if (fabsf(pbVX) + fabsf(pbVY) < 0.08f && !(pbBX > 56.5f && pbBY > 85)) still++;
+    else still = 0;
+    if (still > 80) { still = 0; pbVX += (random(21) - 10) / 10.0f; pbVY -= 1.2f; }
+  }
+  if (pbBY > 99) {  // balle perdue
+    if (pbSave > 0) { pbNewBall(); pbMsg = "BALLE RENDUE"; pbMsgT = 70; sfxMenu(); }
+    else { altLoseLife(pbSX(28, 92), max(10, pbSY(92))); pbMult = 1; }
+  }
+  if (!gDemo && gScore > gHi) gHi = gScore;
+  if (gStageT > 0) gStageT--;
+}
+void pbDraw() {
+  uint16_t palFull[9];
+  for (int i = 0; i < 9; i++) palFull[i] = rgb(G_PAL_RGB[i][0], G_PAL_RGB[i][1], G_PAL_RGB[i][2]);
+  gNOld = 0;
+  if (!pbCv) return;
+  GFXcanvas16 &c = *pbCv;
+  // la vue suit la balle (en douceur), sans sortir de la table
+  if (!gPaused) {
+    float by = pbPY0 + pbBY * pbPH / 96.0f, want = constrain(by - H * 0.55f, 0.0f, (float)max(0, pbSceneH - H));
+    pbCam += (want - pbCam) * 0.12f;
+  }
+  // couleurs choisies pour une dalle a 3 bits : chaque composante eteinte ou franche
+  uint16_t white = rgb(255, 255, 255), yel = rgb(255, 220, 0), red = rgb(230, 30, 30), dred = rgb(150, 0, 0), blue = rgb(PB_BLUE_RGB[0], PB_BLUE_RGB[1], PB_BLUE_RGB[2]);
+  c.fillScreen(0);
+  for (int y = 0; y < H; y++) {  // plateau bleu (en perspective)
+    float vy = (y + pbCam - pbPY0) * 96.0f / pbPH;
+    if (vy < 0 || vy > 96) continue;
+    int xl = pbSX(-1, vy), xr = pbSX(65, vy);
+    c.drawFastHLine(xl, y, xr - xl + 1, blue);
+  }
+  int cam = (int)pbCam;
+  if (pbGlass && cam < pbGlassH) {  // fronton : etoiles, cometes, logo, bille chromee, afficheur
+    int oy = -cam;
+    c.drawRect(0, oy, W, 34, rgb(0, 90, 255));
+    c.drawRect(1, oy + 1, W - 2, 32, rgb(0, 0, 160));
+    uint32_t sd = 12345;
+    for (int i = 0; i < 26; i++) {
+      sd = sd * 1103515245u + 12345u;
+      static const uint16_t SC[3] = { 0xFFFF, 0x07FF, 0xFFE0 };
+      c.drawPixel(3 + (sd >> 16) % (W - 6), oy + 3 + (sd >> 8) % 16, ((gFrame >> 3) + i) % 7 ? SC[i % 3] : 0);
+    }
+    static const uint8_t CC[3][3] = { { 255, 200, 0 }, { 255, 40, 40 }, { 0, 220, 255 } };
+    for (int k = 0; k < 3; k++) c.drawLine(8 + k * 6, oy + 19 - k, W - 30 + k * 4, oy + 6 + k * 3, rgb(CC[k][0], CC[k][1], CC[k][2]));
+    int lx = (W - 80) / 2 - 6, ly = oy + 2;
+    for (int pass = 0; pass < 2; pass++)
+      for (int r = 0; r < 16; r++) {
+        int sh = (15 - r) / 3;  // italique
+        uint16_t col = pass == 0 ? rgb(150, 0, 0) : r < 5 ? rgb(255, 230, 0) : r < 10 ? rgb(255, 150, 0) : rgb(255, 30, 20);
+        for (int x = 0; x < 80; x++)
+          if (pbLogo[r][x / 8] & (0x80 >> (x % 8))) c.drawPixel(lx + x + sh + (pass ? 0 : 1), ly + r + (pass ? 0 : 1), col);
+      }
+    int bx = W - 14, by = oy + 10;
+    c.fillCircle(bx, by, 6, rgb(150, 155, 170));
+    c.fillCircle(bx - 1, by - 1, 4, rgb(220, 225, 235));
+    c.fillCircle(bx - 2, by - 2, 1, white);
+    c.drawRect(W / 2 - 50, oy + 20, 100, 13, rgb(255, 150, 0));
+    char num[16], b[16];
+    snprintf(num, sizeof(num), "%lu", (unsigned long)gScore);
+    int n = strlen(num), j = 0;  // points tous les 3 chiffres : 1.234.567
+    for (int i = 0; i < n; i++) { b[j++] = num[i]; if ((n - i - 1) % 3 == 0 && i < n - 1) b[j++] = '.'; }
+    b[j] = 0;
+    tinyText(c, (W - tinyWidth(b)) / 2, oy + 21, b, rgb(255, 40, 40));
+    snprintf(num, sizeof(num), "BALL %d", max(1, (gDiff == 0 && !gDemo ? 5 : 3) - gLives + 1));
+    tinyText(c, W / 2 - 46, oy + 27, num, yel);
+    snprintf(num, sizeof(num), "X%d", pbMult);
+    tinyText(c, W / 2 + 46 - tinyWidth(num), oy + 27, num, yel);
+  }
+  auto P = [&](float x, float y, int &X, int &Y) { X = pbSX(x, y); Y = pbSY(y); };
+  auto R = [&](float r, float y) { return max(1, (int)lroundf(r * pbS(y))); };
+  auto line = [&](float x0, float y0, float x1, float y1, uint16_t col) { int a, b, cx, cy; P(x0, y0, a, b); P(x1, y1, cx, cy); c.drawLine(a, b, cx, cy, col); };
+  auto dot = [&](float x, float y, float r, uint16_t col) { int X, Y; P(x, y, X, Y); c.fillCircle(X, Y, R(r, y), col); };
+  bool blink = (gFrame >> 3) & 1;
+  {  // losange central : jaune, orange, bande cyan
+    int tx, ty, rx, ry, bx, by, lx, ly;
+    P(28, 43, tx, ty); P(33, 51, rx, ry); P(28, 60, bx, by); P(23, 51, lx, ly);
+    c.fillTriangle(tx, ty, rx, ry, lx, ly, yel);
+    c.fillTriangle(bx, by, rx, ry, lx, ly, rgb(255, 150, 0));
+    line(25, 54, 31, 54, rgb(0, 220, 255));
+    line(26, 56, 30, 56, rgb(0, 220, 255));
+    dot(28, 48, 1, (pbTgt[0] || pbTgt[1] || pbTgt[2]) && blink ? white : rgb(255, 30, 20));
+  }
+  static const float YD[][2] = { { 12, 22 }, { 10, 30 }, { 10, 38 }, { 46, 22 }, { 47, 30 }, { 47, 38 }, { 20, 47 }, { 36, 47 },
+                                 { 17, 54 }, { 39, 54 }, { 15, 62 }, { 41, 62 }, { 28, 33 } };
+  for (int i = 0; i < (int)(sizeof(YD) / sizeof(YD[0])); i++) dot(YD[i][0], YD[i][1], 0.9f, ((gFrame >> 2) % 13) == i ? white : yel);
+  dot(13, 46, 1.0f, rgb(40, 220, 80)); dot(43, 46, 1.0f, rgb(40, 220, 80)); dot(28, 72, 1.0f, rgb(40, 220, 80));
+  for (int i = 0; i < 3; i++) dot(22 + i * 6, 7, 1.0f, ((gFrame >> 2) + i) % 3 == 0 ? rgb(0, 220, 255) : rgb(0, 0, 150));
+  for (auto &sg : PB_SEG) {  // murs : rail chrome
+    int a, b, cc, d; P(sg[0], sg[1], a, b); P(sg[2], sg[3], cc, d);
+    c.drawLine(a, b, cc, d, rgb(170, 220, 255));
+    c.drawLine(a + (sg[0] < 32 ? -1 : 1), b, cc + (sg[2] < 32 ? -1 : 1), d, rgb(0, 150, 255));
+  }
+  line(1, 75, 12, 82.6f, red); line(55, 75, 44, 82.6f, red);
+  for (int i = 0; i < 2; i++) {  // rebonds : rouges, triangle bleu, caoutchouc blanc
+    const float *k0 = PB_KICK[i];
+    int a, b, cc, d, e, f; P(k0[0], k0[1], a, b); P(k0[2], k0[3], cc, d); P(i ? 51 : 5, 70, e, f);
+    bool fl = pbFlash[3 + i];
+    c.fillTriangle(a, b, cc, d, e, f, fl ? white : red);
+    int ma = (a + cc + e) / 3, mb = (b + d + f) / 3;
+    c.fillTriangle(ma, mb - 4, ma - 2, mb + 2, ma + 2, mb + 2, rgb(0, 90, 255));
+    c.drawLine(a, b, cc, d, fl ? yel : white);
+    c.drawLine(a + (i ? 1 : -1), b, cc + (i ? 1 : -1), d, fl ? yel : white);
+  }
+  for (int i = 0; i < 3; i++) {  // bumpers champignons
+    const float *bp = PB_BUMP[i];
+    int x, y; P(bp[0], bp[1], x, y);
+    int r = max(2, R(bp[2], bp[1]));
+    bool f = pbFlash[i];
+    c.fillCircle(x + 1, y + 2, r, rgb(0, 0, 90));
+    c.fillCircle(x, y, r, f ? yel : white);
+    c.fillCircle(x, y, max(1, r - 1), f ? white : red);
+    if (r >= 3) {
+      c.fillCircle(x, y - 1, max(1, r / 2), f ? yel : white);
+      c.fillCircle(x, y - 1, max(1, r / 3), f ? white : red);
+      c.drawPixel(x - r / 3, y - r / 2, white);
+    }
+  }
+  for (int i = 0; i < 3; i++) {  // cibles
+    const float *t = PB_TGT[i];
+    int x0, y0, x1, y1; P(t[0], t[1], x0, y0); P(t[2], t[3], x1, y1);
+    int u = max(1, R(0.8f, t[1]));
+    if (pbTgt[i]) {
+      c.fillRect(x0, y0 - u, x1 - x0 + 1, 2 * u + 1, rgb(255, 200, 0));
+      c.drawFastHLine(x0, y0 - u, x1 - x0 + 1, white);
+      c.drawFastHLine(x0, y0 + u, x1 - x0 + 1, rgb(170, 0, 0));
+    } else c.drawFastHLine(x0, y0, x1 - x0 + 1, 0);
+  }
+  for (int i = 0; i < 5; i++) dot(20 + i * 4, 66 + (i == 0 || i == 4 ? -1 : 0), 1.1f, i < pbMult ? rgb(255, 40, 40) : dred);
+  for (int f = 0; f < 2; f++) {  // flippers effiles
+    float an = f ? pbAR : pbAL, px = PB_PIV[f][0], py = PB_PIV[f][1];
+    float ux = f ? -cosf(an) : cosf(an), uy = sinf(an), nx = -uy, ny = ux;
+    float tx = px + ux * PB_FL, ty = py + uy * PB_FL, w0 = 1.7f, w1 = 0.8f;
+    int ax, ay, bx, by, cx, cy, dx, dy;
+    P(px + nx * w0, py + ny * w0, ax, ay); P(px - nx * w0, py - ny * w0, bx, by);
+    P(tx + nx * w1, ty + ny * w1, cx, cy); P(tx - nx * w1, ty - ny * w1, dx, dy);
+    c.fillTriangle(ax, ay, bx, by, cx, cy, white);
+    c.fillTriangle(bx, by, cx, cy, dx, dy, white);
+    c.drawLine(ax, ay, cx, cy, red);
+    c.drawLine(bx, by, dx, dy, red);
+    int pxs, pys; P(px, py, pxs, pys);
+    c.fillCircle(pxs, pys, max(1, R(1.2f, py)), red);
+  }
+  if (pbPow > 0) {  // lanceur : ressort tendu
+    int x, yb; P(58, 95, x, yb);
+    int h = max(1, (int)(pbPow * 14 * pbPH / 96)), w = max(2, R(4, 95));
+    for (int k = 0; k < h; k += 2) c.drawFastHLine(x, yb - h + k, w, k & 2 ? rgb(255, 150, 0) : yel);
+  }
+  if (gDead == 0) {  // bille chromee
+    int bx, by; P(pbBX, pbBY, bx, by);
+    int r = max(1, R(PB_R, pbBY));
+    c.fillCircle(bx, by, r, rgb(150, 155, 170));
+    if (r >= 2) c.fillCircle(bx - 1, by - 1, r - 1, rgb(220, 225, 235));
+    c.drawPixel(bx - (r > 1), by - (r > 1), white);
+  }
+  if (cam > pbGlassH - 8) {  // le fronton est sorti de la vue : score et multiplicateur dans un bandeau
+    char b[16];
+    snprintf(b, sizeof(b), "%lu", (unsigned long)gScore);
+    c.fillRect(0, 0, W, 7, 0);
+    tinyText(c, 2, 1, b, rgb(255, 40, 40));
+    snprintf(b, sizeof(b), "X%d", pbMult);
+    tinyText(c, W - 2 - tinyWidth(b), 1, b, yel);
+    for (int i = 0; i < min(gLives, 5); i++) c.fillCircle(W / 2 - 8 + i * 4, 3, 1, rgb(220, 225, 235));
+  }
+  if (pbMsgT > 0) {
+    int tw = tinyWidth(pbMsg), mx = (W - tw) / 2, my = H / 2 - 20;
+    c.fillRect(mx - 2, my - 2, tw + 4, 9, 0);
+    tinyText(c, mx, my, pbMsg, (pbMsgT & 8) ? white : yel);
+  }
+  gfx->drawRGBBitmap(0, 0, c.getBuffer(), W, H);  // l'image entiere d'un bloc
+  altBooms(palFull);
+}
+
 // taille du bloc memoire de chaque jeu (0 : rien a reserver)
 size_t gMemSize(uint8_t g) {
   switch (g) {
@@ -6392,6 +6772,7 @@ void altReset() {
     case G_BIL: pReset(); break;
     case G_ESQ: aReset(); break;
     case G_CAR: vReset(); break;
+    case G_PIN: pbReset(); break;
     default: zReset(); break;
   }
 }
@@ -6411,6 +6792,7 @@ void altStep() {
     case G_BIL: pStep(); break;
     case G_ESQ: aStep(); break;
     case G_CAR: vStep(); break;
+    case G_PIN: pbStep(); break;
     default: zStep(); break;
   }
 }
@@ -6429,12 +6811,14 @@ void altDraw() {
     case G_BIL: pDraw(); break;
     case G_ESQ: aDraw(); break;
     case G_CAR: vDraw(); break;
+    case G_PIN: pbDraw(); break;
     default: zDraw(); break;
   }
 }
 // remise a zero du jeu choisi (partie ou demo)
 void resetCurrent() {
   if (gGame != G_BUN) zRelease();  // la memoire de BUNKER 3D est rendue aux autres jeux et au Bluetooth
+  if (gGame != G_PIN) pbRelease();  // et celle de l'image de PINCAB
   if (!gMemFor(gGame)) { gGame = 0; topLoad(); gMemFor(0); }  // memoire insuffisante : on revient au premier jeu
   if (gGame == 0) gReset();
   else altReset();
@@ -6655,7 +7039,7 @@ void gameUpdate() {
     if (menuGame >= 0 && screen == 0) { gGame = menuGame; menuGame = -1; topLoad(); resetCurrent(); }
   }
   if (menuMode) {  // menu sur son propre ecran : aucun jeu ne tourne, sa memoire est rendue (reprise au lancement)
-    if (gMemGame != -1 || zD) { zRelease(); gMemFor(255); }
+    if (gMemGame != -1 || zD || pbCv) { zRelease(); pbRelease(); gMemFor(255); }
     menuScreen();
     return;
   }
@@ -6922,7 +7306,7 @@ void serialMenu() {
   Serial.println("  c NDFS : dalles. N nombre 1-4, D 0 l'une sous l'autre / 1 cote a cote / 2 carre,");
   Serial.println("           F ecran retourne 0/1, S une dalle sur deux retournee 0/1. Ex. : c 2000");
   Serial.println("  p N : couleurs des dalles sur N bits (3 a 6, redemarre). 3 = le plus sur pour le Bluetooth,");
-  Serial.println("        4 = plus de nuances (par defaut). 2 plantages de suite : retour automatique a 3.");
+  Serial.println("        4 = plus de nuances (mais scintille plus). 2 plantages de suite : retour automatique a 3.");
   Serial.printf("  v N : volume du son, 0 (muet) a 10. Actuel : %u\n", volume);
   Serial.printf("  l N : luminosite des dalles, 0 a 100 %%. Actuelle : %d %%\n", (bright * 100 + 127) / 255);
   Serial.printf("  j N : test, demo du jeu N (0 a %d)\n", N_GAMES - 1);
@@ -7015,11 +7399,11 @@ void setup() {
   // profondeur de couleur choisie, en laissant assez de memoire au Bluetooth
   // Couleurs choisies au moniteur serie (p 3 a p 6), 3 bits par defaut : au-dela, le Bluetooth peut manquer de
   // memoire a la connexion de la manette (assert hci_hal_h4.c:553). 2 plantages de suite : retour a 3 bits.
-  if (!prefs.isKey("bits4")) {  // V4.03 : demarrage en 4 bits (une seule fois ; ensuite la commande p et le retour a 3 bits restent)
-    prefs.putUChar("bits", 4);
-    prefs.putBool("bits4", true);
+  if (!prefs.isKey("bits3")) {  // V4.04 : retour a 3 bits (4 bits scintille trop) ; une seule fois, ensuite la commande p decide
+    prefs.putUChar("bits", 3);
+    prefs.putBool("bits3", true);
   }
-  uint8_t wantBits = constrain(prefs.getUChar("bits", 4), 3, 6);
+  uint8_t wantBits = constrain(prefs.getUChar("bits", 3), 3, 6);
   esp_reset_reason_t why = esp_reset_reason();
   if (why == ESP_RST_PANIC || why == ESP_RST_INT_WDT || why == ESP_RST_TASK_WDT) {
     uint8_t crashes = prefs.getUChar("crash", 0) + 1;

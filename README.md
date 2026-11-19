@@ -6,9 +6,9 @@ Jeux d'arcade sur 1 à 4 dalles LED 128x64, avec un ESP32 classique et une **man
 - **Partition unique de 3 Mo :** il reste de la place pour d'autres jeux.
 - **Son en option :** une broche PWM vers un petit ampli et un haut-parleur.
 
-**14 jeux originaux**, à choisir dans le menu (gauche / droite sur la ligne JOUER). Au démarrage, c'est toujours **SPACE DEFENDER** qui est proposé.
+**15 jeux originaux**, à choisir dans le menu (gauche / droite sur la ligne JOUER). Au démarrage, c'est toujours **SPACE DEFENDER** qui est proposé.
 
-Les 14 jeux ont en commun les niveaux de difficulté, les stages, les vies, les meilleurs scores avec les noms et la démo automatique.
+Les 15 jeux ont en commun les niveaux de difficulté, les stages, les vies, les meilleurs scores avec les noms et la démo automatique.
 
 
 ## Deux manettes (Bluepad32)
@@ -18,7 +18,7 @@ Depuis la V3.84, le Game-hub utilise **Bluepad32** : jusqu'à **4 manettes Bluet
 - **Menu « JOUEURS 1 / 2 »** (2e ligne, une étoile par manette connectée) : seuls les jeux à deux joueurs utilisent la 2e manette.
   - **RAQUETTES** : match à deux (raquette de droite pour le joueur 2), **le premier à 7 points gagne**.
   - **SPACE DEFENDER** : coopération, un 2e vaisseau **vert** pour le joueur 2, vies et score communs ; les ennemis piquent sur l'un ou l'autre ; la manette du joueur touché vibre.
-- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V4.03_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
+- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V4.06_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
 - **Mémoire** : environ 81 Ko libres avec 2 dalles en 3 bits et deux manettes connectées.
 
 # SPACE DEFENDER
@@ -206,7 +206,7 @@ Un shoot vertical original au-dessus de la mer (V3.85, remplace ESCALADE ; nouve
 - **Navires (V3.99) :** coque en relief (bord éclairé, bord dans l'ombre, bastingage, ombre portée), passerelles vitrées, **radars qui tournent**, cheminées à bande rouge, canots orange ; porte-avions au pont gris avec axe jaune, piste en biais, ascenseur et îlot.
 - **Mer plus sombre et îles sans clignotement (V3.97) :** les sprites ressortent mieux ; l'île n'est plus effacée à chaque image. Couleurs choisies pour rester visibles sur une dalle à 3 bits.
 - **Hélices qui tournent (V4.02)** sur ton avion, les chasseurs et les bombardiers ; tes tirs en trait blanc et jaune.
-- **Dalle à 3 ou 4 bits (V4.01) :** toutes les couleurs de 1945 évitent le niveau le plus faible (qui scintille ou disparaît). Mer : **unie bleu nuit en 4 bits** (V4.03), tramée (1 point sur 4 noir) seulement en 3 bits.
+- **Dalle à 3 ou 4 bits (V4.01) :** toutes les couleurs de 1945 évitent le niveau le plus faible (qui scintille ou disparaît). Mer unie : bleu d'origine en 3 bits (V4.05), bleu nuit en 4 bits.
 - **Ton avion :** un chasseur **vert foncé** à étoiles blanches (V3.93 ; les chasseurs ennemis sont rouge brique), hélice qui tourne, avec un **contour sombre** et une **ombre sur la mer** pour bien le voir. Les avions ennemis ont aussi leur ombre.
 - **Ennemis :** des chasseurs (verts, argent ou jaunes) en V, en vague sinueuse, par le côté ou en piqué ; des **bombardiers bimoteurs** qui tirent en éventail ; des **navires** qui avancent sur la mer (vague d'étrave, sillage d'écume, tourelles qui suivent ton avion) : vedette, destroyer à cheminées qui fument, et **porte-avions** (pont en bois, îlot, avions posés) qui fait décoller des chasseurs.
 - **Capsules :** **P** jaune = arme (2, 3, 4 puis 5 tirs en éventail), **T** bleue = un tonneau de plus, **+** rouge = une vie (laissée par le porte-avions). Une vie perdue fait baisser l'arme d'un niveau.
@@ -239,6 +239,7 @@ Un jeu de voiture original vu de dessus (V3.94) : tu doubles voitures et camions
 - **Commandes :** gauche / droite pour braquer (au **stick**, braquage proportionnel), **✕, R2 ou haut accélérer**, **bas freiner**, **stick droit : haut accélère, bas freine** (proportionnel, V4.00), **○ turbo** (flammes, vitesse maximale plus haute).
 - **Chrono (V4.00) :** un temps à respecter pour atteindre l'arrivée (en haut à droite, bip dans les 10 dernières secondes) ; **distance restante en km** en haut à gauche, **vitesse en km/h** en bas à droite, **ligne d'arrivée en damier**. Temps écoulé : une vie (le chrono repart) ; chaque seconde restante à l'arrivée : +100.
 - **Graphismes (V4.00) :** voitures en relief avec ombre sur la route, ta voiture à bande blanche et aileron, traces de pneus et lignes de bord, arbres ronds, traits de vitesse au turbo.
+- **Chocs (V4.04) :** percuter **l'arrière** d'une voiture ou d'un camion coûte une vie ; un contact **sur le côté** te repousse et te ralentit 1 s.
 - **À éviter :** voitures et camions (qui changent de voie avec leur clignotant à partir du stage 2), **cônes**, **taches d'huile** (tête-à-queue). Le bas-côté secoue et freine.
 - **À ramasser :** **pièces** (+250) et **bidons bleus** de turbo (3 au plus, en bas à gauche). Chaque voiture doublée : +50.
 - **Poursuite :** une fois par stage, **la police surgit par l'arrière**, gyrophare rouge et bleu et sirène. Elle est un peu plus rapide que toi et se cale sur ta voie pour te percuter : tiens **15 s** (« SEMEE ! +2000 »), ou fais-la percuter une voiture, un camion ou un cône que tu viens de doubler (« POLICE KO +3000 »). Le turbo te permet de la distancer.
@@ -247,6 +248,18 @@ Un jeu de voiture original vu de dessus (V3.94) : tu doubles voitures et camions
 - **Grand écran (128x128 et plus) :** tout est dessiné en double taille.
 
 ![Les 4 décors de TURBO ROUTE](docs/turbo-decors.png)
+
+### PINCAB
+
+![PINCAB](docs/jeu-pincab.gif)
+
+Un flipper original (V4.06).
+- **Table :** 2 flippers, 3 bumpers champignons, 2 rebonds triangulaires, 3 cibles qui tombent, un lanceur à droite. Plateau bleu en perspective, losange central, points lumineux qui s'allument à tour de rôle, bille chromée.
+- **Grand écran (128x128) :** la table occupe toute la largeur et **défile** : la vue suit la balle. En haut, un **fronton** avec le logo PINCAB, les étoiles, les comètes et l'afficheur (score, balle, multiplicateur). Chaque image est dessinée en mémoire puis envoyée d'un bloc (32 Ko pendant le jeu seulement) : pas de scintillement.
+- **Commandes :** **gauche ou L1** flipper gauche, **droite ou R1** flipper droit, **✕ maintenu puis relâché** pour lancer la balle (plus tu tiens, plus elle part fort).
+- **Points :** bumper 100, rebond 10, cible 250 ; les 3 cibles : +2000 et **multiplicateur** (x2 à x5). Deux séries de cibles : stage suivant. Une balle perdue dans les 4 s après le lancement est rendue. 3 balles.
+
+![PINCAB : fronton, milieu et bas de la table](docs/pincab-rendus.png)
 
 ### CRUCH
 
@@ -273,7 +286,7 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. **La démo cha
 
 | Ligne | Action |
 |---|---|
-| **JOUER** | **gauche / droite : choix du jeu** (14 jeux ; leurs noms se changent dans le tableau `GAME_NAME` en haut de `games/games.ino`). Au démarrage : le premier jeu de la liste. ✕ ou OPTIONS lance la partie. |
+| **JOUER** | **gauche / droite : choix du jeu** (15 jeux ; leurs noms se changent dans le tableau `GAME_NAME` en haut de `games/games.ino`). Au démarrage : le premier jeu de la liste. ✕ ou OPTIONS lance la partie. |
 | **NIVEAU** | Facile / Normal / Difficile (gauche / droite ou ✕), choix gardé en mémoire |
 | **LUMINOSITE** | 0 à 100 % par pas de 10 % (gauche / droite ou ✕), visible tout de suite et gardée en mémoire. À 0 %, les dalles restent très faiblement allumées pour qu'on voie encore le menu. |
 | **VOLUME** | volume du son, 0 à 100 % par pas de 10 % (gauche / droite ou ✕). Un bip fait entendre le niveau. 0 % = muet. C'est le rapport cyclique du PWM : le potentiomètre de l'ampli règle le maximum. |
@@ -383,7 +396,7 @@ De la V2.01 à la V2.22, le son passait par un ampli I2S MAX98357A (GPIO 22, 21,
 | `?` | aide et état (adresse Bluetooth, dalles, couleurs, volume) |
 | `a xx:xx:xx:xx:xx:xx` | adresse Bluetooth que prend l'ESP32, celle de la console. `a` seule revient à l'adresse d'origine |
 | `c NDFS` | dalles. N : nombre (1 à 4). D : disposition (0 l'une sous l'autre, 1 côte à côte, 2 carré). F : écran retourné (0/1). S : serpentin (0/1) |
-| `p N` | couleurs des dalles sur N bits (3 à 6). **4 bits par défaut** (V4.03 : chaque borne y passe une fois au premier démarrage ; 2 plantages de suite : retour à 3). Rafraîchissement visé : 120 images/s |
+| `p N` | couleurs des dalles sur N bits (3 à 6). **3 bits par défaut** (V4.05 : 4 bits scintillait trop ; chaque borne revient une fois à 3). Rafraîchissement visé : 120 images/s |
 | `v N` | volume du son, de 0 à 10 |
 | `l N` | luminosité des dalles, de 0 à 100 % (gardée en mémoire, comme la ligne LUMINOSITE du menu) ; `l` seul affiche la valeur actuelle |
 | `e 0` / `e 1` / `e x` | test des pertes Bluetooth : LED éteintes / rallumées / transfert vers les dalles arrêté (jusqu'au redémarrage) |
@@ -406,8 +419,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V4.03_complet.bin](firmware/GameHub_V4.03_complet.bin) | 0x0 | `2034d975358a6cadf9c5ac1a56dfdba2` |
-| [firmware/GameHub_V4.03.bin](firmware/GameHub_V4.03.bin) | 0x10000 | `18a52925d73d61af7714c1a1b03c1b60` |
+| [firmware/GameHub_V4.06_complet.bin](firmware/GameHub_V4.06_complet.bin) | 0x0 | `75d6b5763d573e10941f6345e3f72968` |
+| [firmware/GameHub_V4.06.bin](firmware/GameHub_V4.06.bin) | 0x10000 | `1d363ecc8d80d855024742a3fc5ecd58` |
 | [firmware/GameHub_V3.86_complet.bin](firmware/GameHub_V3.86_complet.bin) | 0x0 | `dc451b01c498df647da822a1427a1a5e` |
 | [firmware/GameHub_V3.86.bin](firmware/GameHub_V3.86.bin) | 0x10000 | `ee1945d390b91eb82240245a1e52821f` |
 
@@ -425,6 +438,6 @@ Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB S
 - **Carte :** installée avec la configuration `build/bp32/arduino-cli.yaml` (adresse du paquet Bluepad32 ajoutée). Le programme d'essai `bp32test/` affiche l'état des manettes et la mémoire libre.
 - **Bibliothèques :** ESP32-HUB75-MatrixPanel-I2S-DMA et Adafruit GFX ; Bluepad32 est fourni avec la carte.
 - **Manettes :** une petite couche d'adaptation (`PadShim`) garde les noms `PS4.Cross()`, `PS4.LStickX()`... utilisés par les jeux ; `PAD2` lit la 2e manette. L'ancienne bibliothèque PS4Controller (une seule manette, adresse de la console à recopier) reste dans l'historique Git (V3.70, commit `11e9556`).
-- **Plans, aperçus et GIF :** `python docs/branchement.py`, `python docs/rendu.py`, `python docs/gif_manette_ps4.py`, `python docs/gif_arrivee.py`, `python docs/gif_menus.py`, `python docs/gif_jeux.py [raid raquettes bulles labyrinthe orbite briques blocs cruch taupe billes escadrille]`, `python docs/gif_bunker.py`, `python docs/gif_turbo.py`, `python docs/branchement_son.py` (Pillow).
+- **Plans, aperçus et GIF :** `python docs/branchement.py`, `python docs/rendu.py`, `python docs/gif_manette_ps4.py`, `python docs/gif_arrivee.py`, `python docs/gif_menus.py`, `python docs/gif_jeux.py [raid raquettes bulles labyrinthe orbite briques blocs cruch taupe billes escadrille]`, `python docs/gif_bunker.py`, `python docs/gif_turbo.py`, `python docs/gif_pincab.py`, `python docs/branchement_son.py` (Pillow).
 
 L'ancienne version avec wifi, page web et manette ESP-NOW reste disponible dans l'historique Git, jusqu'au commit `fb11367`.
