@@ -28,7 +28,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "3.92"
+#define GAMES_VERSION "3.93"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -725,7 +725,7 @@ void gBossStep() {
   gBX = W / 2 - 8 + sinf(gBT * 0.02f) * (W / 2 - 12);
   if (gDead || gStageT || gBY < gTop - 1) return;
   bool p2 = gBHp * 2 < gBHpMax;
-  int every = max(22, (p2 ? 40 : 60) - 4 * (gWave / 4) - 10 * (gEffDiff() - 1));
+  int every = max(30, (p2 ? 50 : 70) - 3 * (gWave / 4) - 10 * (gEffDiff() - 1));  // boss : salves plus espacees (V3.93)
   if (gBT % every == 0) {
     int n = p2 ? 5 : 3;
     for (int k = 0; k < n; k++)
@@ -784,7 +784,7 @@ void gameStep() {
   gDescend = gWorld == 3 ? (1 - cosf(gFrame * 0.012f)) * min(14, H / 9) : 0;
   int alive = 0, entering = 0;
   for (int i = 0; i < gNE; i++) { alive += gEn[i].alive; entering += gEn[i].alive && gEn[i].state == 3; }
-  int diveEvery = max(16, 60 - gWave * 7);
+  int diveEvery = max(24, 70 - min(gWave, 12) * 4);  // piques : la frequence monte doucement et plafonne (V3.93)
   if (gEffDiff() == 0) diveEvery = diveEvery * 3 / 2;               // facile : piques plus rares
   else if (gEffDiff() == 2) diveEvery = max(12, diveEvery * 2 / 3);  // difficile : plus frequents
   if (gDead == 0 && gStageT == 0 && !entering && gFrame % diveEvery == 0 && alive) {  // pas de pique pendant l'arrivee
@@ -821,7 +821,7 @@ void gameStep() {
       float curve = gWorld == 2 ? e.dir * 1.6f * sinf(e.t * 0.15f)                   // cristaux : zigzag
                                 : e.t < 50 ? e.dir * 1.2f * cosf(e.t * 0.063f) : 0;  // boucle
       e.vx = constrain(e.vx * 0.96f + curve * 0.06f + (shipC - (e.x + 4)) * (e.t < 50 ? 0.0005f : 0.004f), -1.4f, 1.4f);
-      e.vy = min(e.vy + 0.03f, 1.3f + 0.1f * gWave);
+      e.vy = min(e.vy + 0.03f, 1.2f + 0.05f * min(gWave, 12));
       e.x += e.vx + curve; e.y += e.vy;
       if (e.y > H) {
         if (e.path == 9) { e.y = -8; e.x = random(W - GW); e.vx = 0; e.vy = 0.6f; e.t = 50; }  // eclat : replonge du haut
@@ -838,7 +838,7 @@ void gameStep() {
       e.y += constrain(dy * 0.1f, -2.2f, 2.2f);
       if (fabsf(dx) < 0.6f && fabsf(dy) < 0.6f) e.state = 0;
     }
-    int chance = e.state == 1 ? 18 : e.state == 3 ? 5 : 2 + gWave;  // tirs ennemis
+    int chance = e.state == 1 ? 12 : e.state == 3 ? 3 : 1 + min(gWave, 12) / 2;  // tirs ennemis (moins nombreux, plafonnes)
     if (gEffDiff() == 0) chance = max(1, chance / 2);
     else if (gEffDiff() == 2) chance = chance * 8 / 5;
     if (gDead == 0 && gStageT == 0 && e.y > 0 && e.y < H * 0.6f && random(1000) < chance)
@@ -941,7 +941,7 @@ void gameStep() {
   }
   for (auto &b : gBomb) {  // tirs ennemis
     if (!b.on) continue;
-    b.y += 1.3f + 0.1f * gWave + (gEffDiff() - 1) * 0.3f;  // tirs plus lents en facile, plus rapides en difficile
+    b.y += 1.1f + 0.05f * min(gWave, 12) + (gEffDiff() - 1) * 0.3f;  // tirs plus lents en facile, plus rapides en difficile
     b.x += b.vx;
     if (b.y >= H || b.x < 0 || b.x >= W) { b.on = false; continue; }
     if (gDead == 0 && gInv == 0 && b.x >= gPx && b.x <= gPx + 8 && b.y + 2 >= gPY + 2 && b.y <= gPY + 7) { b.on = false; gHitPlayer(); }
@@ -954,7 +954,7 @@ void gameStep() {
   for (int i = 0; i < gNE; i++) any |= gEn[i].alive;
   if (!any && gWave % 4 == 0 && !gBossDone) {  // formation detruite au stage 4, 8, 12... : le boss arrive
     gBossOn = gBossDone = true;
-    gBHpMax = gBHp = (24 + 8 * (gWave / 4)) * (gEffDiff() == 0 ? 7 : gEffDiff() == 2 ? 13 : 10) / 10;
+    gBHpMax = gBHp = (20 + 6 * (gWave / 4)) * (gEffDiff() == 0 ? 7 : gEffDiff() == 2 ? 13 : 10) / 10;
     gBX = W / 2 - 8; gBY = -10; gBT = 0; gBFlash = 0;
     sndMelody(JINGLE_ARME, 4);
     any = true;
@@ -1345,7 +1345,7 @@ uint8_t rAuto() {
         float d = fabsf(e.x - rX) + (H - e.y) * 0.2f;
         if (d < best) { best = d; tx = e.x; }
       }
-    if (rBoss) tx = rBX + 12;
+    if (rBoss) tx = rBX + 13;
     if (rCap.on) tx = rCap.x;
     hold = 20;
   }
@@ -1476,24 +1476,23 @@ void rStep() {
       sndMelody(JINGLE_ARME, 4);
     }
   }
-  // boss : 3 formes selon le stage ; 2e phase sous la moitie de sa vie (plus vite, tirs en spirale)
+  // boss : le meme vaisseau-mere que le 1er jeu (en double taille) ; il se balance, tire en eventail (3 tirs, 5 en 2e phase,
+  // sous la moitie de sa vie) ; detruit, il eclate en 5 petits vaisseaux qui plongent sur toi
   if (rBoss) {
     rBT++;
     if (rBFlash > 0) rBFlash--;
     bool phase2 = rBHp < rBMax / 2;
-    float swing = phase2 ? 0.035f : 0.02f;
     if (rBY < 16) rBY += 0.5f;
-    else rBX = W / 2 - 16 + sinf(rBT * swing) * (W / 2 - 20);
-    if (rBY >= 16) {
-      if (rBT % max(18, int((phase2 ? 32 : 45) / diff)) == 0) rSpread(rBX + 16, rBY + 14, phase2 ? 7 : 5, 1.2f * diff);
-      if (rBT % 33 == 0) rAimed(rBX + 16, rBY + 14, 1.6f * diff);
-      if (phase2 && rBT % 6 == 0) {
-        float a = rBT * 0.31f;
-        rBombAt(rBX + 16, rBY + 8, cosf(a) * 1.1f * diff, fabsf(sinf(a)) * 1.1f * diff + 0.3f);
+    else rBX = W / 2 - 17 + sinf(rBT * 0.02f) * (W / 2 - 20);
+    if (rBY >= 16 && gDead == 0) {
+      int every = max(30, (phase2 ? 40 : 60) - 3 * (gWave / 2) - 10 * (gEffDiff() - 1));
+      if (rBT % every == 0) {
+        int n = phase2 ? 5 : 3;
+        for (int k = 0; k < n; k++) rBombAt(rBX + 17, rBY + 17, (k - (n - 1) / 2.0f) * 0.45f, 1.3f * diff);
       }
     }
     for (auto &s : rShot)
-      if (s.on && s.x >= rBX && s.x <= rBX + 31 && s.y >= rBY && s.y <= rBY + 14) {
+      if (s.on && s.x >= rBX && s.x <= rBX + 33 && s.y >= rBY && s.y <= rBY + 17) {
         s.on = false;
         rBHp--;
         rBFlash = 2;
@@ -1502,14 +1501,22 @@ void rStep() {
       }
     if (rBHp <= 0) {  // boss detruit : stage gagne
       rBoss = false;
-      for (int i = 0; i < 8; i++) gBoomAt(rBX + random(32), rBY + random(15));
+      for (int i = 0; i < 8; i++) gBoomAt(rBX + random(34), rBY + random(18));
+      int k = 0;
+      for (auto &e : rEn)  // il eclate en 5 petits vaisseaux qui plongent (kamikazes)
+        if (!e.on && k < 5) {
+          e = {};
+          e.on = true; e.pat = 3; e.type = 0; e.hp = 1; e.t = -k * 4;
+          e.x = rBX + 13 + (k - 2) * 6; e.y = rBY + 8;
+          k++;
+        }
       sfxHit();
       gScore += 2000UL * gWave;
       altStageClear(1000UL * gWave);
       for (auto &b : rBomb) b.on = false;
       rNewStage();
     }
-    if (rBoss && gDead == 0 && rInv == 0 && rBX + 31 >= rX && rBX <= rX + 8 && rBY + 14 >= rY && rBY <= rY + 7) rHit();
+    if (rBoss && gDead == 0 && rInv == 0 && rBX + 33 >= rX && rBX <= rX + 8 && rBY + 17 >= rY && rBY <= rY + 7) rHit();
   }
   for (auto &b : rBomb) {
     if (!b.on) continue;
@@ -1522,39 +1529,19 @@ void rStep() {
   }
   if (gStageT > 0) gStageT--;
 }
-void rDrawBoss(uint16_t *palFull) {  // 3 boss : coque a canons, crabe a pinces, noyau a bras qui tournent
-  static const uint8_t BC[4][3] = { { 200, 40, 160 }, { 220, 90, 20 }, { 110, 60, 230 }, { 30, 170, 90 } };
-  const uint8_t *c = BC[(gWave - 1) % 4];
-  uint16_t body = rBFlash ? palFull[0] : rgb(c[0], c[1], c[2]), dark = rgb(c[0] / 3, c[1] / 3, c[2] / 3);
-  int x = rBX, y = rBY, kind = (gWave - 1) % 3;
-  if (kind == 0) {
-    gfx->fillRect(x + 4, y + 2, 24, 8, body);
-    gfx->fillRect(x, y + 5, 32, 4, body);
-    gfx->fillRect(x + 8, y, 16, 3, dark);
-    gfx->fillRect(x + 2, y + 9, 4, 5, dark);
-    gfx->fillRect(x + 26, y + 9, 4, 5, dark);
-    gfx->fillRect(x + 14, y + 10, 4, 5, dark);
-  } else if (kind == 1) {
-    gfx->fillRect(x + 8, y + 3, 16, 9, body);  // carapace
-    gfx->fillRect(x + 2, y + 1, 5, 4, body);   // pinces qui s'ouvrent
-    gfx->fillRect(x + 25, y + 1, 5, 4, body);
-    int o = (gFrame / 8) & 1;
-    gfx->fillRect(x + 1, y + 5 + o, 3, 3, dark);
-    gfx->fillRect(x + 28, y + 5 + o, 3, 3, dark);
-    for (int l = 0; l < 3; l++) { gfx->drawFastVLine(x + 10 + l * 6, y + 12, 3, dark); }
-  } else {
-    gfx->fillCircle(x + 16, y + 7, 7, body);  // noyau
-    gfx->fillCircle(x + 16, y + 7, 3, dark);
-    for (int a = 0; a < 4; a++) {  // bras qui tournent
-      float ang = rBT * 0.05f + a * PI / 2;
-      gfx->drawLine(x + 16, y + 7, x + 16 + cosf(ang) * 15, y + 7 + sinf(ang) * 7, body);
+void rDrawBoss(uint16_t *palFull) {  // le vaisseau-mere du 1er jeu, en double taille : blanc quand il est touche, coque rouge en 2e phase
+  bool p2 = rBHp < rBMax / 2;
+  char from = rBFlash ? 'p' : p2 ? 'b' : 0, to = rBFlash ? 'w' : p2 ? 'r' : 0;
+  int x = rBX, y = rBY;
+  for (int r = 0; r < 9; r++)
+    for (int c = 0; c < 17; c++) {
+      char ch = SPR_BOSS[r][c];
+      if (ch == '.') continue;
+      if (ch == from) ch = to;
+      int i = gPalIdx(ch);
+      if (i >= 0) gfx->fillRect(x + c * 2, y + r * 2, 2, 2, palFull[i]);
     }
-  }
-  if (kind != 2) {
-    gfx->fillRect(x + 9, y + 4, 4, 3, palFull[2]);  // yeux
-    gfx->fillRect(x + 19, y + 4, 4, 3, palFull[2]);
-  }
-  gMark(x - 1, y - 1, 34, 17);
+  gMark(x - 1, y - 1, 36, 20);
   int bw = W - 20, fill = bw * max(0, rBHp) / rBMax;  // barre de vie
   gfx->drawRect(10, 12, bw, 3, rgb(90, 90, 110));
   gfx->fillRect(10, 13, fill, 1, rBHp < rBMax / 2 ? palFull[7] : palFull[1]);
@@ -2825,7 +2812,7 @@ void kHitBrick(int r, int c) {
   gScore += b == 7 ? 50 : 10 * (kRows - r) + 10;
   int x = kOX + c * 10, y = kOY + r * 4;
   gBoomAt(x + 4, y + 1);
-  gMark(x, y, 9, 3);  // la brique disparait (effacee a la prochaine image)
+  gMark(x, y, 10, 4);  // la brique et son ombre disparaissent (effacees a la prochaine image)
   if (random(100) < 12)
     for (auto &cp : kCap)
       if (!cp.on) { int r = random(100); cp.on = true; cp.x = x + 2; cp.y = y; cp.type = r < 8 ? 3 : r < 30 ? 4 : random(3); break; }  // 4 : tir
@@ -2942,17 +2929,42 @@ void kDraw() {
   eraseOld();
   uint16_t palFull[9];
   altBackground(0.04f, palFull);
-  for (int r = 0; r < kRows; r++)  // briques : couleur + reflet clair en haut + ombre en bas a droite
+  const uint16_t kShadow = rgb(6, 6, 12);
+  for (int r = 0; r < kRows; r++)  // briques en relief : arete claire, reflet, bords dans l'ombre, ombre portee ; eclat sur l'argent et l'or
     for (int c = 0; c < kCols; c++) {
       uint8_t b = kBrick[r][c];
       if (!b) continue;
       int x = kOX + c * 10, y = kOY + r * 4;
       const uint8_t *cc = K_COL[b];
       bool dmg = b == 7 && kHp[r][c] < (gWave >= 6 ? 3 : 2);
-      uint16_t base = rgb(cc[0] * (dmg ? 3 : 4) / 5, cc[1] * (dmg ? 3 : 4) / 5, cc[2] * (dmg ? 3 : 4) / 5);
-      gfx->fillRect(x, y, 9, 3, base);
-      gfx->drawFastHLine(x, y, 9, (b >= 7 && ((gFrame / 4 + c) % 24) == 0) ? palFull[0] : rgb(min(255, cc[0] + 60), min(255, cc[1] + 60), min(255, cc[2] + 60)));
-      gfx->drawFastHLine(x + 1, y + 2, 8, rgb(cc[0] / 3, cc[1] / 3, cc[2] / 3));
+      int lv = dmg ? 7 : 9;  // une brique d'argent abimee est plus terne
+      auto tone = [&](int k, int add) {  // k : dixiemes de la couleur, add : eclaircissement
+        return rgb(min(255, cc[0] * k * lv / 90 + add), min(255, cc[1] * k * lv / 90 + add), min(255, cc[2] * k * lv / 90 + add));
+      };
+      uint16_t hi = tone(12, 50), base = tone(8, 0), side = tone(5, 0), low = tone(3, 0);
+      gfx->drawFastHLine(x + 1, y + 3, 9, kShadow);  // ombre portee, dans l'espace entre les briques
+      gfx->drawFastVLine(x + 9, y + 1, 2, kShadow);
+      gfx->drawFastHLine(x, y, 8, hi);  // arete du haut
+      gfx->drawPixel(x + 8, y, base);
+      gfx->drawPixel(x, y + 1, tone(10, 25));  // bord gauche eclaire
+      gfx->drawFastHLine(x + 1, y + 1, 7, base);
+      gfx->drawPixel(x + 8, y + 1, side);  // bord droit dans l'ombre
+      gfx->drawPixel(x, y + 2, side);
+      gfx->drawFastHLine(x + 1, y + 2, 8, low);  // dessous dans l'ombre
+      gfx->drawPixel(x + 2, y + 1, tone(6, 150));  // reflet brillant
+      gfx->drawPixel(x + 3, y + 1, tone(8, 70));
+      if (b >= 7) {  // argent et or : un eclat passe en diagonale
+        int s = (gFrame / 2 + r * 3 + c * 5) % 48;
+        for (int k = 0; k < 3; k++) {
+          int px = x + s - k;
+          if (px >= x && px < x + 9) gfx->drawPixel(px, y + k, k == 1 ? rgb(255, 255, 255) : tone(8, 120));
+        }
+      }
+      if (dmg) {  // fissure
+        gfx->drawPixel(x + 5, y, low);
+        gfx->drawPixel(x + 4, y + 1, kShadow);
+        gfx->drawPixel(x + 5, y + 2, kShadow);
+      }
     }
   int py = kPY();
   // raquette : 3 rangees en degrade (reflet en haut), embouts rouges arrondis, centre cyan lumineux ; canons jaunes avec la capsule de tir
@@ -4167,7 +4179,7 @@ float aBX, aBY;
 int aBHp, aBMax, aBT = 0, aBFlash = 0;
 // sprites : B/b bleu, W blanc, y/o helice et feu, c vitrage, k sombre, G/g couleur de l'ennemi (vert, argent, jaune),
 // S/s gris des navires, n/N pont du porte-avions, w sillage
-const char *const SPR_A_ME[2][9] = {  // ton chasseur bleu (helice qui tourne)
+const char *const SPR_A_ME[2][9] = {  // ton chasseur vert fonce (helice qui tourne)
   { "....yyy....", ".....B.....", "....BcB....", "BBBBBBBBBBB", "BWBBBbBBBWB", ".bbBBBBBbb.", ".....B.....", "...BBBBB...", "....bBb...." },
   { "...y...y...", ".....B.....", "....BcB....", "BBBBBBBBBBB", "BWBBBbBBBWB", ".bbBBBBBbb.", ".....B.....", "...BBBBB...", "....bBb...." } };
 const char *const SPR_A_ROLL[9] = { "....yyy....", ".....B.....", "....BcB....", "..BBBBBBB..", "..bWBbBWb..", "...bBBBb...", ".....B.....", "...BBBBB...", "....bBb...." };
@@ -4186,10 +4198,11 @@ const char *const SPR_A_BOSS[15] = {  // grand quadrimoteur
 const uint8_t A_W[5] = { 9, 17, 7, 9, 15 }, A_H[5] = { 7, 11, 18, 28, 40 };
 
 uint16_t aCol(char ch, uint8_t var) {
-  static const uint8_t G[3][2][3] = { { { 90, 170, 40 }, { 40, 100, 20 } }, { { 190, 190, 205 }, { 105, 105, 120 } }, { { 245, 200, 40 }, { 190, 120, 20 } } };
+  static const uint8_t G[3][2][3] = { { { 205, 75, 50 }, { 125, 35, 25 } },  // ennemis rouge brique (ton avion est vert)
+                                       { { 190, 190, 205 }, { 105, 105, 120 } }, { { 245, 200, 40 }, { 190, 120, 20 } } };
   switch (ch) {
-    case 'B': return var == 3 ? rgb(30, 70, 190) : rgb(100, 170, 255);  // var 3 : dessous de l'avion (tonneau)
-    case 'b': return rgb(30, 70, 190);
+    case 'B': return var == 3 ? rgb(16, 62, 24) : rgb(34, 118, 46);  // ton avion vert fonce ; var 3 : dessous (tonneau)
+    case 'b': return rgb(16, 62, 24);
     case 'W': return rgb(255, 255, 255);
     case 'y': return rgb(255, 220, 0);
     case 'o': return rgb(255, 140, 0);
@@ -4615,14 +4628,6 @@ void aIsland(int i) {
   for (int l = 0; l < 6; l++)
     for (int k = 0; k < nb; k++)
       if (br[k] + OFF[l] > 0) aDisc(x0 + bx[k], y0 + by[k], br[k] + OFF[l], COL[l]);
-  for (int k = 0; k < nb; k++) {  // ressac : ecume en pointilles qui bougent autour de la plage
-    int rr = br[k] + 1, n = rr * 6;
-    for (int s = 0; s < n; s++)
-      if ((s + (gFrame >> 2)) % 4 == 0) {
-        float a = s * 6.2832f / n;
-        aP(x0 + bx[k] + lroundf(cosf(a) * rr), y0 + by[k] + lroundf(sinf(a) * rr), rgb(235, 245, 255));
-      }
-  }
   int np = 1 + rn(3);
   for (int p = 0; p < np; p++) {  // palmiers
     int px = x0 + rn(r) - r / 2, py = y0 + rn(r) - r / 2;

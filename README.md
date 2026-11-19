@@ -18,7 +18,7 @@ Depuis la V3.84, le Game-hub utilise **Bluepad32** : jusqu'à **4 manettes Bluet
 - **Menu « JOUEURS 1 / 2 »** (2e ligne, une étoile par manette connectée) : seuls les jeux à deux joueurs utilisent la 2e manette.
   - **RAQUETTES** : match à deux (raquette de droite pour le joueur 2), **le premier à 7 points gagne**.
   - **SPACE DEFENDER** : coopération, un 2e vaisseau **vert** pour le joueur 2, vies et score communs ; les ennemis piquent sur l'un ou l'autre ; la manette du joueur touché vibre.
-- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V3.92_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
+- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V3.93_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
 - **Mémoire** : environ 81 Ko libres avec 2 dalles en 3 bits et deux manettes connectées.
 
 # SPACE DEFENDER
@@ -49,6 +49,7 @@ Le jeu principal : un shoot'em up original, repris du mode Jeu du VU-mètre. Une
   | 4, 8, 12… | Orbes | la formation **descend et remonte**, et leurs tirs **visent ton vaisseau** |
 - **Les méduses de la rangée du haut**, les plus rares, demandent 2 tirs. Détruites, elles **éclatent en 4 petits vaisseaux** qui plongent aussitôt vers toi, et qui replongent du haut de l'écran tant qu'ils ne sont pas abattus.
 - **Formation :** 10 ennemis par rangée sur une dalle de 128 de large. Il reste de la place sur les côtés, alors l'essaim se balance bien de droite à gauche.
+- **Difficulté adoucie (V3.93) :** piqués moins fréquents, tirs ennemis moins nombreux et moins rapides ; la difficulté monte doucement et plafonne au stage 12. Boss un peu moins résistant, salves plus espacées.
 - **Boss tous les 4 stages (4, 8, 12…) :** une fois la formation détruite, un grand vaisseau-mère arrive en haut de l'écran. Il va et vient et tire en éventail, et sa barre de vie s'affiche sous le score.
   - **2e phase :** sous la moitié de sa vie, il devient rouge et tire plus souvent, en éventail de 5.
   - **Quand tu le casses :** gros bonus (2000 × numéro du boss), puis il **éclate en 5 petits vaisseaux qui plongent aussitôt vers toi**. Il faut les détruire pour passer au stage suivant.
@@ -90,7 +91,7 @@ Un shoot vertical : tu te déplaces partout dans le bas de l'écran, et les vagu
   - **bouclier cyan** : donne un bouclier, qui encaisse un tir.
   - **bombe rouge** : ajoute une bombe. Les bombes restantes s'affichent en bas à gauche.
 - **Bombe (○) :** elle détruit les ennemis à l'écran, efface leurs tirs et blesse le boss.
-- **Boss :** après 8 vagues, un boss apparaît, avec sa barre de vie en haut. Il y a 3 boss différents, qui alternent selon le stage : une coque à canons, un crabe à pinces et un noyau à bras tournants.
+- **Boss (V3.93) :** après 8 vagues, **le même vaisseau-mère que dans le 1er jeu**, en double taille, avec sa barre de vie en haut. Il se balance et tire en éventail (3 tirs, puis 5 sous la moitié de sa vie, coque rouge) ; touché, il devient blanc. Détruit, il **éclate en 5 petits vaisseaux** qui plongent sur toi.
   - Sous la moitié de sa vie, le boss passe en **2ᵉ phase** : plus rapide, avec des tirs en spirale.
   - Le détruire termine le stage : gros bonus et une vie en plus.
 
@@ -154,6 +155,7 @@ Une balle et deux raquettes, **à l'horizontale** : la tienne à gauche, celle d
 ![CASSE BRIQUES](docs/jeu-casse-briques.gif)
 
 Un casse-briques original. Une raquette en bas renvoie la balle vers un mur de briques.
+- **Briques en relief (V3.93) :** arête claire en haut, bord gauche éclairé, bord droit et dessous dans l'ombre, reflet brillant et ombre portée ; un éclat passe sur les briques d'argent et d'or, une fissure apparaît sur l'argent abîmé.
 - **Vies :** de petites balles blanches en haut à droite.
 - **Commandes :** stick ou croix gauche / droite pour la raquette (au **stick**, elle va d'autant plus vite que tu le pousses loin), **✕ pour lancer la balle**.
 - **Briques :** de couleur (1 coup, plus elles sont hautes plus elles rapportent), **d'argent** (2 coups, 3 à partir du stage 6) et **d'or** (incassables, à partir du stage 4). Chaque brique a un reflet et une ombre.
@@ -198,9 +200,9 @@ Un jeu de tir de billes original, dans un puits.
 ![ESCADRILLE](docs/jeu-escadrille.gif)
 
 Un shoot vertical original au-dessus de la mer (V3.85, remplace ESCALADE ; nouveaux sprites et fond marin en V3.86, décor enrichi en V3.87).
-- **Décor :** la mer défile avec sa houle, ses crêtes, ses moutons d'écume et des reflets du soleil ; des îles de formes variées avec lagon en deux tons, ressac, plage, prairie, forêt, palmiers, maisons au toit rouge et rochers. Rien ne déborde sur la ligne du score.
+- **Décor :** la mer défile avec sa houle, ses crêtes, ses moutons d'écume et des reflets du soleil ; des îles de formes variées avec lagon en deux tons, plage, prairie, forêt, palmiers, maisons au toit rouge et rochers. Rien ne déborde sur la ligne du score.
 - **Commandes :** croix ou stick pour voler dans le bas de l'écran, **✕ (ou carré, R1, R2) pour tirer**, **○ pour un tonneau** : l'avion tourne sur lui-même, il est invincible pendant 1 s mais ne tire pas. 3 tonneaux par stage (les ronds cyan en bas à gauche).
-- **Ton avion :** un chasseur bleu clair à étoiles blanches, hélice qui tourne, avec un **contour sombre** et une **ombre sur la mer** pour bien le voir. Les avions ennemis ont aussi leur ombre.
+- **Ton avion :** un chasseur **vert foncé** à étoiles blanches (V3.93 ; les chasseurs ennemis sont rouge brique), hélice qui tourne, avec un **contour sombre** et une **ombre sur la mer** pour bien le voir. Les avions ennemis ont aussi leur ombre.
 - **Ennemis :** des chasseurs (verts, argent ou jaunes) en V, en vague sinueuse, par le côté ou en piqué ; des **bombardiers bimoteurs** qui tirent en éventail ; des **navires** qui avancent sur la mer (vague d'étrave, sillage d'écume, tourelles qui suivent ton avion) : vedette, destroyer à cheminées qui fument, et **porte-avions** (pont en bois, îlot, avions posés) qui fait décoller des chasseurs.
 - **Capsules :** **P** jaune = arme (2, 3, 4 puis 5 tirs en éventail), **T** bleue = un tonneau de plus, **+** rouge = une vie (laissée par le porte-avions). Une vie perdue fait baisser l'arme d'un niveau.
 - **Boss :** après 10 vagues, un **grand quadrimoteur vert** ; il tire peu (éventail de 3 balles et un tir visé de temps en temps) ; sous la moitié de sa vie, il bouge plus vite, tire en éventail de 5 et en spirale lente.
@@ -376,8 +378,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V3.92_complet.bin](firmware/GameHub_V3.92_complet.bin) | 0x0 | `c91f4aa8b951408e78c3cc97cc9c3116` |
-| [firmware/GameHub_V3.92.bin](firmware/GameHub_V3.92.bin) | 0x10000 | `1c89d6213cfc6bf791453c0d9fd7166a` |
+| [firmware/GameHub_V3.93_complet.bin](firmware/GameHub_V3.93_complet.bin) | 0x0 | `3c167f6391edc483098d31541bd36d35` |
+| [firmware/GameHub_V3.93.bin](firmware/GameHub_V3.93.bin) | 0x10000 | `5665e868b952c32adcb0ac1280461ddb` |
 | [firmware/GameHub_V3.86_complet.bin](firmware/GameHub_V3.86_complet.bin) | 0x0 | `dc451b01c498df647da822a1427a1a5e` |
 | [firmware/GameHub_V3.86.bin](firmware/GameHub_V3.86.bin) | 0x10000 | `ee1945d390b91eb82240245a1e52821f` |
 
