@@ -18,7 +18,7 @@ Depuis la V3.84, le Game-hub utilise **Bluepad32** : jusqu'à **4 manettes Bluet
 - **Menu « JOUEURS 1 / 2 »** (2e ligne, une étoile par manette connectée) : seuls les jeux à deux joueurs utilisent la 2e manette.
   - **RAQUETTES** : match à deux (raquette de droite pour le joueur 2), **le premier à 7 points gagne**.
   - **SPACE DEFENDER** : coopération, un 2e vaisseau **vert** pour le joueur 2, vies et score communs ; les ennemis piquent sur l'un ou l'autre ; la manette du joueur touché vibre.
-- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V3.89_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
+- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V3.90_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
 - **Mémoire** : environ 81 Ko libres avec 2 dalles en 3 bits et deux manettes connectées.
 
 # SPACE DEFENDER
@@ -246,7 +246,7 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. **La démo cha
 
 | Ligne | Action |
 |---|---|
-| **JOUER** | **gauche / droite : choix du jeu** (SPACE DEFENDER, RAID, RAQUETTES, BULLES, LABYRINTHE, ORBITUS, CASSE BRIQUES, BLOCS, CRUCH, TAUPE, BILLES, ESCADRILLE, BUNKER 3D). Au démarrage : SPACE DEFENDER. ✕ ou OPTIONS lance la partie. |
+| **JOUER** | **gauche / droite : choix du jeu** (13 jeux ; leurs noms se changent dans le tableau `GAME_NAME` en haut de `games/games.ino`). Au démarrage : le premier jeu de la liste. ✕ ou OPTIONS lance la partie. |
 | **NIVEAU** | Facile / Normal / Difficile (gauche / droite ou ✕), choix gardé en mémoire |
 | **LUMINOSITE** | 0 à 100 % par pas de 10 % (gauche / droite ou ✕), visible tout de suite et gardée en mémoire. À 0 %, les dalles restent très faiblement allumées pour qu'on voie encore le menu. |
 | **VOLUME** | volume du son, 0 à 100 % par pas de 10 % (gauche / droite ou ✕). Un bip fait entendre le niveau. 0 % = muet. C'est le rapport cyclique du PWM : le potentiomètre de l'ampli règle le maximum. |
@@ -297,7 +297,7 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. **La démo cha
 
 **Associer une manette, une seule fois.** Ensuite, le bouton **PS** suffit pour la reconnecter.
 
-1. **Mode association** : il est actif **60 s après chaque démarrage**. On peut aussi le relancer en maintenant **Share 3 s** sur une manette déjà connectée, ou avec la commande `m` du moniteur série. La dalle affiche « ASSOCIATION 45 / SHARE + PS » ; le son est coupé pendant ce temps (le Bluetooth a tout le processeur pour lui).
+1. **Mode association** : il est actif **60 s après chaque démarrage**. On peut aussi le relancer avec **le bouton « config wifi » du shield** (le même que l'horloge, GPIO 34, V3.90), en maintenant **Share 3 s** sur une manette déjà connectée, ou avec la commande `m` du moniteur série. La dalle affiche « ASSOCIATION 45 / SHARE + PS » dans un cadre ; le son est coupé et **la luminosité baisse à environ 10 %** pendant ce temps (moins de courant dans les dalles, le Bluetooth a tout pour lui). Ton réglage de luminosité revient dès la fin de l'association.
 2. Sur la manette : **PS4** : maintenir **Share puis PS** jusqu'au clignotement rapide de la barre lumineuse. **PS5** : **Create + PS**. **Xbox** : le bouton d'association sur le dessus.
 3. La dalle affiche « MANETTE 1 OK » (puis « MANETTE 2 OK » pour la suivante). La 1re manette connectée est le joueur 1 (barre bleue), la 2e le joueur 2 (rouge).
 
@@ -353,6 +353,7 @@ De la V2.01 à la V2.22, le son passait par un ampli I2S MAX98357A (GPIO 22, 21,
 | `c NDFS` | dalles. N : nombre (1 à 4). D : disposition (0 l'une sous l'autre, 1 côte à côte, 2 carré). F : écran retourné (0/1). S : serpentin (0/1) |
 | `p N` | couleurs des dalles sur N bits (3 à 6) |
 | `v N` | volume du son, de 0 à 10 |
+| `l N` | luminosité des dalles, de 0 à 100 % (gardée en mémoire, comme la ligne LUMINOSITE du menu) ; `l` seul affiche la valeur actuelle |
 | `e 0` / `e 1` / `e x` | test des pertes Bluetooth : LED éteintes / rallumées / transfert vers les dalles arrêté (jusqu'au redémarrage) |
 | `j N` | test : lance la démo du jeu N (0 SPACE DEFENDER ... 12 BUNKER 3D), sans manette |
 
@@ -373,8 +374,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V3.89_complet.bin](firmware/GameHub_V3.89_complet.bin) | 0x0 | `6e0b75315f4031fcb8073388646a4cac` |
-| [firmware/GameHub_V3.89.bin](firmware/GameHub_V3.89.bin) | 0x10000 | `ef331ea026aae3a88a7ba1af35db30d4` |
+| [firmware/GameHub_V3.90_complet.bin](firmware/GameHub_V3.90_complet.bin) | 0x0 | `f78e6154330a94ca034d31a0687b1a85` |
+| [firmware/GameHub_V3.90.bin](firmware/GameHub_V3.90.bin) | 0x10000 | `ab963d67f189d7b4a35034839e60e371` |
 
 Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB SPIFFS)** dans Outils → Partition Scheme.
 

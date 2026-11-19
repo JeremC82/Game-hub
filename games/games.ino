@@ -28,7 +28,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "3.89"
+#define GAMES_VERSION "3.90"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -132,7 +132,7 @@ enum GameId : uint8_t { G_SPACE, G_RAID, G_RAQ, G_BUL, G_LAB, G_ORB, G_BRI, G_BL
 // Au-dela de 10 caracteres, le menu affiche le nom seul (sans le mot JOUER devant).
 const char *const GAME_NAME[N_GAMES] = {
   "GALAGA",  // G_SPACE
-  "RAID",            // G_RAID
+  "SHOOTME",            // G_RAID
   "PONG",       // G_RAQ
   "BULLES",          // G_BUL
   "PAC MAN",      // G_LAB
@@ -142,7 +142,7 @@ const char *const GAME_NAME[N_GAMES] = {
   "CANDY CRUCH",           // G_CRU
   "DIG DUG",           // G_TAU
   "BILLES",          // G_BIL
-  "ESCADRILLE",      // G_ESQ
+  "1945",      // G_ESQ
   "BUNKER 3D",       // G_BUN
 };
 uint8_t gGame = 0;                  // jeu choisi dans le menu (gauche / droite sur la ligne JOUER)
@@ -5954,8 +5954,10 @@ uint32_t restartAt = 0;
 uint32_t brightSaveAt = 0;  // luminosite changee : enregistree 2 s plus tard
 
 uint32_t pairUntil = 0;  // mode association en cours jusqu'a (millis), 0 : non
+#define PAIR_BRIGHT 25  // luminosite pendant l'association (~10 %) : moins de courant dans les dalles, Bluetooth plus stable
 void pairStart(uint32_t ms) {
   pairUntil = millis() + ms;
+  if (dma) dma->setBrightness8(min<uint8_t>(bright, PAIR_BRIGHT));  // ton reglage (bright) n'est pas modifie
   if (sndTimer) timerAlarmDisable(sndTimer);  // son coupe : tout le coeur 0 pour le Bluetooth pendant l'association
   ledcWrite(SND_LEDC, 128);
   BP32.enableNewBluetoothConnections(true);
@@ -5964,15 +5966,34 @@ void pairStart(uint32_t ms) {
 void pairStop(const char *why) {
   if (!pairUntil) return;
   pairUntil = 0;
+  if (dma) dma->setBrightness8(bright);  // luminosite normale de retour
   if (sndTimer) timerAlarmEnable(sndTimer);
   Serial.printf("Fin du mode association : %s\n", why);
 }
-void pairOverlay() {  // sur la dalle : ASSOCIATION 45 / SHARE + PS
+void pairOverlay() {  // sur la dalle, dans un cadre : ASSOCIATION 45 / SHARE + PS
   if (!pairUntil) return;
   char b[20];
   snprintf(b, sizeof(b), "ASSOCIATION %lu", (unsigned long)((pairUntil - millis()) / 1000 + 1));
+  gBox(H / 2 - 14, H / 2 + 12);
   gText(H / 2 - 9, b, rgb(255, 220, 0));
   gText(H / 2 + 1, "SHARE + PS", rgb(0, 220, 255));
+}
+// bouton "config wifi" du shield (le meme que l'horloge, GPIO 34, actif a l'etat haut, resistance de tirage sur le shield) :
+// un appui ouvre le mode association 60 s (nouvel appui : 60 s de nouveau)
+#define CFG_BTN_PIN 34
+void cfgButton() {
+  static uint32_t downAt = 0;
+  static bool done = true;  // ignore le bouton tant qu'il n'a pas ete lu relache une fois (bouton tenu au demarrage)
+  uint32_t now = millis();
+  if (digitalRead(CFG_BTN_PIN) == LOW) { downAt = 0; done = false; return; }
+  if (!downAt) downAt = now;
+  if (!done && now - downAt > 60) {  // 60 ms d'appui : anti-rebond
+    done = true;
+    lastInput = now;
+    sfxMenu();
+    pairStart(60000);
+    Serial.println("Bouton du shield : mode association");
+  }
 }
 // Bluepad32 : association simple, PS + Share sur la manette (la barre lumineuse clignote vite), plus d'adresse a recopier
 void ps4Begin() {
@@ -6170,12 +6191,14 @@ void serialMenu() {
   Serial.printf("Dalles : %u, disposition %u, retourne %u, serpentin %u -> ecran %dx%d, couleurs %u bits\n", nPanels, arrange, flipAll,
                 serpent, W, H, colorBits);
   Serial.println("  a : oublier les manettes associees (pour en associer d'autres : PS + Share)");
-  Serial.println("  m : mode association 60 s (son coupe ; aussi : Share maintenu 3 s, et 60 s au demarrage)");
+  Serial.println("  m : mode association 60 s (son coupe ; aussi : bouton du shield, Share maintenu 3 s, et 60 s au demarrage)");
   Serial.println("  c NDFS : dalles. N nombre 1-4, D 0 l'une sous l'autre / 1 cote a cote / 2 carre,");
   Serial.println("           F ecran retourne 0/1, S une dalle sur deux retournee 0/1. Ex. : c 2000");
   Serial.println("  p N : couleurs des dalles sur N bits (3 a 6, redemarre). 3 = le plus sur pour le Bluetooth,");
   Serial.println("        4 = plus de nuances. 2 plantages de suite : retour automatique a 3.");
   Serial.printf("  v N : volume du son, 0 (muet) a 10. Actuel : %u\n", volume);
+  Serial.printf("  l N : luminosite des dalles, 0 a 100 %%. Actuelle : %d %%\n", (bright * 100 + 127) / 255);
+  Serial.printf("  j N : test, demo du jeu N (0 a %d)\n", N_GAMES - 1);
   Serial.println("  e 0 / e 1 : test, LED eteintes / rallumees ; e x : transfert vers les dalles arrete (jusqu'au redemarrage)");
   Serial.println("  ? : ce menu");
 }
@@ -6200,6 +6223,12 @@ void handleSerial() {
       Serial.println("Manettes associees oubliees : PS + Share sur chaque manette pour l'associer de nouveau");
     } else if (cmd == 'm') {
       pairStart(60000);
+    } else if (cmd == 'l') {  // luminosite des dalles en %, gardee en memoire (comme la ligne LUMINOSITE du menu)
+      int p = atoi(arg);
+      if (*arg && p >= 0 && p <= 100) {
+        setBrightPct(p);
+        Serial.printf("Luminosite %d %% (valeur %u/255), enregistree\n", p, bright);
+      } else Serial.printf("Format : l 0 a l 100 (en %%). Actuelle : %d %% (valeur %u/255)\n", (bright * 100 + 127) / 255, bright);
     } else if (cmd == 'j') {  // test : demo du jeu N (0 a N_GAMES - 1)
       int g = atoi(arg);
       if (*arg && g >= 0 && g < N_GAMES) {
@@ -6316,6 +6345,7 @@ void setup() {
   gDiff = prefs.getUChar("diff", 1) % 3;
   gPlayers = constrain(prefs.getUChar("players", 1), 1, 2);
   gGame = 0;  // demarrage toujours sur ESSAIM (choix d'un autre jeu : gauche / droite dans le menu)
+  pinMode(CFG_BTN_PIN, INPUT);  // bouton du shield (GPIO 34 : entree seule, tirage par la resistance du shield)
   ps4Begin();
   audioBegin();
   pairStart(60000);  // 60 s pour associer une manette, son coupe (le Bluetooth a tout son temps)
@@ -6330,6 +6360,7 @@ void setup() {
 void loop() {
   if (restartAt && millis() > restartAt) ESP.restart();
   ps4Poll();
+  cfgButton();
   sndUpdate();
   handleSerial();
   if (brightSaveAt && millis() > brightSaveAt) { brightSaveAt = 0; prefs.putUChar("bright", bright); }
