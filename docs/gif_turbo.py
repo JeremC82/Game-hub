@@ -22,7 +22,7 @@ def arr(name):
     return re.findall(r'"([^"]*)"', body)
 
 
-CAR, TRUCK, CONE, OIL, COIN, CAN = (arr(n) for n in ('V_SPR_CAR[11]', 'V_SPR_TRUCK[17]', 'V_SPR_CONE[5]', 'V_SPR_OIL[5]', 'V_SPR_COIN[5]', 'V_SPR_CAN[6]'))
+CAR, TRUCK, CONE, OIL, COIN, CAN, ME = (arr(n) for n in ('V_SPR_CAR[11]', 'V_SPR_TRUCK[17]', 'V_SPR_CONE[5]', 'V_SPR_OIL[5]', 'V_SPR_COIN[5]', 'V_SPR_CAN[6]', 'V_SPR_ME[11]'))
 SPR = [CAR, TRUCK, CONE, OIL, COIN, CAN]
 V_W, V_H = (7, 7, 5, 7, 5, 5), (11, 17, 5, 5, 5, 6)
 V_COL = [(40, 110, 255), (255, 210, 0), (40, 200, 80), (230, 230, 235), (170, 70, 230), (255, 130, 0), (0, 200, 220), (150, 150, 160)]
@@ -50,7 +50,7 @@ def spr(px, rows, x, y, body, dark, W, H, S=1):
             if ch == '.' or not (0 <= X < W and V_TOP <= Y < H):
                 continue
             col = {'B': body, 'b': dark, 'k': (18, 18, 22), 'W': (150, 200, 240), 'L': (255, 240, 170), 'R': (255, 30, 20),
-                   'S': (190, 195, 205), 'o': (255, 120, 0), 'y': (255, 215, 0)}.get(ch)
+                   'S': (190, 195, 205), 's': (130, 135, 145), 'o': (255, 120, 0), 'y': (255, 215, 0)}.get(ch)
             if ch == 'h':
                 col = tuple((v + 255) // 2 for v in body)
             if col is None:
@@ -61,7 +61,7 @@ def spr(px, rows, x, y, body, dark, W, H, S=1):
                         px[X + a, Y + b] = col
 
 
-def render(sc, scroll, player_x, cars, decos, frame, nitro=0, nitro_t=0, score=0, lives=3, prog=0.4, cop=None, msg=None):
+def render(sc, scroll, player_x, cars, decos, frame, nitro=0, nitro_t=0, score=0, lives=3, prog=0.4, cop=None, msg=None, km=1.8, sec=45, spd=2.6):
     W, H, S = sc.W, sc.H, sc.s
     im = Image.new('RGB', (W, H))
     px = im.load()
@@ -70,6 +70,17 @@ def render(sc, scroll, player_x, cars, decos, frame, nitro=0, nitro_t=0, score=0
     for y in range(V_TOP, H):
         for x in range(W):
             px[x, y] = road if rl - 3 <= x < rr + 3 else grass
+    rut = tuple(v * 4 // 5 for v in road)
+    for l in range(sc.lanes):
+        for sg in (-1, 1):
+            cx = sc.rl + l * sc.lw + sc.lw // 2 + sg * (sc.lw // 4)
+            for y in range(V_TOP, H):
+                for a in range(S):
+                    px[cx + a, y] = rut
+    for y in range(V_TOP, H):
+        for a in range(S):
+            px[rl + a, y] = (200, 200, 200)
+            px[rr - S + a, y] = (200, 200, 200)
     off = int(scroll)
     cp = 8 * S
     for y0 in range(V_TOP - cp + off % cp, H, cp):
@@ -107,6 +118,13 @@ def render(sc, scroll, player_x, cars, decos, frame, nitro=0, nitro_t=0, score=0
                 for k in range(1, 7):
                     p(x + 2, y + k, (110, 110, 120))
                 p(x + 1, y, (255, 240, 160)); p(x + 2, y, (255, 255, 220)); p(x + 3, y, (255, 240, 160)); p(x + 2, y - 1, (160, 140, 60))
+            elif sc.th == 0:
+                TW = (1, 2, 3, 3, 2, 1)
+                for r in range(6):
+                    for c in range(-TW[r], TW[r] + 1):
+                        col = (80, 190, 70) if (c < 0 and r < 3) else (20, 90, 30) if (c > 0 and r > 1) else (40, 140, 45)
+                        p(x + 3 + c, y + r, col)
+                p(x + 3, y + 6, (110, 70, 30)); p(x + 3, y + 7, (110, 70, 30)); p(x + 4, y + 7, (20, 70, 25))
             else:
                 f, f2 = ((30, 90, 60), (240, 245, 255)) if sc.th == 2 else ((30, 120, 40), (60, 170, 60))
                 for r in range(5):
@@ -125,6 +143,11 @@ def render(sc, scroll, player_x, cars, decos, frame, nitro=0, nitro_t=0, score=0
             body = (70, 40, 110)
         if t == 5:
             body, dark = (40, 110, 255), (20, 55, 150)
+        if t <= 1 and sc.th != 3:  # ombre
+            for yy in range(y + 2 * S, y + 2 * S + V_H[t] * S):
+                for xx in range(x + S, x + S + 7 * S):
+                    if V_TOP <= yy < H and 0 <= xx < W:
+                        px[xx, yy] = tuple(v // 2 for v in road)
         spr(px, SPR[t], x, y, body, dark, W, H, S)
         if blink and frame & 4:
             for yy in (y + S, y + (V_H[t] - 2) * S):
@@ -150,7 +173,11 @@ def render(sc, scroll, player_x, cars, decos, frame, nitro=0, nitro_t=0, score=0
             for c in range(-r // 3, 7 * S + r // 3):
                 if (c + r) & 1 and py - r >= V_TOP and 0 <= x + c < W:
                     px[x + c, py - r] = (90, 85, 40)
-    spr(px, CAR, x, py, (230, 30, 30), (120, 10, 10), W, H, S)
+    if sc.th != 3:
+        for yy in range(py + 2 * S, min(H, py + 13 * S)):
+            for xx in range(x + S, x + 8 * S):
+                px[xx, yy] = tuple(v // 2 for v in road)
+    spr(px, ME, x, py, (230, 30, 30), (120, 10, 10), W, H, S)
     if nitro_t:
         for k in range((2 + (frame & 3)) * S):
             if py + 11 * S + k < H:
@@ -164,6 +191,14 @@ def render(sc, scroll, player_x, cars, decos, frame, nitro=0, nitro_t=0, score=0
         d.line((0, V_TOP - 2, int(W * prog) - 1, V_TOP - 2), fill=(0, 200, 255))
     for i in range(nitro):
         d.rectangle((1 + i * 4, H - 4, 3 + i * 4, H - 2), fill=(40, 110, 255))
+    b = '%d.%dKM' % (int(km), int(km * 10) % 10)
+    d.rectangle((0, V_TOP, len(b) * 4 + 1, V_TOP + 6), fill=(0, 0, 0)); GB.tiny(d, 1, V_TOP + 1, b, (0, 220, 255))
+    b = 'T%d' % sec
+    tw = len(b) * 4 - 1
+    d.rectangle((W - tw - 3, V_TOP, W - 1, V_TOP + 6), fill=(0, 0, 0)); GB.tiny(d, W - tw - 1, V_TOP + 1, b, (255, 40, 40) if sec <= 10 else (255, 220, 0))
+    b = '%dKMH' % int(spd * 60)
+    tw = len(b) * 4 - 1
+    d.rectangle((W - tw - 3, H - 7, W - 1, H - 1), fill=(0, 0, 0)); GB.tiny(d, W - tw - 1, H - 6, b, (230, 230, 230))
     s = str(score)
     lw, nw = len('SCORE') * 4 - 1, len(s) * 4 - 1
     x0 = (W - (lw + 4 + nw)) // 2

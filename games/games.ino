@@ -28,7 +28,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "3.99"
+#define GAMES_VERSION "4.02"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -186,6 +186,7 @@ struct PadShim {
   int R2Value() const { ControllerPtr p = c(); return p ? p->throttle() / 4 : 0; }
   int L2Value() const { ControllerPtr p = c(); return p ? p->brake() / 4 : 0; }
   int RStickX() const { ControllerPtr p = c(); return p ? constrain(p->axisRX() / 4, -128, 127) : 0; }
+  int RStickY() const { ControllerPtr p = c(); return p ? constrain(-p->axisRY() / 4, -128, 127) : 0; }  // vers le haut : positif
   bool Share() const { return misc() & MISC_BUTTON_SELECT; }
   bool Options() const { return misc() & MISC_BUTTON_START; }
   int LStickX() const { ControllerPtr p = c(); return p ? constrain(p->axisX() / 4, -128, 127) : 0; }
@@ -243,7 +244,7 @@ const uint8_t TF_R[5] = { 6, 5, 6, 5, 5 }, TF_E[5] = { 7, 4, 6, 4, 7 }, TF_S[5] 
               TF_G[5] = { 7, 4, 5, 5, 7 }, TF_PCT[5] = { 5, 1, 2, 4, 5 }, TF_L[5] = { 4, 4, 4, 4, 7 }, TF_I[5] = { 7, 2, 2, 2, 7 }, TF_V[5] = { 5, 5, 5, 5, 2 },
               TF_Q[5] = { 7, 5, 5, 6, 3 }, TF_H[5] = { 5, 5, 7, 5, 5 }, TF_K[5] = { 5, 5, 6, 5, 5 }, TF_Y[5] = { 5, 5, 2, 2, 2 },
               TF_W[5] = { 5, 5, 7, 7, 5 }, TF_J[5] = { 1, 1, 1, 5, 7 }, TF_Z[5] = { 7, 1, 2, 4, 7 }, TF_EXC[5] = { 2, 2, 2, 0, 2 },
-              TF_PLUS[5] = { 0, 2, 7, 2, 0 }, TF_PO[5] = { 1, 2, 2, 2, 1 }, TF_PF[5] = { 4, 2, 2, 2, 4 };
+              TF_PLUS[5] = { 0, 2, 7, 2, 0 }, TF_PO[5] = { 1, 2, 2, 2, 1 }, TF_PF[5] = { 4, 2, 2, 2, 4 }, TF_DOT[5] = { 0, 0, 0, 0, 2 };
 const uint8_t *tfGlyph(char c) {
   if (c >= '0' && c <= '9') return TF_DIG[c - '0'];
   switch (c) {
@@ -252,7 +253,7 @@ const uint8_t *tfGlyph(char c) {
     case 'F': return TF_F; case 'M': return TF_M; case 'N': return TF_N; case 'T': return TF_T;
     case 'U': return TF_U; case 'P': return TF_P; case ':': return TF_COL; case 'X': return TF_X; case 'G': return TF_G; case '%': return TF_PCT; case 'L': return TF_L; case 'I': return TF_I; case 'V': return TF_V;
     case 'Q': return TF_Q; case 'H': return TF_H; case 'K': return TF_K; case 'Y': return TF_Y; case 'W': return TF_W; case 'J': return TF_J;
-    case 'Z': return TF_Z; case '!': return TF_EXC; case '+': return TF_PLUS; case '(': return TF_PO; case ')': return TF_PF;
+    case 'Z': return TF_Z; case '!': return TF_EXC; case '+': return TF_PLUS; case '(': return TF_PO; case ')': return TF_PF; case '.': return TF_DOT;
   }
   return nullptr;
 }
@@ -4182,15 +4183,15 @@ int aBHp, aBMax, aBT = 0, aBFlash = 0;
 // sprites : B/b bleu, W blanc, y/o helice et feu, c vitrage, k sombre, G/g couleur de l'ennemi (vert, argent, jaune),
 // S/s gris des navires, n/N pont du porte-avions, w sillage
 const char *const SPR_A_ME[2][9] = {  // ton chasseur vert fonce (helice qui tourne)
-  { "....yyy....", ".....B.....", "....BcB....", "BBBBBBBBBBB", "BWBBBbBBBWB", ".bbBBBBBbb.", ".....B.....", "...BBBBB...", "....bBb...." },
-  { "...y...y...", ".....B.....", "....BcB....", "BBBBBBBBBBB", "BWBBBbBBBWB", ".bbBBBBBbb.", ".....B.....", "...BBBBB...", "....bBb...." } };
-const char *const SPR_A_ROLL[9] = { "....yyy....", ".....B.....", "....BcB....", "..BBBBBBB..", "..bWBbBWb..", "...bBBBb...", ".....B.....", "...BBBBB...", "....bBb...." };
+  { "...........", ".....B.....", "....BcB....", "BBBBBBBBBBB", "BWBBBbBBBWB", ".bbBBBBBbb.", ".....B.....", "...BBBBB...", "....bBb...." },
+  { "...........", ".....B.....", "....BcB....", "BBBBBBBBBBB", "BWBBBbBBBWB", ".bbBBBBBbb.", ".....B.....", "...BBBBB...", "....bBb...." } };
+const char *const SPR_A_ROLL[9] = { "...........", ".....B.....", "....BcB....", "..BBBBBBB..", "..bWBbBWb..", "...bBBBb...", ".....B.....", "...BBBBB...", "....bBb...." };
 const char *const SPR_A_FIGHT[2][7] = {  // chasseur ennemi, nez vers le bas
-  { "...gGg...", "....G....", "GGGGGGGGG", "gGGGgGGGg", "...GcG...", "....G....", "...ooo..." },
-  { "...gGg...", "....G....", "GGGGGGGGG", "gGGGgGGGg", "...GcG...", "....G....", "..o...o.." } };
+  { "...gGg...", "....G....", "GGGGGGGGG", "gGGGgGGGg", "...GcG...", "....G....", "........." },
+  { "...gGg...", "....G....", "GGGGGGGGG", "gGGGgGGGg", "...GcG...", "....G....", "........." } };
 const char *const SPR_A_BOMBER[11] = {  // bombardier bimoteur
   "......GGGGG......", "........G........", "........G........", "...g....G....g...", "GGGGGGGGGGGGGGGGG",
-  "gGGGGgGGGGGgGGGGg", "....ggg.G.ggg....", "....ggg.G.ggg....", "....ooo.G.ooo....", "........G........", ".......GcG......." };
+  "gGGGGgGGGGGgGGGGg", "....ggg.G.ggg....", "....ggg.G.ggg....", "....kkk.G.kkk....", "........G........", ".......GcG......." };
 const char *const SPR_A_BOSS[2][2][17] = {  // boss : bombardier lourd (4 moteurs), puis bimoteur a double queue ; 2 images (helices)
   { { "..........kkkkkkkkk..........", ".........kSSSSSSSSSk.........", "..........kGGkSkGGk..........", "............kSSSk............", "............kSWSk............", "......kkkkkkkSSSkkkkkkk......", "...kkkSSSSSSSSSSSSSSSSSkkk...", "kkkSSSWSSSSSSSSSSSSSSSWSSSkkk", "kGGSSSSSSSSGSSSSSGSSSSSSSSGGk", ".kksssskssssksSskssssksssskk.", "....kSSkkSSk.kSk.kSSkkSSk....", "....koSkkSok.kck.koSkkSok....", "...yyyy.yyyy.kck.yyyy.yyyy...", ".............kck.............", ".............kWk.............", ".............kSk.............", "..............k.............." },
     { "..........kkkkkkkkk..........", ".........kSSSSSSSSSk.........", "..........kGGkSkGGk..........", "............kSSSk............", "............kSWSk............", "......kkkkkkkSSSkkkkkkk......", "...kkkSSSSSSSSSSSSSSSSSkkk...", "kkkSSSWSSSSSSSSSSSSSSSWSSSkkk", "kGGSSSSSSSSGSSSSSGSSSSSSSSGGk", ".kksssskssssksSskssssksssskk.", "....kSSkkSSk.kSk.kSSkkSSk....", "....koSkkSok.kck.koSkkSok....", "....yy...yy..kck..yy...yy....", ".............kck.............", ".............kWk.............", ".............kSk.............", "..............k.............." } },
@@ -4200,11 +4201,11 @@ const char *const SPR_A_BOSS[2][2][17] = {  // boss : bombardier lourd (4 moteur
 const uint8_t A_W[5] = { 9, 17, 7, 9, 15 }, A_H[5] = { 7, 11, 18, 28, 40 };
 
 uint16_t aCol(char ch, uint8_t var) {
-  static const uint8_t G[3][2][3] = { { { 205, 75, 50 }, { 125, 35, 25 } },  // ennemis rouge brique (ton avion est vert)
-                                       { { 190, 190, 205 }, { 105, 105, 120 } }, { { 245, 200, 40 }, { 190, 120, 20 } } };
+  static const uint8_t G[3][2][3] = { { { 205, 75, 50 }, { 150, 30, 20 } },  // ennemis rouge brique (ton avion est vert)
+                                       { { 190, 190, 205 }, { 150, 150, 160 } }, { { 245, 200, 40 }, { 190, 150, 0 } } };
   switch (ch) {
-    case 'B': return var == 3 ? rgb(16, 62, 24) : rgb(34, 118, 46);  // ton avion vert fonce ; var 3 : dessous (tonneau)
-    case 'b': return rgb(16, 62, 24);
+    case 'B': return var == 3 ? rgb(0, 90, 20) : rgb(20, 150, 40);  // ton avion vert fonce ; var 3 : dessous (tonneau)
+    case 'b': return rgb(0, 90, 20);
     case 'W': return rgb(255, 255, 255);
     case 'y': return rgb(255, 220, 0);
     case 'o': return rgb(255, 140, 0);
@@ -4213,7 +4214,7 @@ uint16_t aCol(char ch, uint8_t var) {
     case 'G': return rgb(G[var % 3][0][0], G[var % 3][0][1], G[var % 3][0][2]);
     case 'g': return rgb(G[var % 3][1][0], G[var % 3][1][1], G[var % 3][1][2]);
     case 'S': return rgb(188, 192, 202);  // assez clair pour une dalle a 3 bits
-    case 's': return rgb(135, 140, 150);
+    case 's': return rgb(150, 155, 165);
     case 'n': return rgb(160, 105, 55);
     case 'N': return rgb(230, 210, 170);
     default: return rgb(200, 230, 255);  // w : sillage
@@ -4514,7 +4515,7 @@ void aErase(uint16_t sea) {
   if (gOverflow || aPaint) {
     gOverflow = false; aPaint = false; gNOld = 0;
     gfx->fillRect(0, 0, W, A_TOP, 0);
-    gfx->fillRect(0, A_TOP, W, H - A_TOP, sea);
+    aSeaFill(0, A_TOP, W, H);
     return;
   }
   for (int i = 0; i < gNOld; i++) {
@@ -4522,12 +4523,20 @@ void aErase(uint16_t sea) {
     int x0 = max(0, (int)rc.x), y0 = max(0, (int)rc.y), x1 = min(W, rc.x + rc.w), y1 = min(H, rc.y + rc.h);
     if (x1 <= x0 || y1 <= y0) continue;
     if (y0 < A_TOP) gfx->fillRect(x0, y0, x1 - x0, min(y1, A_TOP) - y0, 0);
-    if (y1 > A_TOP) gfx->fillRect(x0, max(y0, A_TOP), x1 - x0, y1 - max(y0, A_TOP), sea);
+    if (y1 > A_TOP) aSeaFill(x0, max(y0, A_TOP), x1, y1);
   }
   gNOld = 0;
 }
 // dessin limite a la mer (jamais dans la bande du score, meme un instant)
-uint16_t aSea() { return rgb(6, 40, 108); }  // mer (V3.96 : plus sombre, les sprites ressortent)
+// Couleurs de 1945 choisies pour une dalle a 3 bits : chaque composante est eteinte ou au niveau 2 et plus (le niveau 1,
+// trop faible, scintille ou disparait). La mer est au niveau 2, tramee (1 point sur 4 noir) : moins intense, sans scintiller.
+uint16_t aSea() { return rgb(10, 60, 150); }
+void aSeaFill(int x0, int y0, int x1, int y1) {  // remplit de mer tramee le rectangle [x0, x1[ x [y0, y1[
+  static const uint8_t B4[4][4] = { { 0, 8, 2, 10 }, { 12, 4, 14, 6 }, { 3, 11, 1, 9 }, { 15, 7, 13, 5 } };
+  uint16_t sea = aSea();
+  for (int y = y0; y < y1; y++)
+    for (int x = x0; x < x1; x++) gfx->drawPixel(x, y, B4[y & 3][x & 3] < 4 ? 0 : sea);
+}
 // un point (x, y) est-il sur une ile ? (les vagues n'y sont pas dessinees : elles y feraient des trous qui clignotent)
 bool aOnIsle(int x, int y) {
   for (int i = 0; i < 2; i++) {
@@ -4557,6 +4566,16 @@ void aSil(const char *const *rows, int w, int h, int x, int y, uint16_t c) {
       if (rows[r][q] != '.' && x + q >= 0 && x + q < W && y + r >= A_TOP && y + r < H) gfx->drawPixel(x + q, y + r, c);
   gMark(x, y, w, h);
 }
+// helice qui tourne : une pale de 3 points autour du moyeu, un quart de tour toutes les 2 images
+void aProp(int x, int y, int phase) {
+  static const int8_t PX[4] = { 1, 1, 0, -1 }, PY[4] = { 0, 1, 1, 1 };
+  int f = phase & 3;
+  uint16_t blade = rgb(215, 215, 225), tip = rgb(255, 210, 0);
+  aP(x - PX[f], y - PY[f], tip);
+  aP(x + PX[f], y + PY[f], tip);
+  aP(x, y, blade);
+  gMark(x - 1, y - 1, 3, 3);
+}
 void aTurret(int x, int y, uint16_t c) {  // tourelle ronde, canon tourne vers ton avion
   aDisc(x, y, 1, c);
   float dx = aX + 5 - x, dy = aY + 4 - y, d = sqrtf(dx * dx + dy * dy) + .01f;
@@ -4567,8 +4586,8 @@ void aShip(const AEn &e) {
   int x = e.x, y = e.y, w = A_W[e.type], h = A_H[e.type], cx = x + w / 2, hw0 = w / 2;
   bool fl = e.flash;
   uint16_t wh = rgb(255, 255, 255), edge = fl ? wh : rgb(45, 50, 62), hull = fl ? wh : rgb(178, 182, 194), lite = fl ? wh : rgb(225, 228, 236);
-  uint16_t shade = fl ? wh : rgb(140, 145, 158), rail = fl ? wh : rgb(225, 228, 235), dark = fl ? wh : rgb(38, 40, 50);
-  uint16_t glass = fl ? wh : rgb(110, 210, 250), boat = fl ? wh : rgb(255, 130, 20), red = fl ? wh : rgb(200, 40, 30);
+  uint16_t shade = fl ? wh : rgb(150, 155, 166), rail = fl ? wh : rgb(225, 228, 235), dark = fl ? wh : rgb(38, 40, 50);
+  uint16_t glass = fl ? wh : rgb(0, 210, 250), boat = fl ? wh : rgb(255, 130, 20), red = fl ? wh : rgb(200, 40, 30);
   uint16_t foam = rgb(170, 195, 225), foam2 = rgb(55, 100, 160), seaSh = rgb(3, 22, 64);
   for (int k = 0; k < 14; k++) {  // sillage : deux traines d'ecume qui s'ecartent, remous au milieu
     int yy = y + h + k, sp = hw0 - 1 + k / 2;
@@ -4628,7 +4647,7 @@ void aShip(const AEn &e) {
       aP(cx + ((p + (gFrame >> 3)) & 1) - (p == 2), y + 22 + p * 2 + ((gFrame >> 2) & 1), rgb(140 - p * 25, 140 - p * 25, 150 - p * 25));
     aTurret(cx, y + 25, lite);
   } else {  // porte-avions : pont gris, bords blancs, axe jaune, piste en biais, ascenseur, ilot, avions
-    uint16_t deck = fl ? wh : rgb(128, 132, 142), mark = fl ? wh : rgb(230, 230, 230), yel = fl ? wh : rgb(240, 200, 30);
+    uint16_t deck = fl ? wh : rgb(150, 152, 160), mark = fl ? wh : rgb(230, 230, 230), yel = fl ? wh : rgb(240, 200, 30);
     aR(x + 2, y + 6, 11, 32, deck);
     aV(x + 2, y + 6, 32, mark);
     aV(x + 12, y + 6, 32, mark);
@@ -4665,7 +4684,7 @@ void aIsland(int i) {
     br[k] = k ? r / 2 + rn(r / 2 + 1) : r;
   }
   static const int8_t OFF[6] = { 4, 2, 0, -2, -4, -6 };
-  uint16_t COL[6] = { rgb(18, 78, 140), rgb(45, 135, 175), rgb(230, 205, 125), rgb(70, 170, 60), rgb(30, 120, 45), rgb(20, 85, 35) };
+  uint16_t COL[6] = { rgb(40, 160, 200), rgb(150, 210, 230), rgb(230, 205, 90), rgb(60, 190, 60), rgb(20, 150, 40), rgb(0, 150, 0) };
   // l'ile n'est jamais effacee en entier (elle clignotait) : on redessine par-dessus, et on ne rend a la mer que les
   // points qu'elle vient de quitter en descendant (le haut de chaque colonne)
   static int16_t prevY[2] = { -32000, -32000 };
@@ -4685,11 +4704,10 @@ void aIsland(int i) {
         }
       }
     }
-    uint16_t sea = aSea();
     for (int c = 0; c <= 2 * span; c++) {
       if (top[c] == 32767) continue;
       int x = x0 - span + c, a = max(prevY[i] + top[c], (int)A_TOP), b = min(y0 + top[c], (int)H);
-      if (x >= 0 && x < W && b > a) gfx->drawFastVLine(x, a, b - a, sea);
+      if (x >= 0 && x < W && b > a) aSeaFill(x, a, x + 1, b);
     }
   }
   prevY[i] = y0;
@@ -4700,7 +4718,7 @@ void aIsland(int i) {
   int np = 1 + rn(3);
   for (int p = 0; p < np; p++) {  // palmiers
     int px = x0 + rn(r) - r / 2, py = y0 + rn(r) - r / 2;
-    aP(px, py + 1, rgb(130, 85, 35));
+    aP(px, py + 1, rgb(150, 90, 30));
     aP(px - 1, py, rgb(60, 210, 80)); aP(px + 1, py, rgb(60, 210, 80));
     aP(px, py - 1, rgb(60, 210, 80)); aP(px, py, rgb(35, 150, 50));
   }
@@ -4712,7 +4730,7 @@ void aIsland(int i) {
     aH(hx + 4, hy, 2, rgb(205, 55, 40));
   }
   int rx = x0 + r + 3, ry = y0 - r / 2;  // rochers dans le lagon
-  aH(rx, ry, 2, rgb(125, 120, 110));
+  aH(rx, ry, 2, rgb(160, 155, 145));
   aP(rx, ry + 1, rgb(90, 88, 80));
 }
 void aFire() {  // explosions en boules de feu (blanc, jaune, orange, rouge, fumee)
@@ -4741,13 +4759,13 @@ void aDraw() {
       gfx->drawFastHLine(x, y, len, rgb(4, 28, 80));
       gMark(x, y, len, 1);
     } else if (kind < 6) {
-      uint16_t c = kind == 5 ? rgb(150, 175, 205) : rgb(38, 86, 150);
+      uint16_t c = kind == 5 ? rgb(150, 175, 205) : rgb(80, 150, 230);
       gfx->drawPixel(x, y, c); gfx->drawPixel(x + 3, y, c);
       gfx->drawFastHLine(x + 1, y - 1, 2, c);
       if (kind == 5) gfx->drawPixel(x + 1 + ((gFrame >> 3) & 1), y - 2, rgb(190, 205, 225));
       gMark(x, y - 2, 4, 3);
     } else {
-      gPix(x, y, ((gFrame >> 2) + i) % 6 < 2 ? rgb(170, 170, 150) : rgb(30, 70, 130));
+      gPix(x, y, ((gFrame >> 2) + i) % 6 < 2 ? rgb(170, 170, 150) : rgb(80, 150, 230));
     }
   }
   for (int i = 0; i < 2; i++) aIsland(i);
@@ -4772,8 +4790,12 @@ void aDraw() {
     gMark(x, y, 7, 7);
   }
   for (auto &e : aEn)
-    if (e.on && e.type == 0) aSpr(SPR_A_FIGHT[(gFrame / 3) & 1], 9, 7, (int)e.x, (int)e.y, e.var, e.flash);
-    else if (e.on && e.type == 1) aSpr(SPR_A_BOMBER, 17, 11, (int)e.x, (int)e.y, e.var % 2, e.flash);
+    if (e.on && e.type == 0) { aSpr(SPR_A_FIGHT[0], 9, 7, (int)e.x, (int)e.y, e.var, e.flash); aProp((int)e.x + 4, (int)e.y + 6, gFrame >> 1); }
+    else if (e.on && e.type == 1) {
+      aSpr(SPR_A_BOMBER, 17, 11, (int)e.x, (int)e.y, e.var % 2, e.flash);
+      aProp((int)e.x + 5, (int)e.y + 9, gFrame >> 1);
+      aProp((int)e.x + 11, (int)e.y + 9, (gFrame >> 1) + 1);
+    }
   if (aBoss) {
     aSpr(SPR_A_BOSS[aBKind][(gFrame >> 1) & 1], 29, 17, (int)aBX, (int)aBY, aBKind ? 2 : 0, aBFlash);  // helices qui tournent ; liseres rouges ou jaunes
     int bw = W - 20, fill = bw * max(0, aBHp) / aBMax;  // barre de vie
@@ -4782,7 +4804,7 @@ void aDraw() {
     gMark(10, A_TOP + 1, bw, 3);
   }
   for (auto &s : aShot)
-    if (s.on) { gPix(s.x, s.y, palFull[2]); gPix(s.x, s.y + 1, palFull[7]); }
+    if (s.on) { gPix(s.x, s.y, rgb(255, 255, 255)); gPix(s.x, s.y + 1, rgb(255, 230, 60)); }
   for (auto &b : aBomb)
     if (b.on) { gPix(b.x, b.y, palFull[1]); gPix(b.x + 1, b.y, palFull[1]); gPix(b.x, b.y + 1, palFull[7]); gPix(b.x + 1, b.y + 1, palFull[0]); }
   aFire();
@@ -4792,6 +4814,7 @@ void aDraw() {
     aSil(spr, 11, 9, (int)aX - 1, (int)aY, ring); aSil(spr, 11, 9, (int)aX + 1, (int)aY, ring);
     aSil(spr, 11, 9, (int)aX, (int)aY - 1, ring); aSil(spr, 11, 9, (int)aX, (int)aY + 1, ring);
     aSpr(spr, 11, 9, (int)aX, (int)aY, aRoll && ((aRoll >> 2) & 1) ? 3 : 0, false);
+    aProp((int)aX + 5, (int)aY, gFrame >> 1);  // ton helice
   }
   for (int i = 0; i < aRolls; i++) {  // tonneaux restants en bas a gauche
     gfx->drawCircle(3 + i * 7, H - 4, 2, palFull[4]);
@@ -5822,9 +5845,11 @@ void zDraw() {
 // ---------------------------------------------------------------- TURBO ROUTE
 // Jeu de voiture original vu de dessus : tu doubles voitures et camions sur une route a 3 ou 4 voies et tu evites
 // cones et taches d'huile. Gauche / droite pour braquer (au stick : proportionnel), X ou R2 (ou haut) accelerer,
-// bas freiner, rond : turbo (bidons bleus ramasses). Pieces : points. Huile : tete-a-queue. Bas-cote : ca secoue et
+// bas freiner ; stick droit : haut accelere, bas freine (proportionnel), rond : turbo (bidons bleus ramasses). Pieces : points. Huile : tete-a-queue. Bas-cote : ca secoue et
 // ca freine. Choc : une vie. Chaque stage : une distance a parcourir (barre en haut), decor qui change (campagne,
 // desert, neige, nuit), plus de circulation, des voitures qui changent de voie. Bruit du moteur selon la vitesse.
+// Chrono : un temps a respecter pour arriver (en haut a droite), distance restante en km (en haut a gauche) ;
+// temps ecoule : une vie ; secondes restantes a l'arrivee : bonus. Ligne d'arrivee en damier.
 // Poursuite : une fois par stage, la police surgit par l'arriere (sirene) ; tiens 15 s (+2000) ou fais-la percuter
 // une voiture, un camion ou un cone (+3000) ; si elle te touche, une vie.
 #define V_TOP 10   // bande du score
@@ -5839,6 +5864,8 @@ int vLanes = 3, vLW = 13, vRoadL = 12, vInv = 0, vSpin = 0, vNitro = 0, vNitroT 
 float vCopX = 0, vCopY = 0, vCopAt = 0;
 int vCop = 0, vCopT = 0, vMsgT = 0;
 const char *vMsg = "";
+int vTime = 0, vTimeMax = 1;  // chrono du stage (images), temps accorde
+#define V_KM 2400.0f  // points de route par km (180 km/h a vitesse normale)
 int vS = 1;  // echelle : 2 sur un grand ecran (128x128 et plus), tout est dessine en double taille
 bool vPaint = true;
 struct VTheme { uint8_t grass[3], tuft[3], road[3]; };
@@ -5850,9 +5877,10 @@ int vTheme() { return (max(1, gWave) - 1) % 4; }
 int vPY() { return H - 14 * vS; }  // ta voiture : en bas de l'ecran
 float vLaneX(int l) { return vRoadL + l * vLW + vLW / 2.0f; }
 // voitures vues de dessus, nez vers le haut (7 de large) : B carrosserie, b sombre, k pneus, W vitres, L phares, R feux
-const char *const V_SPR_CAR[11] = { "..BBB..", ".BLBLB.", "kBBBBBk", "kBWWWBk", ".BWWWB.", ".BBBBB.", ".BBBBB.", ".BbWbB.", "kBBBBBk", "kRBBBRk", ".bbbbb." };
-const char *const V_SPR_TRUCK[17] = { ".SSSSS.", "kSLSLSk", "kSWWWSk", ".SSSSS.", "..kkk..", "BBBBBBB", "BhBBBhB", "BhBBBhB", "BBBBBBB", "BhBBBhB",
-                                      "BhBBBhB", "BBBBBBB", "BhBBBhB", "BhBBBhB", "kBBBBBk", "kRBBBRk", ".bbbbb." };
+const char *const V_SPR_CAR[11] = { "..bBb..", ".bLBLb.", "kbBhBbk", "kbWWWbk", ".bWWWb.", ".bBhBb.", ".bBhBb.", ".bWWWb.", "kbBhBbk", "kRbBbRk", "..bbb.." };
+const char *const V_SPR_ME[11] = { "..BhB..", ".BLhLB.", "kBBhBBk", "kbWWWbk", ".bWWWb.", ".BBhBB.", ".BBhBB.", ".bWWWb.", "kBBhBBk", "kRBhBRk", "kkkkkkk" };  // ta voiture : bande blanche, aileron
+const char *const V_SPR_TRUCK[17] = { ".SSSSS.", "kSLSLSk", "kSWWWSk", ".sSSSs.", "..kkk..", "bBBBBBb", "bhBBBhb", "bhBBBhb", "bBBBBBb", "bhBBBhb",
+                                      "bhBBBhb", "bBBBBBb", "bhBBBhb", "bhBBBhb", "kBBBBBk", "kRBBBRk", ".kkkkk." };
 const char *const V_SPR_CONE[5] = { "..o..", "..o..", ".oWo.", ".ooo.", "ooooo" };
 const char *const V_SPR_OIL[5] = { "..kk...", ".kkkkk.", "kkhkkkk", ".kkkkk.", "...kk.." };
 const char *const V_SPR_COIN[5] = { ".yyy.", "yWyyy", "yyyyy", "yyyyo", ".yoo." };
@@ -5876,6 +5904,7 @@ void vSpr(const char *const *rows, int w, int h, int x, int y, uint16_t body, ui
         case 'L': col = rgb(255, 240, 170); break;
         case 'R': col = rgb(255, 30, 20); break;
         case 'S': col = rgb(190, 195, 205); break;
+        case 's': col = rgb(130, 135, 145); break;
         case 'o': col = rgb(255, 120, 0); break;
         case 'y': col = rgb(255, 215, 0); break;
         default: col = rgb(255, 255, 255); break;  // W blanc (cone, piece)
@@ -5898,6 +5927,15 @@ void vBg(int x0, int y0, int x1, int y1) {
   seg(0, rl, grass);
   seg(rl, rr, road);
   seg(rr, W, grass);
+  // traces de pneus (plus sombres) au milieu de chaque voie, lignes blanches au bord de la chaussee : fixes, elles ne defilent pas
+  uint16_t rut = rgb(t.road[0] * 4 / 5, t.road[1] * 4 / 5, t.road[2] * 4 / 5), edge = rgb(200, 200, 200);
+  for (int l = 0; l < vLanes; l++)
+    for (int sgn = -1; sgn <= 1; sgn += 2) {
+      int cx = vRoadL + l * vLW + vLW / 2 + sgn * vLW / 4;
+      seg(cx, cx + vS, rut);
+    }
+  seg(vRoadL, vRoadL + vS, edge);
+  seg(vRoadL + vLanes * vLW - vS, vRoadL + vLanes * vLW, edge);
 }
 void vErase() {
   if (gOverflow || vPaint) { gOverflow = false; vPaint = false; gNOld = 0; vBg(0, 0, W, H); return; }
@@ -5913,7 +5951,7 @@ void vDecoNew(VDeco &d, float y) {  // arbre, touffe ou poteau sur le bord de la
   d.on = room >= 4;
   d.y = y;
   d.type = random(3);
-  d.x = side ? vRoadL + vLanes * vLW + 3 + random(max(1, room - 5 * vS)) : random(max(1, room - 5 * vS));
+  d.x = side ? vRoadL + vLanes * vLW + 3 + random(max(1, room - 8 * vS)) : random(max(1, room - 8 * vS));
 }
 void vNewStage() {
   gWave++;
@@ -5921,6 +5959,7 @@ void vNewStage() {
   sndMelody(JINGLE_STAGE, 4);
   vDist = 0;
   vGoal = 3500 + 900 * min(gWave, 6);
+  vTimeMax = vTime = (int)(vGoal / (2.1f + 0.05f * min(gWave, 8))) + 400;  // temps accorde : plus serre a chaque stage
   vCop = 0;
   vCopAt = vGoal * (gWave == 1 ? 0.55f : 0.25f + random(35) / 100.0f);  // la police arrive a un moment au hasard
   vPaint = true;  // nouveau decor : tout l'ecran est repeint
@@ -6014,11 +6053,17 @@ void vStep() {
   if (abs(sx) > 20) steer = sx / 127.0f;  // stick : braquage proportionnel
   else steer = (k & 1) ? -1 : (k & 2) ? 1 : 0;
   bool gas = (k & 4) || (k & 8), brake = (k & 16) != 0;
+  float gasK = 1, brakeK = 1;  // stick droit : haut accelere, bas freine, d'autant plus qu'il est pousse loin
+  if (!gDemo) {
+    float rs = PS4.RStickY() / 127.0f;
+    if (rs > 0.2f && !gas) { gas = true; gasK = rs; }
+    else if (rs < -0.2f && !brake) { brake = true; brakeK = -rs; }
+  }
   if ((k & 32) && vNitro > 0 && !vNitroT) { vNitro--; vNitroT = 120; sndPlay(200, 900, 400, 0.4f, true, 1); }
   if (vSpin > 0) { vSpin--; steer = sinf(vSpin * 0.55f) * 0.9f; gas = false; }  // tete-a-queue sur l'huile
   if (vNitroT > 0) { vNitroT--; vSpd = min(vSpd + 0.08f, 4.2f); }
-  else if (gas) vSpd = min(vSpd + 0.035f, 3.0f);
-  else if (brake) vSpd = max(vSpd - 0.09f, 0.5f);
+  else if (gas) vSpd = min(vSpd + 0.035f * gasK, 3.0f);
+  else if (brake) vSpd = max(vSpd - 0.09f * brakeK, 0.5f);
   else vSpd = max(vSpd - 0.012f, 1.0f);
   if (!vNitroT && vSpd > 3.0f) vSpd -= 0.04f;
   vX += steer * (0.8f + vSpd * 0.25f) * vS;
@@ -6036,6 +6081,17 @@ void vStep() {
   if (vGap <= 0) { vSpawn(); vGap = max(16, 44 - 3 * min(gWave, 8)) + random(18); }
   int lvl = min(gWave, 8);
   if (vMsgT > 0) vMsgT--;
+  if (gStageT == 0 && vTime > 0) {  // chrono : bip chaque seconde dans les 10 dernieres
+    vTime--;
+    if (vTime <= 400 && vTime % 40 == 0 && vTime > 0) sndPlay(1500, 1500, 60, 0.3f, false, 1);
+    if (vTime == 0) {
+      vMsg = "TEMPS ECOULE"; vMsgT = 90;
+      altLoseLife((int)vX, py + 5 * vS);
+      vTime = vTimeMax;  // le chrono repart, la distance parcourue est gardee
+      vCop = 0;
+      return;
+    }
+  }
   if (!vCop && vCopAt > 0 && vDist >= vCopAt && gStageT == 0) {  // la police te prend en chasse
     vCop = 1; vCopAt = 0; vCopT = 600; vCopX = vX; vCopY = H + 4 * vS;
     vMsg = "POLICE !"; vMsgT = 80;
@@ -6092,7 +6148,10 @@ void vStep() {
   if (!gDemo && gScore > gHi) gHi = gScore;
   for (auto &d : vDeco)
     if (d.on && (d.y += vSpd * vS) > H + 2) vDecoNew(d, V_TOP - 10 * vS - random(20 * vS));
-  if (vDist >= vGoal && gStageT == 0) { altStageClear(1000UL * gWave); vNewStage(); }
+  if (vDist >= vGoal && gStageT == 0) {  // arrivee : bonus du stage et du temps restant
+    altStageClear(1000UL * gWave + 100UL * (vTime / 40));
+    vNewStage();
+  }
   // bruit du moteur : un grondement grave relance en continu, plus aigu quand tu vas vite (turbo : encore plus)
   if (gFrame % 3 == 0) {
     float f = 42 + vSpd * 36 + (vNitroT ? 30 : 0);
@@ -6145,13 +6204,21 @@ void vDraw() {
         for (int k = 1; k < 7; k++) px(x + 2, y + k, rgb(110, 110, 120));
         px(x + 1, y, rgb(255, 240, 160)); px(x + 2, y, rgb(255, 255, 220)); px(x + 3, y, rgb(255, 240, 160));
         px(x + 2, y - 1, rgb(160, 140, 60));
+      } else if (th == 0) {  // arbre rond : reflet en haut a gauche, ombre a droite, tronc
+        static const int8_t TW[6] = { 1, 2, 3, 3, 2, 1 };
+        for (int r = 0; r < 6; r++)
+          for (int c = -TW[r]; c <= TW[r]; c++) {
+            uint16_t col = (c < 0 && r < 3) ? rgb(80, 190, 70) : (c > 0 && r > 1) ? rgb(20, 90, 30) : rgb(40, 140, 45);
+            px(x + 3 + c, y + r, col);
+          }
+        px(x + 3, y + 6, rgb(110, 70, 30)); px(x + 3, y + 7, rgb(110, 70, 30)); px(x + 4, y + 7, rgb(20, 70, 25));
       } else {  // arbre (pin enneige l'hiver)
         uint16_t f = th == 2 ? rgb(30, 90, 60) : rgb(30, 120, 40), f2 = th == 2 ? rgb(240, 245, 255) : rgb(60, 170, 60);
         for (int r = 0; r < 5; r++)
           for (int c = 2 - r / 2; c <= 2 + r / 2; c++) px(x + c, y + r, (r == 0 || c == 2 - r / 2) ? f2 : f);
         px(x + 2, y + 5, rgb(110, 70, 30)); px(x + 2, y + 6, rgb(110, 70, 30));
       }
-      gMark(x, y - vS, 5 * vS, 8 * vS);
+      gMark(x, y - vS, 7 * vS, 9 * vS);
     } else if (d.type == 1) {  // touffe d'herbe (ou caillou) : on voit le sol defiler
       px(x, y, tuft); px(x + 2, y, tuft); px(x + 1, y + 1, tuft);
       gMark(x, y, 3 * vS, 2 * vS);
@@ -6160,12 +6227,35 @@ void vDraw() {
       gMark(x, y, vS, 4 * vS);
     }
   }
+  {  // ligne d'arrivee en damier quand elle approche
+    int fy = py - (int)((vGoal - vDist) * vS), sq = 2 * vS;
+    if (fy + 2 * sq > V_TOP && fy < H) {
+      for (int r = 0; r < 2; r++)
+        for (int x = rl; x < rr; x += sq) {
+          int y = fy + r * sq, a = max(y, (int)V_TOP), b = min(y + sq, (int)H);
+          if (b > a) gfx->fillRect(x, a, min(sq, rr - x), b - a, (((x - rl) / sq + r) & 1) ? rgb(20, 20, 20) : rgb(245, 245, 245));
+        }
+      gMark(rl, fy, rr - rl, 2 * sq);
+    }
+  }
+  if (vNitroT > 0)  // traits de vitesse au turbo
+    for (int k = 0; k < 4; k++) {
+      int x = rl + 2 + random(rr - rl - 4), y = V_TOP + random(H - V_TOP - 10 * vS), l = 8 * vS;
+      gfx->drawFastVLine(x, y, l, rgb(220, 220, 230));
+      gMark(x, y, 1, l);
+    }
   // circulation et obstacles
   for (auto &c : vCar) {
     if (!c.on) continue;
     int x = (int)c.x - V_W[c.type] * vS / 2, y = (int)c.y;
     const uint8_t *cc = V_COL[c.col];
     uint16_t body = rgb(cc[0], cc[1], cc[2]), dark = rgb(cc[0] / 2, cc[1] / 2, cc[2] / 2);
+    if (c.type <= 1 && th != 3) {  // ombre sur la route (en bas a droite)
+      int sx = x + vS, sy = y + 2 * vS, sw = 7 * vS, sh = V_H[c.type] * vS;
+      int a = max(sy, (int)V_TOP), b = min(sy + sh, (int)H);
+      if (b > a) gfx->fillRect(sx, a, sw, b - a, rgb(t.road[0] / 2, t.road[1] / 2, t.road[2] / 2));
+      gMark(sx, sy, sw, sh);
+    }
     if (c.type == 0) vSpr(V_SPR_CAR, 7, 11, x, y, body, dark, false);
     else if (c.type == 1) vSpr(V_SPR_TRUCK, 7, 17, x, y, body, dark, false);
     else if (c.type == 2) vSpr(V_SPR_CONE, 5, 5, x, y, body, dark, false);
@@ -6199,7 +6289,12 @@ void vDraw() {
           if (((c + r) & 1) && py - r >= V_TOP && x + c >= 0 && x + c < W) gfx->drawPixel(x + c, py - r, rgb(90, 85, 40));
       gMark(x - 4 * vS, py - 10 * vS, 15 * vS, 10 * vS);
     }
-    vSpr(V_SPR_CAR, 7, 11, x, py, rgb(230, 30, 30), rgb(120, 10, 10), false);
+    if (th != 3) {  // ombre
+      int sh = min(11 * vS, H - (py + 2 * vS));
+      if (sh > 0) gfx->fillRect(x + vS, py + 2 * vS, 7 * vS, sh, rgb(t.road[0] / 2, t.road[1] / 2, t.road[2] / 2));
+      gMark(x + vS, py + 2 * vS, 7 * vS, 11 * vS);
+    }
+    vSpr(V_SPR_ME, 7, 11, x, py, rgb(230, 30, 30), rgb(120, 10, 10), false);
     if (vNitroT > 0) {  // flammes du turbo
       int fl = (2 + (gFrame & 3)) * vS;
       for (int k = 0; k < fl; k++) {
@@ -6216,6 +6311,27 @@ void vDraw() {
     gfx->fillRect(mx - 2, my - 2, tw + 4, 9, 0);
     tinyText(*gfx, mx, my, vMsg, vCop == 1 ? rgb(255, 60, 60) : rgb(255, 220, 0));
     gMark(mx - 2, my - 2, tw + 4, 9);
+  }
+  {  // km jusqu'a l'arrivee (en haut a gauche), chrono (en haut a droite), vitesse (en bas a droite)
+    char b[12];
+    float km = max(0.0f, (vGoal - vDist) / V_KM);
+    snprintf(b, sizeof(b), "%d.%dKM", (int)km, (int)(km * 10) % 10);
+    int tw = tinyWidth(b);
+    gfx->fillRect(0, V_TOP, tw + 3, 7, 0);
+    tinyText(*gfx, 1, V_TOP + 1, b, rgb(0, 220, 255));
+    gMark(0, V_TOP, tw + 3, 7);
+    int sec = (vTime + 39) / 40;
+    snprintf(b, sizeof(b), "T%d", sec);
+    tw = tinyWidth(b);
+    bool hurry = sec <= 10;
+    gfx->fillRect(W - tw - 3, V_TOP, tw + 3, 7, 0);
+    tinyText(*gfx, W - tw - 1, V_TOP + 1, b, hurry ? ((gFrame & 8) ? rgb(255, 40, 40) : rgb(255, 255, 255)) : rgb(255, 220, 0));
+    gMark(W - tw - 3, V_TOP, tw + 3, 7);
+    snprintf(b, sizeof(b), "%dKMH", (int)(vSpd * 60));
+    tw = tinyWidth(b);
+    gfx->fillRect(W - tw - 3, H - 7, tw + 3, 7, 0);
+    tinyText(*gfx, W - tw - 1, H - 6, b, rgb(230, 230, 230));
+    gMark(W - tw - 3, H - 7, tw + 3, 7);
   }
   // barre de progression du stage (sous le score) et turbos en reserve (en bas a gauche)
   int fw = (int)(W * min(1.0f, vDist / vGoal));
@@ -6914,6 +7030,7 @@ void setup() {
     HUB75_I2S_CFG cfg(128, 64, nPanels, pins);
     cfg.setPixelColorDepthBits(depth);
     cfg.clkphase = false;
+    cfg.min_refresh_rate = 120;  // 120 images/s au lieu de 60 : plus de scintillement (en 4 bits et plus), sans charger le transfert
     dma = new MatrixPanel_I2S_DMA(cfg);
     if (dma->begin()) {
       if (ESP.getFreeHeap() >= needHeap || depth == 3) {
