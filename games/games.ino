@@ -28,7 +28,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "4.09"
+#define GAMES_VERSION "4.11"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -125,8 +125,8 @@ bool gAttract = false;              // mode demo : menu cache (ligne DEMO, ou 30
 #define MENU_IDLE_MS 30000UL        // menu sans activite : passage en mode demo
 bool menuScores = false;            // page des meilleurs scores affichee
 // numeros des jeux (ordre du menu)
-enum GameId : uint8_t { G_SPACE, G_RAID, G_RAQ, G_BUL, G_LAB, G_ORB, G_BRI, G_BLO, G_CRU, G_TAU, G_BIL, G_ESQ, G_BUN, G_CAR, G_PIN };
-#define N_GAMES 15
+enum GameId : uint8_t { G_SPACE, G_RAID, G_RAQ, G_BUL, G_LAB, G_ORB, G_BRI, G_BLO, G_CRU, G_TAU, G_BIL, G_ESQ, G_BUN, G_CAR, G_PIN, G_RUN };
+#define N_GAMES 16
 // ===== NOMS DES JEUX : a modifier ici, ils s'affichent dans le menu, les scores et la demo =====
 // Majuscules, sans accents (la police n'en a pas), 14 caracteres au plus. Garder l'ordre : il suit la liste GameId ci-dessus.
 // Au-dela de 10 caracteres, le menu affiche le nom seul (sans le mot JOUER devant).
@@ -146,9 +146,10 @@ const char *const GAME_NAME[N_GAMES] = {
   "BUNKER 3D",       // G_BUN
   "TURBO ROUTE",     // G_CAR
   "PINCAB",          // G_PIN
+  "RENARD",          // G_RUN
 };
 uint8_t gGame = 0;                  // jeu choisi dans le menu (gauche / droite sur la ligne JOUER)
-const char *topKey() { static const char *const K[N_GAMES] = { "top", "top1", "top3", "top4", "top5", "top7", "top8", "top9", "top10", "top11", "top12", "top14", "top15", "top16", "top17" }; return K[gGame % N_GAMES]; }  // top2 (COURSE), top6 (SAUTERELLE), top13 (ESCALADE) : jeux retires
+const char *topKey() { static const char *const K[N_GAMES] = { "top", "top1", "top3", "top4", "top5", "top7", "top8", "top9", "top10", "top11", "top12", "top14", "top15", "top16", "top17", "top18" }; return K[gGame % N_GAMES]; }  // top2 (COURSE), top6 (SAUTERELLE), top13 (ESCALADE) : jeux retires
 #define TOP_N 5
 HiScore gBest[TOP_N];                // meilleurs scores (gardes en memoire)
 uint8_t gLastRank = 0;              // place obtenue a la derniere partie (0 : hors tableau)
@@ -3099,7 +3100,7 @@ void tReset() {
   sndMelody(JINGLE_STAGE, 4);
   for (auto &b : gBoom) b.t = 0;
   tC = max(3, min((H - 8) / 20, (W / 2) / T_COLS));
-  tRows = min(20, (H - 8) / tC);
+  tRows = min(20, (H - 8 - 2) / tC);  // 2 points de marge : le cadre (haut et bas) reste dans l'ecran
   tBX = (W - T_COLS * tC) / 2;
   tBY = 8 + ((H - 8) - tRows * tC) / 2;
   tLines = 0; tFlash = 0; tBagN = 0;
@@ -3214,7 +3215,15 @@ void tCellDraw(int x, int y, int s, uint8_t v, bool ghost) {  // bloc en relief 
   if (!v) { gfx->fillRect(x, y, s, s, 0); if (s >= 5) gfx->drawPixel(x + s / 2, y + s / 2, rgb(25, 25, 40)); return; }
   const uint8_t *c = T_COL[v == 8 ? 0 : v];
   if (v == 8) { gfx->fillRect(x, y, s, s, (gFrame & 2) ? rgb(255, 255, 255) : rgb(120, 120, 120)); return; }
-  if (ghost) { gfx->fillRect(x, y, s, s, 0); gfx->drawRect(x, y, s, s, rgb(c[0] / 3, c[1] / 3, c[2] / 3)); return; }
+  if (ghost) {  // piece fantome : contour en pointilles dans la couleur vive de la piece (visible meme en 3 bits)
+    gfx->fillRect(x, y, s, s, 0);
+    uint16_t gc = rgb(c[0], c[1], c[2]);
+    for (int k = 0; k < s; k += 2) {
+      gfx->drawPixel(x + k, y, gc); gfx->drawPixel(x + k, y + s - 1, gc);
+      gfx->drawPixel(x, y + k, gc); gfx->drawPixel(x + s - 1, y + k, gc);
+    }
+    return;
+  }
   gfx->fillRect(x, y, s, s, rgb(c[0] * 3 / 4, c[1] * 3 / 4, c[2] * 3 / 4));
   gfx->drawFastHLine(x, y, s, rgb(min(255, c[0] + 90), min(255, c[1] + 90), min(255, c[2] + 90)));
   gfx->drawFastVLine(x, y, s, rgb(min(255, c[0] + 60), min(255, c[1] + 60), min(255, c[2] + 60)));
@@ -3228,7 +3237,7 @@ void tDraw() {
   uint16_t palFull[9];
   for (int i = 0; i < 9; i++) palFull[i] = rgb(G_PAL_RGB[i][0], G_PAL_RGB[i][1], G_PAL_RGB[i][2]);
   int s = tC, bw = T_COLS * s, bh = tRows * s;
-  uint16_t frame = rgb(70, 80, 140);
+  uint16_t frame = rgb(150, 150, 230);  // assez clair pour une dalle a 3 bits
   gfx->drawRect(tBX - 1, tBY - 1, bw + 2, bh + 2, frame);  // cadre du plateau
   int gy = gDead == 0 && tFlash == 0 ? tDropY(tPiece, tRot, tX, tY) : -99;
   for (int r = 0; r < tRows; r++)
@@ -6921,6 +6930,267 @@ void pbDraw() {
   altBooms(palFull);
 }
 
+// ---------------------------------------------------------------- RENARD
+// Course sans fin originale : un petit renard court tout seul ; X ou haut pour sauter (tenir : plus haut), bas pour se
+// baisser (ou retomber vite). Obstacles : rochers, buissons epineux, troncs, chauves-souris (basses, moyennes, hautes).
+// Gemmes +100 ; etoile rare : invincible 5 s. La vitesse monte ; stage tous les 1000 points ; jour et nuit en alternance.
+// Image dessinee dans un tampon (32 Ko pendant le jeu seulement) puis envoyee d'un bloc : decor qui defile sans scintiller.
+#define RU_OBS 6
+RuObj ruObs[RU_OBS];
+GFXcanvas16 *ruCv = nullptr;
+float ruY = 0, ruVY = 0, ruSpd = 2, ruDist = 0, ruGap = 60, ruScroll = 0;
+int ruS = 1, ruGround = 50, ruInv = 0, ruStar = 0, ruMsgT = 0, ruLastK = 0;
+bool ruDuck = false, ruHold = false;
+const char *ruMsg = "";
+// renard (12 x 10, tourne vers la droite) : o orange, d orange sombre, w blanc, k noir
+const char *const RU_FOX[3][10] = {
+  { "........o..o", "........oooo", ".......ookow", ".......ooooo", "ooo...oooow.", ".ooooooooww.", "..ooooooooo.", "..ow....ow..", "..k.....k...", "............" },
+  { "........o..o", "........oooo", ".......ookow", ".......ooooo", "ooo...oooow.", ".ooooooooww.", "..ooooooooo.", "...ow..ow...", "...k...k....", "............" },
+  { "........o..o", "........oooo", ".......ookow", ".......ooooo", "oo....oooow.", "dooooooooww.", ".dooooooooo.", ".ow......ow.", "............", "............" } };
+const char *const RU_DUCK[6] = { "..........o..o", "ooo....oooooko", ".ooooooooooooow", "..oooooooooww..", "..ow.....ow....", "..k......k....." };
+void ruRelease() { if (ruCv) { delete ruCv; ruCv = nullptr; } }
+void ruReset() {
+  gLives = (!gDemo && gDiff == 0) ? 5 : 3;
+  gPaused = false;
+  gScore = 0; gWave = 1; gDead = 0; gBonus = 0; gLifeUp = false;
+  ruS = H >= 128 ? 2 : 1;
+  ruGround = H - 12 * ruS;
+  ruY = 0; ruVY = 0; ruSpd = 2.0f; ruDist = 0; ruGap = 60; ruInv = 0; ruStar = 0; ruMsgT = 0; ruScroll = 0;
+  for (auto &o : ruObs) o.on = false;
+  gStageT = 80;
+  if (!ruCv) {
+    ruCv = new GFXcanvas16(W, H);
+    if (!ruCv->getBuffer()) { delete ruCv; ruCv = nullptr; Serial.println("RENARD : memoire insuffisante"); }
+  }
+  gfx->fillScreen(0);
+  gNOld = 0;
+}
+// tailles des obstacles (points du dessin, avant l'echelle)
+int ruW(const RuObj &o) { return o.type == 0 ? 6 : o.type == 1 ? 5 * o.h : o.type == 2 ? 11 : o.type == 3 ? 9 : 5; }
+int ruHt(const RuObj &o) { return o.type == 0 ? 5 : o.type == 1 ? 9 : o.type == 2 ? 5 : o.type == 3 ? 5 : 5; }
+int ruOY(const RuObj &o) {  // hauteur du bas de l'objet au-dessus du sol (points du dessin)
+  if (o.type == 3) return o.h == 0 ? 1 : o.h == 1 ? 6 : 16;  // chauve-souris basse (sauter), moyenne (se baisser), haute
+  if (o.type >= 4) return 14 + o.h;
+  return 0;
+}
+void ruSpawn() {
+  for (auto &o : ruObs)
+    if (!o.on) {
+      int r = random(100), lvl = min(gWave, 8);
+      o.on = true; o.x = W + 4;
+      if (r < 6) { o.type = 5; o.h = random(4); }                    // etoile
+      else if (r < 22) { o.type = 4; o.h = random(6); }              // gemme
+      else if (r < 22 + 10 + 3 * lvl && gWave >= 2) { o.type = 3; o.h = random(3); }  // chauve-souris
+      else if (r < 70) { o.type = 1; o.h = 1 + random(min(3, 1 + gWave / 2)); }       // buissons epineux
+      else if (r < 85) o.type = 0;                                    // rocher
+      else o.type = 2;                                                // tronc
+      return;
+    }
+}
+// demo : saute devant l'obstacle, se baisse sous les chauves-souris moyennes
+uint8_t ruAuto() {
+  uint8_t k = 0;
+  int fx = 6 * ruS + 12 * ruS;
+  for (auto &o : ruObs) {
+    if (!o.on || o.type >= 4) continue;
+    float d = o.x - fx;
+    if (d < -4 || d > ruSpd * 14 * ruS) continue;
+    if (o.type == 3 && o.h == 1) k |= 16;
+    else if (o.type == 3 && o.h == 2) continue;
+    else if (d < ruSpd * 9 * ruS) k |= 4;
+  }
+  return k;
+}
+void ruStep() {
+  gFrame++;
+  if (ruInv > 0) ruInv--;
+  if (ruStar > 0) ruStar--;
+  if (ruMsgT > 0) ruMsgT--;
+  if (gDead > 0) {
+    if (--gDead == 0) {
+      if (gLives <= 0) {
+        if (gDemo) ruReset();
+        else if (gLastRank) startNameEntry();
+        else toDemo();
+        return;
+      }
+      for (auto &o : ruObs) if (o.x < W * 0.6f) o.on = false;  // la piste est degagee
+      ruInv = 90; ruY = 0; ruVY = 0;
+    }
+    return;
+  }
+  uint8_t k = gDemo ? ruAuto() : keysPs4;
+  bool jump = (k & 4) || (k & 8), down = (k & 16);
+  float g = 0.32f;
+  bool onGround = ruY <= 0.01f;
+  if (jump && onGround && gStageT < 60) { ruVY = 3.0f; ruHold = true; sndPlay(500, 1000, 90, 0.3f, false, 0); }
+  if (!jump) ruHold = false;
+  if (!onGround) ruVY -= (ruHold && ruVY > 0) ? g * 0.6f : g;  // tenir le saut : plus haut
+  if (down && !onGround) ruVY -= 0.6f;                           // en l'air, bas : retombe vite
+  ruY = max(0.0f, ruY + ruVY);
+  if (ruY <= 0) ruVY = 0;
+  ruDuck = down && ruY <= 0;
+  // la course : vitesse qui monte doucement
+  ruSpd = min(5.5f, ruSpd + 0.0009f);
+  ruScroll += ruSpd * ruS;
+  ruDist += ruSpd;
+  int pts = 0;
+  while (ruDist >= 6) { ruDist -= 6; pts++; }
+  if (pts) {
+    uint32_t before = gScore / 1000;
+    gScore += pts;
+    if (gScore / 1000 != before) {  // stage tous les 1000 points
+      gWave++;
+      ruMsg = "STAGE !"; ruMsgT = 60;
+      sndMelody(JINGLE_ARME, 4);
+    }
+  }
+  ruGap -= ruSpd;
+  if (ruGap <= 0) { ruSpawn(); ruGap = max(30.0f, 70 - ruSpd * 6) + random(50); }
+  // collisions (boites un peu plus petites que le dessin)
+  int fx = 6 * ruS, fw = (ruDuck ? 13 : 9) * ruS, fh = (ruDuck ? 5 : 9) * ruS;
+  int fyBot = ruGround - (int)(ruY * ruS), fyTop = fyBot - fh;
+  for (auto &o : ruObs) {
+    if (!o.on) continue;
+    o.x -= ruSpd * ruS;
+    if (o.x < -40) { o.on = false; continue; }
+    int ow = ruW(o) * ruS, oh = ruHt(o) * ruS, oBot = ruGround - ruOY(o) * ruS, oTop = oBot - oh;
+    bool hit = o.x + 1 * ruS < fx + fw && o.x + ow - 1 * ruS > fx + 2 * ruS && oTop + ruS < fyBot && oBot - ruS > fyTop;
+    if (!hit) continue;
+    if (o.type == 4) { o.on = false; gScore += 100; sndPlay(1500, 2200, 80, 0.3f, false, 1); continue; }
+    if (o.type == 5) { o.on = false; ruStar = 200; ruMsg = "ETOILE !"; ruMsgT = 60; sndMelody(JINGLE_STAGE, 4); continue; }
+    if (ruStar) { o.on = false; gScore += 50; gBoomAt((int)o.x + ow / 2, oTop + oh / 2); sfxBoom(); continue; }  // invincible : tout eclate
+    if (ruInv) continue;
+    altLoseLife(fx + fw / 2, fyTop + fh / 2);
+    ruInv = 0;
+  }
+  if (!gDemo && gScore > gHi) gHi = gScore;
+  if (gStageT > 0) gStageT--;
+}
+void ruDraw() {
+  uint16_t palFull[9];
+  for (int i = 0; i < 9; i++) palFull[i] = rgb(G_PAL_RGB[i][0], G_PAL_RGB[i][1], G_PAL_RGB[i][2]);
+  gNOld = 0;
+  if (!ruCv) return;
+  GFXcanvas16 &c = *ruCv;
+  int s = ruS, gy = ruGround;
+  bool night = (gScore / 1000) & 1;  // jour et nuit en alternance
+  // couleurs franches (dalle a 3 bits)
+  uint16_t white = rgb(255, 255, 255), black = 0, orange = rgb(255, 140, 0), dorange = rgb(200, 80, 0);
+  uint16_t sky = night ? 0 : rgb(0, 150, 255), hill = night ? rgb(0, 0, 150) : rgb(0, 150, 90), hill2 = night ? rgb(60, 0, 160) : rgb(40, 190, 60);
+  uint16_t ground = night ? rgb(150, 100, 0) : rgb(220, 170, 60), dirt = night ? rgb(150, 60, 0) : rgb(180, 110, 30);
+  c.fillRect(0, 0, W, gy, sky);
+  // soleil ou lune, etoiles la nuit
+  if (night) {
+    c.fillCircle(W - 18 * s / 2 - 6, 16, 4 * s, rgb(255, 240, 180));
+    c.fillCircle(W - 18 * s / 2 - 4, 15, 3 * s, 0);
+    for (int i = 0; i < 18; i++) {
+      int x = (i * 53 + (int)(ruScroll * 0.05f)) % W, y = 9 + (i * 37) % max(10, gy / 2);
+      c.drawPixel(W - 1 - x, y, ((gFrame >> 3) + i) % 5 ? white : 0);
+    }
+  } else {
+    c.fillCircle(W - 18 * s / 2 - 6, 16, 4 * s, rgb(255, 230, 0));
+    for (int i = 0; i < 4; i++) {  // nuages
+      int x = W - 1 - ((int)(ruScroll * 0.2f) + i * 47) % (W + 30) + 15, y = 12 + (i * 13) % 20;
+      c.fillCircle(x, y, 3 * s, white); c.fillCircle(x + 4 * s, y + 1, 2 * s, white); c.fillCircle(x - 4 * s, y + 1, 2 * s, white);
+    }
+  }
+  // montagnes qui defilent lentement (deux plans)
+  for (int x = 0; x < W; x++) {
+    float wx = x + ruScroll * 0.15f;
+    int h = (int)((8 + 5 * sinf(wx * 0.045f) + 3 * sinf(wx * 0.11f)) * s);
+    c.drawFastVLine(x, gy - h, h, hill);
+    float wx2 = x + ruScroll * 0.35f;
+    int h2 = (int)((4 + 3 * sinf(wx2 * 0.07f + 1) + 2 * sinf(wx2 * 0.19f)) * s);
+    c.drawFastVLine(x, gy - h2, h2, hill2);
+  }
+  // sol : bord clair, terre, cailloux qui defilent
+  c.fillRect(0, gy, W, H - gy, dirt);
+  c.drawFastHLine(0, gy, W, ground);
+  c.drawFastHLine(0, gy + 1, W, ground);
+  for (int i = 0; i < 24; i++) {
+    int x = W - 1 - ((int)ruScroll + i * 29) % (W + 8), y = gy + 3 + (i * 7) % max(2, H - gy - 4);
+    c.fillRect(x, y, s, s, (i & 1) ? ground : rgb(100, 40, 0));
+  }
+  auto spr = [&](const char *const *rows, int w, int h, int x, int y, bool flash) {  // y : haut du dessin
+    for (int r = 0; r < h; r++)
+      for (int q = 0; q < w; q++) {
+        char ch = rows[r][q];
+        if (ch == '.' || !ch) continue;
+        uint16_t col = ch == 'o' ? orange : ch == 'd' ? dorange : ch == 'w' ? white : black;
+        if (flash) col = (ch == 'k') ? black : rgb(255, 255, 160);
+        c.fillRect(x + q * s, y + r * s, s, s, col);
+      }
+  };
+  // obstacles et bonus
+  for (auto &o : ruObs) {
+    if (!o.on) continue;
+    int x = (int)o.x, bot = gy - ruOY(o) * s, top = bot - ruHt(o) * s;
+    if (o.type == 0) {  // rocher : gris, reflet, ombre
+      c.fillRoundRect(x, top + s, 6 * s, 4 * s, s, rgb(150, 150, 160));
+      c.fillRect(x + s, top, 3 * s, 2 * s, rgb(150, 150, 160));
+      c.drawFastHLine(x + s, top, 3 * s, rgb(220, 220, 230));
+      c.fillRect(x + 4 * s, top + 3 * s, 2 * s, 2 * s, rgb(0, 0, 0));
+    } else if (o.type == 1) {  // buissons epineux
+      for (int b = 0; b < o.h; b++) {
+        int bx = x + b * 5 * s;
+        c.fillRect(bx + s, top + 2 * s, 3 * s, 7 * s, rgb(0, 150, 0));
+        c.fillRect(bx, top + 4 * s, s, 3 * s, rgb(0, 150, 0));
+        c.fillRect(bx + 4 * s, top + 3 * s, s, 3 * s, rgb(0, 150, 0));
+        c.fillRect(bx + 2 * s, top + s, s, s, rgb(40, 220, 80));
+        for (int sp = 0; sp < 3; sp++) c.drawPixel(bx + 4 * s + (s > 1), top + (3 + sp * 2) * s, white);  // epines
+        c.drawPixel(bx + s, top + 2 * s, rgb(255, 40, 40));  // baie
+      }
+    } else if (o.type == 2) {  // tronc couche, cernes
+      c.fillRect(x, top, 11 * s, 5 * s, rgb(150, 90, 30));
+      c.drawFastHLine(x, top, 11 * s, rgb(220, 170, 60));
+      c.fillCircle(x + 9 * s, top + 2 * s + s / 2, 2 * s, rgb(220, 170, 60));
+      c.drawCircle(x + 9 * s, top + 2 * s + s / 2, s, rgb(150, 90, 30));
+    } else if (o.type == 3) {  // chauve-souris : ailes qui battent
+      bool up = (gFrame >> 2) & 1;
+      uint16_t bc = rgb(170, 60, 255);
+      c.fillRect(x + 3 * s, top + s, 3 * s, 3 * s, bc);
+      c.fillTriangle(x, up ? top : top + 4 * s, x + 3 * s, top + s, x + 3 * s, top + 3 * s, bc);
+      c.fillTriangle(x + 9 * s, up ? top : top + 4 * s, x + 6 * s, top + s, x + 6 * s, top + 3 * s, bc);
+      c.drawPixel(x + 4 * s, top + 2 * s, rgb(255, 220, 0));
+      c.drawPixel(x + 5 * s, top + 2 * s, rgb(255, 220, 0));
+    } else if (o.type == 4) {  // gemme cyan qui brille
+      int cx = x + 2 * s, cy = top + 2 * s;
+      c.fillTriangle(cx, cy - 2 * s, cx - 2 * s, cy, cx + 2 * s, cy, rgb(0, 220, 255));
+      c.fillTriangle(cx, cy + 2 * s, cx - 2 * s, cy, cx + 2 * s, cy, rgb(0, 150, 255));
+      if ((gFrame >> 2) & 1) c.drawPixel(cx - s / 2, cy - s, white);
+    } else {  // etoile jaune qui clignote
+      int cx = x + 2 * s, cy = top + 2 * s;
+      uint16_t yc = (gFrame & 4) ? rgb(255, 255, 160) : rgb(255, 220, 0);
+      c.fillTriangle(cx, cy - 3 * s, cx - 2 * s, cy + 2 * s, cx + 2 * s, cy + 2 * s, yc);
+      c.fillTriangle(cx - 3 * s, cy - s, cx + 3 * s, cy - s, cx, cy + s, yc);
+    }
+  }
+  // le renard (clignote apres un choc, brille sous l'etoile)
+  if (gDead == 0 && !(ruInv > 0 && (gFrame & 4))) {
+    int fx = 6 * s, bot = gy - (int)(ruY * s);
+    bool shine = ruStar > 0 && ((gFrame >> 1) & 1);
+    if (ruDuck) spr(RU_DUCK, 15, 6, fx, bot - 6 * s, shine);
+    else spr(RU_FOX[ruY > 0 ? 2 : (gFrame >> 2) & 1], 12, 10, fx, bot - 10 * s + s, shine);
+    if (ruY > 0) c.fillRect(fx + 2 * s, gy - s, 7 * s, s, night ? rgb(100, 40, 0) : dirt);  // ombre au sol
+  }
+  {  // score et record en haut, vies, message
+    char b[16];
+    c.fillRect(0, 0, W, 7, sky);
+    snprintf(b, sizeof(b), "%05lu", (unsigned long)gScore);
+    tinyText(c, W - 2 - tinyWidth(b), 1, b, night ? white : rgb(0, 0, 0));
+    snprintf(b, sizeof(b), "HI %05lu", (unsigned long)gHi);
+    tinyText(c, 2, 1, b, night ? rgb(150, 150, 160) : rgb(0, 0, 150));
+    for (int i = 0; i < min(gLives, 5); i++) c.fillRect(W / 2 - 8 + i * 4, 2, 3, 3, orange);
+    if (ruMsgT > 0) {
+      int tw = tinyWidth(ruMsg);
+      tinyText(c, (W - tw) / 2, 10, ruMsg, (ruMsgT & 8) ? white : rgb(255, 220, 0));
+    }
+  }
+  gfx->drawRGBBitmap(0, 0, c.getBuffer(), W, H);
+  altBooms(palFull);
+}
+
 // taille du bloc memoire de chaque jeu (0 : rien a reserver)
 size_t gMemSize(uint8_t g) {
   switch (g) {
@@ -6967,6 +7237,7 @@ void altReset() {
     case G_ESQ: aReset(); break;
     case G_CAR: vReset(); break;
     case G_PIN: pbReset(); break;
+    case G_RUN: ruReset(); break;
     default: zReset(); break;
   }
 }
@@ -6987,6 +7258,7 @@ void altStep() {
     case G_ESQ: aStep(); break;
     case G_CAR: vStep(); break;
     case G_PIN: pbStep(); break;
+    case G_RUN: ruStep(); break;
     default: zStep(); break;
   }
 }
@@ -7006,6 +7278,7 @@ void altDraw() {
     case G_ESQ: aDraw(); break;
     case G_CAR: vDraw(); break;
     case G_PIN: pbDraw(); break;
+    case G_RUN: ruDraw(); break;
     default: zDraw(); break;
   }
 }
@@ -7013,6 +7286,7 @@ void altDraw() {
 void resetCurrent() {
   if (gGame != G_BUN) zRelease();  // la memoire de BUNKER 3D est rendue aux autres jeux et au Bluetooth
   if (gGame != G_PIN) pbRelease();  // et celle de l'image de PINCAB
+  if (gGame != G_RUN) ruRelease();  // et de RENARD
   if (!gMemFor(gGame)) { gGame = 0; topLoad(); gMemFor(0); }  // memoire insuffisante : on revient au premier jeu
   if (gGame == 0) gReset();
   else altReset();
@@ -7233,7 +7507,7 @@ void gameUpdate() {
     if (menuGame >= 0 && screen == 0) { gGame = menuGame; menuGame = -1; topLoad(); resetCurrent(); }
   }
   if (menuMode) {  // menu sur son propre ecran : aucun jeu ne tourne, sa memoire est rendue (reprise au lancement)
-    if (gMemGame != -1 || zD || pbCv) { zRelease(); pbRelease(); gMemFor(255); }
+    if (gMemGame != -1 || zD || pbCv || ruCv) { zRelease(); pbRelease(); ruRelease(); gMemFor(255); }
     menuScreen();
     return;
   }

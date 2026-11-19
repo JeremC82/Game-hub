@@ -6,11 +6,11 @@ Jeux d'arcade sur 1 à 4 dalles LED 128x64, avec un ESP32 classique et une **man
 - **Partition unique de 3 Mo :** il reste de la place pour d'autres jeux.
 - **Son en option :** une broche PWM vers un petit ampli et un haut-parleur.
 
-**15 jeux originaux**, à choisir dans le menu (gauche / droite sur la ligne JOUER). Au démarrage, c'est toujours le **1er jeu de la liste** qui est proposé. Les noms affichés au menu se changent dans le tableau `GAME_NAME` en haut de `games/games.ino`.
+**16 jeux originaux**, à choisir dans le menu (gauche / droite sur la ligne JOUER). Au démarrage, c'est toujours le **1er jeu de la liste** qui est proposé. Les noms affichés au menu se changent dans le tableau `GAME_NAME` en haut de `games/games.ino`.
 
-Les 15 jeux ont en commun les niveaux de difficulté, les stages, les vies, les meilleurs scores avec les noms et la démo automatique.
+Les 16 jeux ont en commun les niveaux de difficulté, les stages, les vies, les meilleurs scores avec les noms et la démo automatique.
 
-## Les 15 jeux en un coup d'œil
+## Les 16 jeux en un coup d'œil
 
 Dans tous les jeux : **OPTIONS ou L2 = pause** ; en pause, **○ revient au menu** (le score est enregistré). Les deux manettes pilotent le menu. « Sans fin » : les stages continuent tant qu'il reste des vies ; la difficulté monte puis **plafonne** au stage indiqué.
 
@@ -31,6 +31,7 @@ Dans tous les jeux : **OPTIONS ou L2 = pause** ; en pause, **○ revient au menu
 | 12 | BUNKER 3D | [BUNKER 3D](#bunker-3d) | stick gauche : avancer / pas de côté, stick droit : pivoter, L1 / R1 pas de côté, **✕ / R2 tirer**, **□ ouvrir**, **○ arme**, **△ carte** | soin, munitions, armure, carte rouge, arme lourde ; combos DOUBLE, TRIPLE, CARNAGE ; barils en chaîne | sans fin ; un nouveau bunker généré à chaque stage |
 | 13 | TURBO ROUTE | [TURBO ROUTE](#turbo-route) | gauche / droite : braquer, **✕ / R2 / haut accélérer**, **bas freiner**, stick droit : accélérer / freiner, **○ turbo** | pièce 250 ; voiture doublée 50 ; bidon de turbo ; police semée 2000, police KO 3000 ; secondes restantes × 100 | sans fin ; 4 décors en boucle ; distance plafonnée au stage 6, circulation au stage 8 |
 | 14 | PINCAB | [PINCAB](#pincab) | **croix gauche (ou L1)** flipper gauche, **○ (ou R1)** flipper droit, **✕ maintenu puis relâché** : lanceur | 3 cibles : +2000 et multiplicateur jusqu'à x5 ; **multiball** (3 balles, tout ×2) ; gueule 1500 ; poisson 500 ; balle rendue dans les 4 s | sans fin ; stage suivant toutes les 2 séries de cibles |
+| 15 | RENARD | [RENARD](#renard) | **✕ ou haut sauter** (tenir : plus haut), **bas se baisser** (en l'air : retomber vite) | gemme +100 ; étoile : invincible 5 s (traverse tout, +50 par obstacle) | sans fin ; stage tous les 1000 points ; vitesse maximale atteinte peu à peu ; jour et nuit en alternance |
 
 
 ## Deux manettes (Bluepad32)
@@ -40,7 +41,7 @@ Depuis la V3.84, le Game-hub utilise **Bluepad32** : jusqu'à **4 manettes Bluet
 - **Menu « JOUEURS 1 / 2 »** (2e ligne, une étoile par manette connectée) : seuls les jeux à deux joueurs utilisent la 2e manette.
   - **RAQUETTES** : match à deux (raquette de droite pour le joueur 2), **le premier à 7 points gagne**.
   - **SPACE DEFENDER** : coopération, un 2e vaisseau **vert** pour le joueur 2, vies et score communs ; les ennemis piquent sur l'un ou l'autre ; la manette du joueur touché vibre.
-- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V4.09_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
+- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V4.11_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
 - **Mémoire** : environ 81 Ko libres avec 2 dalles en 3 bits et deux manettes connectées.
 
 # SPACE DEFENDER
@@ -285,6 +286,19 @@ Un flipper original sur le thème d'un **lagon maudit** (V4.06, thème et multib
 
 ![PINCAB : fronton, multiball et bas de la table](docs/pincab-rendus.png)
 
+### RENARD
+
+![RENARD](docs/jeu-renard.gif)
+
+Une course sans fin originale (V4.11) : un petit renard orange court tout seul, le décor défile, et toi tu le fais sauter et se baisser.
+- **Commandes :** **✕ ou haut pour sauter** (garder appuyé : saut plus haut), **bas pour se baisser** (en l'air : il retombe plus vite).
+- **Obstacles :** rochers, buissons épineux (seuls ou en groupes de 2 ou 3), troncs couchés et, à partir du stage 2, des **chauves-souris** : basses (sauter), à mi-hauteur (se baisser) ou hautes (rester au sol).
+- **Bonus :** **gemmes** cyan à attraper en l'air (+100) ; **étoile** rare : le renard brille et devient **invincible 5 s**, il traverse les obstacles qui éclatent (+50).
+- **Progression :** la vitesse augmente peu à peu ; un stage tous les 1000 points ; **jour et nuit en alternance** (soleil et nuages, puis lune et ciel étoilé), deux plans de montagnes qui défilent plus lentement que le sol. 3 vies (clignotement après un choc).
+- **Écran 128x128 :** tout est dessiné en double taille, dans une image envoyée d'un bloc (32 Ko pendant le jeu seulement) : pas de scintillement.
+
+![RENARD : jour, nuit, étoile](docs/renard-rendus.png)
+
 ### CRUCH
 
 ![CRUCH](docs/jeu-cruch.gif)
@@ -310,7 +324,7 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. **La démo cha
 
 | Ligne | Action |
 |---|---|
-| **JOUER** | **gauche / droite : choix du jeu** (15 jeux ; leurs noms se changent dans le tableau `GAME_NAME` en haut de `games/games.ino`). Au démarrage : le premier jeu de la liste. ✕ ou OPTIONS lance la partie. |
+| **JOUER** | **gauche / droite : choix du jeu** (16 jeux ; leurs noms se changent dans le tableau `GAME_NAME` en haut de `games/games.ino`). Au démarrage : le premier jeu de la liste. ✕ ou OPTIONS lance la partie. |
 | **NIVEAU** | Facile / Normal / Difficile (gauche / droite ou ✕), choix gardé en mémoire |
 | **LUMINOSITE** | 0 à 100 % par pas de 10 % (gauche / droite ou ✕), visible tout de suite et gardée en mémoire. À 0 %, les dalles restent très faiblement allumées pour qu'on voie encore le menu. |
 | **VOLUME** | volume du son, 0 à 100 % par pas de 10 % (gauche / droite ou ✕). Un bip fait entendre le niveau. 0 % = muet. C'est le rapport cyclique du PWM : le potentiomètre de l'ampli règle le maximum. |
@@ -443,8 +457,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V4.09_complet.bin](firmware/GameHub_V4.09_complet.bin) | 0x0 | `31d101322af7e30daeb47a9ba7d12cc1` |
-| [firmware/GameHub_V4.09.bin](firmware/GameHub_V4.09.bin) | 0x10000 | `81ec35eab9345e23b9557fafdbf86ac4` |
+| [firmware/GameHub_V4.11_complet.bin](firmware/GameHub_V4.11_complet.bin) | 0x0 | `029a416eb61841bc415b6e9aff315a75` |
+| [firmware/GameHub_V4.11.bin](firmware/GameHub_V4.11.bin) | 0x10000 | `8831ef6cb27838d4f48cda7ee5fdbaca` |
 | [firmware/GameHub_V3.86_complet.bin](firmware/GameHub_V3.86_complet.bin) | 0x0 | `dc451b01c498df647da822a1427a1a5e` |
 | [firmware/GameHub_V3.86.bin](firmware/GameHub_V3.86.bin) | 0x10000 | `ee1945d390b91eb82240245a1e52821f` |
 
@@ -462,6 +476,6 @@ Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB S
 - **Carte :** installée avec la configuration `build/bp32/arduino-cli.yaml` (adresse du paquet Bluepad32 ajoutée). Le programme d'essai `bp32test/` affiche l'état des manettes et la mémoire libre.
 - **Bibliothèques :** ESP32-HUB75-MatrixPanel-I2S-DMA et Adafruit GFX ; Bluepad32 est fourni avec la carte.
 - **Manettes :** une petite couche d'adaptation (`PadShim`) garde les noms `PS4.Cross()`, `PS4.LStickX()`... utilisés par les jeux ; `PAD2` lit la 2e manette. L'ancienne bibliothèque PS4Controller (une seule manette, adresse de la console à recopier) reste dans l'historique Git (V3.70, commit `11e9556`).
-- **Plans, aperçus et GIF :** `python docs/branchement.py`, `python docs/rendu.py`, `python docs/gif_manette_ps4.py`, `python docs/gif_arrivee.py`, `python docs/gif_menus.py`, `python docs/gif_jeux.py [raid raquettes bulles labyrinthe orbite briques blocs cruch taupe billes escadrille]`, `python docs/gif_bunker.py`, `python docs/gif_turbo.py`, `python docs/gif_pincab.py`, `python docs/branchement_son.py` (Pillow).
+- **Plans, aperçus et GIF :** `python docs/branchement.py`, `python docs/rendu.py`, `python docs/gif_manette_ps4.py`, `python docs/gif_arrivee.py`, `python docs/gif_menus.py`, `python docs/gif_jeux.py [raid raquettes bulles labyrinthe orbite briques blocs cruch taupe billes escadrille]`, `python docs/gif_bunker.py`, `python docs/gif_turbo.py`, `python docs/gif_pincab.py`, `python docs/gif_renard.py`, `python docs/branchement_son.py` (Pillow).
 
 L'ancienne version avec wifi, page web et manette ESP-NOW reste disponible dans l'historique Git, jusqu'au commit `fb11367`.
