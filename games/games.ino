@@ -28,7 +28,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "3.88"
+#define GAMES_VERSION "3.89"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -127,7 +127,24 @@ bool menuScores = false;            // page des meilleurs scores affichee
 // numeros des jeux (ordre du menu)
 enum GameId : uint8_t { G_SPACE, G_RAID, G_RAQ, G_BUL, G_LAB, G_ORB, G_BRI, G_BLO, G_CRU, G_TAU, G_BIL, G_ESQ, G_BUN };
 #define N_GAMES 13
-const char *const GAME_NAME[N_GAMES] = { "SPACE DEFENDER", "RAID", "RAQUETTES", "BULLES", "LABYRINTHE", "ORBITUS", "CASSE BRIQUES", "BLOCS", "CRUCH", "TAUPE", "BILLES", "ESCADRILLE", "BUNKER 3D" };
+// ===== NOMS DES JEUX : a modifier ici, ils s'affichent dans le menu, les scores et la demo =====
+// Majuscules, sans accents (la police n'en a pas), 14 caracteres au plus. Garder l'ordre : il suit la liste GameId ci-dessus.
+// Au-dela de 10 caracteres, le menu affiche le nom seul (sans le mot JOUER devant).
+const char *const GAME_NAME[N_GAMES] = {
+  "GALAGA",  // G_SPACE
+  "RAID",            // G_RAID
+  "PONG",       // G_RAQ
+  "BULLES",          // G_BUL
+  "PAC MAN",      // G_LAB
+  "ORBITUS",         // G_ORB
+  "CASSE BRIQUES",   // G_BRI
+  "TETRIS",           // G_BLO
+  "CANDY CRUCH",           // G_CRU
+  "DIG DUG",           // G_TAU
+  "BILLES",          // G_BIL
+  "ESCADRILLE",      // G_ESQ
+  "BUNKER 3D",       // G_BUN
+};
 uint8_t gGame = 0;                  // jeu choisi dans le menu (gauche / droite sur la ligne JOUER)
 const char *topKey() { static const char *const K[N_GAMES] = { "top", "top1", "top3", "top4", "top5", "top7", "top8", "top9", "top10", "top11", "top12", "top14", "top15" }; return K[gGame % N_GAMES]; }  // top2 (COURSE), top6 (SAUTERELLE), top13 (ESCALADE) : jeux retires
 #define TOP_N 5
@@ -220,7 +237,10 @@ const uint8_t TF_R[5] = { 6, 5, 6, 5, 5 }, TF_E[5] = { 7, 4, 6, 4, 7 }, TF_S[5] 
               TF_B[5] = { 6, 5, 6, 5, 6 }, TF_F[5] = { 7, 4, 6, 4, 4 }, TF_M[5] = { 5, 7, 7, 5, 5 },
               TF_N[5] = { 6, 5, 5, 5, 5 }, TF_T[5] = { 7, 2, 2, 2, 2 }, TF_U[5] = { 5, 5, 5, 5, 7 },
               TF_P[5] = { 6, 5, 6, 4, 4 }, TF_COL[5] = { 0, 2, 0, 2, 0 }, TF_X[5] = { 5, 5, 2, 5, 5 },
-              TF_G[5] = { 7, 4, 5, 5, 7 }, TF_PCT[5] = { 5, 1, 2, 4, 5 }, TF_L[5] = { 4, 4, 4, 4, 7 }, TF_I[5] = { 7, 2, 2, 2, 7 }, TF_V[5] = { 5, 5, 5, 5, 2 };
+              TF_G[5] = { 7, 4, 5, 5, 7 }, TF_PCT[5] = { 5, 1, 2, 4, 5 }, TF_L[5] = { 4, 4, 4, 4, 7 }, TF_I[5] = { 7, 2, 2, 2, 7 }, TF_V[5] = { 5, 5, 5, 5, 2 },
+              TF_Q[5] = { 7, 5, 5, 6, 3 }, TF_H[5] = { 5, 5, 7, 5, 5 }, TF_K[5] = { 5, 5, 6, 5, 5 }, TF_Y[5] = { 5, 5, 2, 2, 2 },
+              TF_W[5] = { 5, 5, 7, 7, 5 }, TF_J[5] = { 1, 1, 1, 5, 7 }, TF_Z[5] = { 7, 1, 2, 4, 7 }, TF_EXC[5] = { 2, 2, 2, 0, 2 },
+              TF_PLUS[5] = { 0, 2, 7, 2, 0 }, TF_PO[5] = { 1, 2, 2, 2, 1 }, TF_PF[5] = { 4, 2, 2, 2, 4 };
 const uint8_t *tfGlyph(char c) {
   if (c >= '0' && c <= '9') return TF_DIG[c - '0'];
   switch (c) {
@@ -228,6 +248,8 @@ const uint8_t *tfGlyph(char c) {
     case 'O': return TF_DIG[0]; case 'D': return TF_D; case 'A': return TF_A; case 'B': return TF_B;
     case 'F': return TF_F; case 'M': return TF_M; case 'N': return TF_N; case 'T': return TF_T;
     case 'U': return TF_U; case 'P': return TF_P; case ':': return TF_COL; case 'X': return TF_X; case 'G': return TF_G; case '%': return TF_PCT; case 'L': return TF_L; case 'I': return TF_I; case 'V': return TF_V;
+    case 'Q': return TF_Q; case 'H': return TF_H; case 'K': return TF_K; case 'Y': return TF_Y; case 'W': return TF_W; case 'J': return TF_J;
+    case 'Z': return TF_Z; case '!': return TF_EXC; case '+': return TF_PLUS; case '(': return TF_PO; case ')': return TF_PF;
   }
   return nullptr;
 }
@@ -4706,6 +4728,7 @@ int8_t zRoom[Z_ROOMS][4];  // x, y, largeur, hauteur
 uint8_t zNRooms = 0;
 float zVX = 0, zVY = 0, zPX, zPY, zA, zBob = 0, zZbuf[256];
 int zHp = 100, zArmor = 0, zAmmo = 50, zWeapon = 0, zFireT = 0, zFlash = 0, zHurt = 0, zPick = 0, zMsgT = 0;
+int zShake = 0, zHurtDir = 0, zHitT = 0, zHitKill = 0, zCombo = 0, zKillT = 0;  // tremblement, cote du tir recu, viseur touche, combo
 bool zKey = false, zHeavy = false, zMapOn = false, zPrevUse = false, zPrevSw = false, zPrevMap = false;
 int8_t zExitX = 0, zExitY = 0;
 char zMsg[24] = "";
@@ -4714,16 +4737,16 @@ int zHudKey = -1;
 int zVH() { return H - (H >= 128 ? 12 : 8); }  // hauteur de la vue 3D (barre d'etat en bas)
 
 // ---- sprites (16 x 16 sauf objets) : k contour, S/s metal, c cyan, R/r rouge, W blanc, o orange, v armure du colosse,
-// y jaune, G vert, g gant, b bleu
-const char *const ZS_DRONE[2][16] = {  // drone flottant, rotors qui tournent
-  { "..hhhh....hhhh..", "......kddk......", "....kkSSSSkk....", "...khSSSSSShk...", "..khSSddddSShk..", "..kSSdkrrkdSSk..", ".khSdkrRRrkdShk.", ".kSSdkRWWRkdSSk.", ".kSSdkrRRrkdSSk.", "..kSSdkrrkdSSk..", "..kSSSddddSSSk..", "...kSSSSSSSSk...", "....kkdSSdkk....", "...k..kddk..k...", "..k....kk....k..", "................" },
-  { "....hh....hh....", "......kddk......", "....kkSSSSkk....", "...khSSSSSShk...", "..khSSddddSShk..", "..kSSdkrrkdSSk..", ".khSdkrRRrkdShk.", ".kSSdkRWWRkdSSk.", ".kSSdkrRRrkdSSk.", "..kSSdkrrkdSSk..", "..kSSSddddSSSk..", "...kSSSSSSSSk...", "....kkdSSdkk....", "...k..kddk..k...", "..k....kk....k..", "................" } };
-const char *const ZS_SENT[2][16] = {  // sentinelle : 2 images de marche ; ses canons (c) flambent quand elle tire
-  { ".....kkkkkk.....", "....khhSShhk....", "....kSccccSk....", "....kSSSSSSk....", "..kkkkSSSSkkkk..", ".khSSSSSSSSSShk.", "khSkSSdoodSSkShk", "kSkkSSSSSSSSkkSk", "kSk.kSSddSSk.kSk", "kck.kSSddSSk.kck", ".k..kSSkkSSk..k.", "....kSSkkSSk....", "....kSk..kSk....", "....kSk..kSk....", "...kSSk..kSSk...", "...kkkk..kkkk..." },
-  { ".....kkkkkk.....", "....khhSShhk....", "....kSccccSk....", "....kSSSSSSk....", "..kkkkSSSSkkkk..", ".khSSSSSSSSSShk.", "khSkSSdoodSSkShk", "kSkkSSSSSSSSkkSk", "kSk.kSSddSSk.kSk", "kck.kSSddSSk.kck", ".k..kSSkkSSk..k.", "...kSSk.kSSk....", "...kSk...kSk....", "...kSk...kSk....", "..kSSk...kSSk...", "..kkkk...kkkk..." } };
-const char *const ZS_BRUTE[2][16] = {  // colosse blinde : 2 images de marche
-  { "....kkkkkkkk....", "...khhhvvhhhk...", "..khvRRvvRRvhk..", "..kvvvvvvvvvvk..", "kkkvvkkkkkkvvkkk", "khvvvvvvvvvvvvhk", "kvvkvvdvvdvvkvvk", "kvk.kvvvvvvk.kvk", "kok.kvvvvvvk.kok", "kok.kvvkkvvk.kok", ".k..kvvkkvvk..k.", "....kvvkkvvk....", "...kvvvkkvvvk...", "...kkkkkkkkkk...", "................", "................" },
-  { "....kkkkkkkk....", "...khhhvvhhhk...", "..khvRRvvRRvhk..", "..kvvvvvvvvvvk..", "kkkvvkkkkkkvvkkk", "khvvvvvvvvvvvvhk", "kvvkvvdvvdvvkvvk", "kvk.kvvvvvvk.kvk", "kok.kvvvvvvk.kok", "kok.kvvkkvvk.kok", "k..kvvk.kvvk..k.", "...kvvk.kvvk....", "..kvvvk.kvvvk...", "..kkkkk.kkkkk...", "................", "................" } };
+// y jaune, G vert, g gant, b bleu, h reflet, d metal sombre, m metal moyen, a blindage clair, e ombre profonde
+const char *const ZS_DRONE[2][24] = {  // drone flottant (24 x 24) : rotor qui tourne, flamme du reacteur
+  { "..sShhhhhhkddkhhhhhhSs..", "..........kddk..........", "........kkkSSkkk........", "......kkhhSSSShhkk......", ".....khhSSSSSSSShhk.....", "....khSSSSmmmmSSSShk....", "...khSSmmkkkkkkmmSShk...", "...kSSmkkeeeeeekkmSSk...", "kk.kSmkeerrrrrreekmSk.kk", "kckkSmkerrRRRRrrekmSkkck", "kcSSSmkerRRWWRRrekmSSSck", "kcSmSmkerRWWWWRrekmSmSck", "kkkkmmkerRRRRRRrekmmkkkk", "...kmmkeerrrrrreekmmk...", "...kmmmkkeeeeeekkmmmk...", "...kemmmmkkkkkkmmmmek...", "....kemmssmmmmssmmek....", ".....kessssssssssek.....", "......kkessssssekk......", "........kkddddkk........", "..........kddk..........", "...........oo...........", "...........yy...........", "........................" },
+  { "......sShhkddkhhSs......", "..........kddk..........", "........kkkSSkkk........", "......kkhhSSSShhkk......", ".....khhSSSSSSSShhk.....", "....khSSSSmmmmSSSShk....", "...khSSmmkkkkkkmmSShk...", "...kSSmkkeeeeeekkmSSk...", "kk.kSmkeerrrrrreekmSk.kk", "kckkSmkerrRRRRrrekmSkkck", "kcSSSmkerRRWWRRrekmSSSck", "kcSmSmkerRWWWWRrekmSmSck", "kkkkmmkerRRRRRRrekmmkkkk", "...kmmkeerrrrrreekmmk...", "...kmmmkkeeeeeekkmmmk...", "...kemmmmkkkkkkmmmmek...", "....kemmssmmmmssmmek....", ".....kessssssssssek.....", "......kkessssssekk......", "........kkddddkk........", "..........kddk..........", "...........yy...........", "........................", "........................" } };
+const char *const ZS_SENT[2][24] = {  // sentinelle (24 x 24) : 2 images de marche ; visiere et canons (c) flambent au tir
+  { "........kkkkkkkk........", "......kkhhSSSShhkk......", ".....khSSSSSSSSSShk.....", ".....kSkkkkkkkkkkSk.....", ".....kSkcccccccckSk.....", ".....kSkcWccccWckSk.....", ".....kmkkkkkkkkkkmk.....", "..kkkkkdmmmmmmmmdkkkkk..", ".khhSSkkSSSSSSSSkkSShhk.", "khSSSSSkShkkkkhSkSSSSShk", "kSkkkkSkSkooookSkSkkkkSk", "kSkcckSkSkoWWokSkSkcckSk", "kskcckskmkooookmkskccksk", "kskkkksksmkkkkmskskkkksk", ".kk..kkdkmmmmmmkdkk..kk.", ".....kmmkkddddkkmmk.....", "....kmSSk......kSSmk....", "....kmSSk......kSSmk....", "....kesk........ksek....", "....kmSk........kSmk....", "....kmSk........kSmk....", "...kmSSk........kSSmk...", "..kmSSSk........kSSSmk..", "..kkkkkk........kkkkkk.." },
+  { "........kkkkkkkk........", "......kkhhSSSShhkk......", ".....khSSSSSSSSSShk.....", ".....kSkkkkkkkkkkSk.....", ".....kSkcccccccckSk.....", ".....kSkcWccccWckSk.....", ".....kmkkkkkkkkkkmk.....", "..kkkkkdmmmmmmmmdkkkkk..", ".khhSSkkSSSSSSSSkkSShhk.", "khSSSSSkShkkkkhSkSSSSShk", "kSkkkkSkSkooookSkSkkkkSk", "kSkcckSkSkoWWokSkSkcckSk", "kskcckskmkooookmkskccksk", "kskkkksksmkkkkmskskkkksk", ".kk..kkdkmmmmmmkdkk..kk.", "....kmSSk...ddkkmmk.....", "....kmSSk......kSSmk....", "....kesk.......kSSmk....", "....kmSk........ksek....", "....kmSk........kSmk....", "...kmSSk........kSmk....", "..kmSSSk........kSSmk...", "..kkkkkk........kSSSmk..", "................kkkkkk.." } };
+const char *const ZS_BRUTE[2][24] = {  // colosse blinde (24 x 24) : 2 images de marche
+  { "......kkkkkkkkkkkk......", ".....kaavvvvvvvvaak.....", "....kavvkkkkkkkkvvak....", "....kavkRRrkkrRRkvak....", "....kvvkkkkkkkkkkvvk....", "..kkkkvvvvvvvvvvvvkkkk..", ".kaaavkkavvvvvvakkvaaak.", "kaavvvvkavoooovakvvvvaak", "kavvvvvkavokkovakvvvvvak", "kvvkkvvkvvoooovvkvvkkvvk", "kvk.kvvkvvvvvvvvkvvk.kvk", "kvk.kvvkkvvkkvvkkvvk.kvk", "kgk.kvvvkkkkkkkkvvvk.kgk", "kggk.kvvvvvvvvvvvvk.kggk", "kggk..kvvkvvvvkvvk..kggk", ".kk...kvvkkkkkkvvk...kk.", ".....kavvk....kvvak.....", ".....kvvvk....kvvvk.....", ".....kdvvk....kvvdk.....", ".....kvvvk....kvvvk.....", "....kavvvk....kvvvak....", "...kaavvvk....kvvvaak...", "...kkkkkkk....kkkkkkk...", "........................" },
+  { "......kkkkkkkkkkkk......", ".....kaavvvvvvvvaak.....", "....kavvkkkkkkkkvvak....", "....kavkRRrkkrRRkvak....", "....kvvkkkkkkkkkkvvk....", "..kkkkvvvvvvvvvvvvkkkk..", ".kaaavkkavvvvvvakkvaaak.", "kaavvvvkavoooovakvvvvaak", "kavvvvvkavokkovakvvvvvak", "kvvkkvvkvvoooovvkvvkkvvk", "kvk.kvvkvvvvvvvvkvvk.kvk", "kvk.kvvkkvvkkvvkkvvk.kvk", "kgk.kvvvkkkkkkkkvvvk.kgk", "kggk.kvvvvvvvvvvvvk.kggk", "kggk..kvvkvvvvkvvk..kggk", ".kk...kvvkkkkkkvvk...kk.", ".....kvvvk....kvvak.....", ".....kdvvk....kvvvk.....", ".....kvvvk....kvvdk.....", "....kavvvk....kvvvk.....", "...kaavvvk....kvvvak....", "...kkkkkkk....kvvvaak...", "..............kkkkkkk...", "........................" } };
 const char *const ZS_SCRAP[16] = {  // debris d'un robot detruit
   "................", "................", "................", "................", "................", "................",
   "................", "................", "................", "................", "................", "...k.....k......",
@@ -4747,9 +4770,10 @@ const char *const ZS_GUN[2][16] = {  // arme en main (28 x 16), tenue a deux mai
   { "........kkk......kkk........", "........kSk......kSk........", "........kok......kok........", "........kSk......kSk........", ".......kkSkkkkkkkkSkk.......", ".......kSSSSSSSSSSSSk.......", "......kSoSSoSSSSoSSoSk......", "......kSSSSSSSSSSSSSSk......", ".....kkSSSkkSSSSkkSSSkk.....", ".....kSSSSkkSSSSkkSSSSk.....", "....kSSssSSSSSSSSSSssSSk....", "...kggkSSSSSSSSSSSSSSkggk...", "..kggggkkSSSSSSSSSSkkggggk..", ".kgggggggkkkkkkkkkkgggggggk.", "kggggggggggggggggggggggggggk", "kggggggggggggggggggggggggggk" } };
 
 void zPal(char ch, uint8_t &r, uint8_t &g, uint8_t &b) {
-  static const char C[] = "kSscRrWovyGgbhd";
-  static const uint8_t P[15][3] = { { 18, 18, 22 }, { 150, 155, 170 }, { 95, 100, 115 }, { 80, 230, 255 }, { 255, 40, 30 }, { 150, 20, 20 },
-                                    { 255, 255, 255 }, { 255, 140, 0 }, { 120, 95, 70 }, { 255, 210, 0 }, { 60, 200, 70 }, { 85, 95, 60 }, { 60, 120, 255 }, { 210, 215, 230 }, { 62, 65, 78 } };
+  static const char C[] = "kSscRrWovyGgbhdmae";
+  static const uint8_t P[18][3] = { { 18, 18, 22 }, { 150, 155, 170 }, { 95, 100, 115 }, { 80, 230, 255 }, { 255, 40, 30 }, { 150, 20, 20 },
+                                    { 255, 255, 255 }, { 255, 140, 0 }, { 120, 95, 70 }, { 255, 210, 0 }, { 60, 200, 70 }, { 85, 95, 60 }, { 60, 120, 255 }, { 210, 215, 230 }, { 62, 65, 78 },
+                                    { 120, 126, 142 }, { 176, 146, 104 }, { 34, 36, 44 } };
   const char *p = strchr(C, ch);
   int i = p && *p ? p - C : 0;
   r = P[i][0]; g = P[i][1]; b = P[i][2];
@@ -4953,6 +4977,7 @@ void zReset() {
   gPaused = false;
   gScore = 0; gWave = 0; gDead = 0; gBonus = 0; gLifeUp = false;
   zHp = 100; zArmor = 0; zAmmo = 50; zWeapon = 0; zHeavy = false; zHurt = 0; zFlash = 0; zPick = 0; zMsgT = 0; zMapOn = false;
+  zShake = 0; zHurtDir = 0; zHitT = 0; zCombo = 0; zKillT = 0;
   static bool tex = false;
   (void)tex;
   if (!zHudCv) zHudCv = new GFXcanvas16(W, H - zVH());
@@ -4968,11 +4993,13 @@ bool zSight(float x0, float y0, float x1, float y1) {
   }
   return true;
 }
-void zHurtMe(int dmg) {
+void zHurtMe(int dmg, int dir = 0) {  // dir : -1 tir venu de gauche, 1 de droite, 0 de face
   if (gDead || gStageT > 60) return;
+  zHurtDir = dir;
   int a = min(zArmor, dmg / 2);
   zArmor -= a; zHp -= dmg - a;
   zHurt = 10;
+  zShake = max(zShake, 5);
   if (!gDemo) rumbleReq = true;
   sfxBoom();
   if (zHp <= 0) {
@@ -4995,6 +5022,7 @@ void zBoom(ZMob &b) {
   sfxHit();
   if (!gDemo) rumbleReq = true;
   gScore += 30;
+  { float db = hypotf(zPX - b.x, zPY - b.y); zShake = max(zShake, db < 5 ? 14 : db < 9 ? 7 : 0); }  // l'explosion secoue la vue
   for (auto &m : zMob) {
     if (!m.on || &m == &b || m.state >= 3 || m.type == 3) continue;
     float d = hypotf(m.x - b.x, m.y - b.y);
@@ -5012,6 +5040,16 @@ void zKill(ZMob &m) {
   if (m.type == 4) { zBoom(m); return; }
   m.state = 3; m.t = 0;
   gScore += m.type == 0 ? 100 : m.type == 1 ? 200 : 600;
+  zHitKill = 10;
+  for (int i = 0; i < 3; i++)  // debris qui volent
+    for (auto &k : zSpark)
+      if (!k.on) { k = { m.x + (random(21) - 10) * 0.03f, m.y + (random(21) - 10) * 0.03f, 0, 0, (uint16_t)random(3), true }; break; }
+  zCombo = zKillT > 0 ? zCombo + 1 : 1;  // combo : robots detruits a moins de 3 s d'intervalle
+  zKillT = 120;
+  if (zCombo >= 2) {
+    gScore += 150UL * zCombo;
+    zMsgSet(zCombo == 2 ? "DOUBLE ! +300" : zCombo == 3 ? "TRIPLE ! +450" : "CARNAGE !");
+  }
   if (!gDemo && gScore > gHi) gHi = gScore;
   sfxHit();
 }
@@ -5033,11 +5071,25 @@ void zShoot() {
     if (!best) {  // impact dans le mur : etincelles
       float dw = zZbuf[W / 2] - 0.08f;
       for (auto &k : zSpark)
-        if (!k.on) { k = { zPX + ca * dw, zPY + sa * dw, 0, true }; break; }
+        if (!k.on) { k = { zPX + ca * dw, zPY + sa * dw, 0, 0, 0, true }; break; }
+      if (r == 0)  // tir manque de peu : ceux qui sont vises font un pas de cote
+        for (auto &m : zMob) {
+          if (!m.on || m.type >= 2 || m.state != 1 || m.dodgeT) continue;
+          float dx = m.x - zPX, dy = m.y - zPY, along = dx * ca + dy * sa, side = -dx * sa + dy * ca;
+          if (along > 0 && fabsf(side) < 1.2f && random(100) < 45) { m.dodgeT = 12 + random(12); m.dx = side > 0 ? 1 : -1; }
+        }
       continue;
     }
+    zHitT = 6;
+    if (best->type == 2 && bestD > 4.5f && best->state < 3) {  // colosse en garde : la moitie des degats, ca ricoche
+      dmg /= 2;
+      best->guard = 5;
+      for (auto &k : zSpark)
+        if (!k.on) { k = { best->x - ca * 0.4f, best->y - sa * 0.4f, 0, 0, 2, true }; break; }
+    }
     best->hp -= dmg;
-    best->flash = 4;
+    best->flash = best->guard ? 0 : 4;
+    if (best->type < 2 && zFree(best->x + ca * 0.12f, best->y + sa * 0.12f, 0.2f)) { best->x += ca * 0.12f; best->y += sa * 0.12f; }  // recul sous l'impact
     if (best->type != 4) {
       best->state = max<uint8_t>(best->state, 1);
       if (best->type != 2) { best->dodgeT = 14 + random(16); best->dx = random(2) ? 1 : -1; }
@@ -5132,6 +5184,10 @@ void zStep() {
   if (zPick > 0) zPick--;
   if (zMsgT > 0) zMsgT--;
   if (zFireT > 0) zFireT--;
+  if (zShake > 0) zShake--;
+  if (zHitT > 0) zHitT--;
+  if (zHitKill > 0) zHitKill--;
+  if (zKillT > 0) zKillT--;
   if (gDead > 0) {
     if (--gDead == 0) {
       if (gLives <= 0) {
@@ -5229,29 +5285,54 @@ void zStep() {
     if (m.state == 4) continue;
     float ex = zPX - m.x, ey = zPY - m.y, d = sqrtf(ex * ex + ey * ey) + 0.001f;
     bool see = (m.t % 6 == 0) ? zSight(m.x, m.y, zPX, zPY) : (m.state == 1);
-    if (m.state == 0 && see && d < 9) { m.state = 1; sfxDive(); }
+    if (m.state == 0) {
+      if (see && d < 9) { m.state = 1; sfxDive(); if (m.cool < 20) m.cool = 20; }  // repere : un court temps de reaction
+      else {  // ronde : il patrouille dans sa salle, sans passer les portes
+        if (m.t % 80 == 1) m.hd = random(628) / 100.0f;
+        float nx = m.x + cosf(m.hd) * 0.012f, ny = m.y + sinf(m.hd) * 0.012f;
+        int cx = nx, cy = ny;
+        if (cx >= 0 && cy >= 0 && cx < Z_N && cy < Z_N && zMap[cy][cx] == 0 && zFree(nx, ny, 0.25f)) { m.x = nx; m.y = ny; m.walk++; }
+        else m.hd += 1.7f;
+        continue;
+      }
+    }
     if (m.state != 1) continue;
     if (m.atk) m.atk--;
+    if (m.guard) m.guard--;
     int maxhp = m.type == 0 ? 20 : m.type == 1 ? 35 : 90;
     // tu le vises : il fait un pas de cote (le colosse, lui, fonce)
     float aim = fabsf(remainderf(atan2f(-ey, -ex) - zA + PI, 2 * PI));
-    if (!m.dodgeT && m.type != 2 && see && aim < 0.2f && random(100) < 7) { m.dodgeT = 16 + random(20); m.dx = random(2) ? 1 : -1; }
+    if (!m.dodgeT && m.type != 2 && see && aim < 0.2f && random(100) < (m.type == 0 ? 9 : 6)) { m.dodgeT = 16 + random(20); m.dx = random(2) ? 1 : -1; }
     float want = m.type == 0 ? 3.2f : m.type == 1 ? 4.0f : 0.7f, spd = (m.type == 0 ? 0.035f : m.type == 1 ? 0.027f : 0.03f) * diff;
     float ux = ex / d, uy = ey / d, mvx = 0, mvy = 0;
     bool flee = m.type != 2 && m.hp < maxhp * 0.35f && d < 6;
     if (flee) { mvx = -ux; mvy = -uy; }  // blesse : il recule en tirant
     else if (d > want) { mvx = ux; mvy = uy; }
     else if (m.type != 2 && d < want * 0.6f) { mvx = -ux * 0.7f; mvy = -uy * 0.7f; }  // trop pres : il garde ses distances
-    if (m.dodgeT) { m.dodgeT--; mvx += -uy * m.dx * 1.5f; mvy += ux * m.dx * 1.5f; }  // pas de cote
+    // au combat, jamais immobile : il tourne autour de toi et change de sens au hasard
+    if (m.strafeT) m.strafeT--;
+    else { m.strafeT = 25 + random(55); if (random(3)) m.dx = random(2) ? 1 : -1; }
+    if (m.dx == 0) m.dx = 1;
+    if (m.type != 2) {
+      float s = m.type == 0 ? 0.75f + sinf(m.t * 0.13f) * 0.55f : 0.6f;  // le drone louvoie
+      mvx += -uy * m.dx * s; mvy += ux * m.dx * s;
+    }
+    if (m.dodgeT) { m.dodgeT--; mvx += -uy * m.dx * 1.6f; mvy += ux * m.dx * 1.6f; }  // pas de cote
     if (m.type == 2 && d < 4.5f) { spd *= 1.9f; float z = sinf(m.t * 0.25f) * 0.7f; mvx += -uy * z; mvy += ux * z; }  // charge en zigzag
+    for (auto &o : zMob) {  // ils s'ecartent les uns des autres
+      if (&o == &m || !o.on || o.type >= 3 || o.state >= 3) continue;
+      float sx = m.x - o.x, sy = m.y - o.y, s2 = sx * sx + sy * sy;
+      if (s2 < 0.5f && s2 > 1e-4f) { float k = (0.5f - s2) * 3 / sqrtf(s2); mvx += sx * k; mvy += sy * k; }
+    }
     if (mvx != 0 || mvy != 0) {
       float nx = m.x + mvx * spd, ny = m.y + mvy * spd;
       int cx = nx, cy = ny;
-      if ((zMap[cy][cx] == 5 || (zMap[cy][cx] == 6 && zKey)) && zOpen[cy][cx] < 14) zDoorT[cy][cx] = 160;  // ils ouvrent les portes
-      bool okx = !zWall((int)nx, (int)m.y), oky = !zWall((int)m.x, (int)ny);
+      if (cx >= 0 && cy >= 0 && cx < Z_N && cy < Z_N && (zMap[cy][cx] == 5 || (zMap[cy][cx] == 6 && zKey)) && zOpen[cy][cx] < 14) zDoorT[cy][cx] = 160;  // ils ouvrent les portes
+      bool okx = zFree(nx, m.y, 0.2f), oky = zFree(m.x, ny, 0.2f);
       if (okx) m.x = nx;
       if (oky) m.y = ny;
-      if (m.dodgeT && !okx && !oky) m.dx = -m.dx;  // bloque contre un mur : esquive de l'autre cote
+      if (!okx && !oky) { m.dx = -m.dx; m.strafeT = 20; }  // bloque : il repart de l'autre cote
+      else if ((!okx || !oky) && m.strafeT > 20) { m.dx = -m.dx; m.strafeT = 20; }
       m.walk++;
     }
     if (m.cool > 0) m.cool--;
@@ -5269,8 +5350,8 @@ void zStep() {
     if (m.burst && m.t % 6 == 0) {
       float a = atan2f(ey, ex) + (random(3) - 1) * 0.06f;
       zFireShot(m.x, m.y, m.x + cosf(a), m.y + sinf(a), 0.12f * diff);
-      m.burst--;
       m.atk = 4;
+      if (--m.burst == 0) { m.dodgeT = 14 + random(14); m.dx = random(2) ? 1 : -1; }  // apres la rafale, il se decale
     }
   }
   for (auto &k : zSpark)
@@ -5279,7 +5360,11 @@ void zStep() {
     if (!s.on) continue;
     s.x += s.vx; s.y += s.vy; s.t++;
     if (zWall((int)s.x, (int)s.y) || s.t > 200) { s.on = false; continue; }
-    if (fabsf(s.x - zPX) < 0.3f && fabsf(s.y - zPY) < 0.3f) { s.on = false; zHurtMe(8 + gWave); }
+    if (fabsf(s.x - zPX) < 0.3f && fabsf(s.y - zPY) < 0.3f) {
+      s.on = false;
+      float rel = remainderf(atan2f(-s.vy, -s.vx) - zA, 2 * PI);  // d'ou vient le tir
+      zHurtMe(8 + gWave, rel < -0.5f ? -1 : rel > 0.5f ? 1 : 0);
+    }
   }
   if (gStageT > 0) gStageT--;
 }
@@ -5289,9 +5374,22 @@ void zHudDraw() {
   if (key == zHudKey) return;
   zHudKey = key;
   GFXcanvas16 &c = *zHudCv;
-  c.fillScreen(rgb(36, 36, 44));
-  c.drawFastHLine(0, 0, W, rgb(110, 110, 125));
-  int y = hh >= 12 ? 4 : 2;
+  for (int yy = 0; yy < hh; yy++) c.drawFastHLine(0, yy, W, rgb(50 - yy * 2, 50 - yy * 2, 62 - yy * 2));  // degrade metal
+  c.drawFastHLine(0, 0, W, rgb(140, 140, 155));
+  c.drawFastHLine(0, 1, W, rgb(16, 16, 22));
+  for (int sx : { 20, 41, 62 }) { c.drawFastVLine(sx, 2, hh - 2, rgb(16, 16, 22)); c.drawFastVLine(sx + 1, 2, hh - 2, rgb(70, 70, 84)); }
+  int y = hh >= 12 ? 3 : 2;
+  if (hh >= 12) {  // jauges : sante (vert -> rouge), armure, munitions
+    auto bar = [&](int x, int v, int vmax, uint16_t col) {
+      c.drawFastHLine(x, 9, 18, rgb(16, 16, 22));
+      c.drawFastHLine(x, 10, 18, rgb(16, 16, 22));
+      int w = constrain(v * 18 / vmax, 0, 18);
+      if (w) { c.drawFastHLine(x, 9, w, col); c.drawFastHLine(x, 10, w, (col >> 1) & 0x7BEF); }
+    };
+    bar(1, zHp, 100, zHp > 60 ? rgb(60, 220, 70) : zHp > 30 ? rgb(255, 200, 0) : rgb(255, 40, 30));
+    bar(22, zArmor, 100, rgb(60, 140, 255));
+    bar(43, zAmmo, 200, rgb(255, 200, 0));
+  }
   char b[16];
   auto icon = [&](int x, const char *rows[5], uint16_t col) {
     for (int r = 0; r < 5; r++)
@@ -5320,12 +5418,13 @@ void zDraw() {
   zHudDraw();
   int VH = zVH(), hh = H - VH;
   float plane = min(1.0f, W / (2.0f * VH * 1.35f)), K = W / (2 * plane);
-  float dirX = cosf(zA), dirY = sinf(zA), plX = -dirY * plane, plY = dirX * plane;
-  int horizon = VH / 2 + (int)(sinf(zBob) * 1.2f);
+  float shA = zShake ? (random(-zShake, zShake + 1)) * 0.0035f : 0;  // tremblement (explosion, coup recu)
+  float dirX = cosf(zA + shA), dirY = sinf(zA + shA), plX = -dirY * plane, plY = dirX * plane;
+  int horizon = VH / 2 + (int)(sinf(zBob) * 1.2f) + (zShake ? (int)random(-(zShake + 2) / 3, (zShake + 2) / 3 + 1) : 0);
   float bobX = sinf(zBob * 0.5f) * 2.0f, bobY = fabsf(cosf(zBob * 0.5f)) * 2.0f;
   // sprites visibles, du plus loin au plus proche
-  struct Spr { float tx, ty; int16_t sx, w, h, top; const char *const *art; uint8_t aw, ah, kind; int8_t flash; };
-  static Spr spr[Z_MOBS + Z_ITEMS + Z_SHOTS];
+  struct Spr { float tx, ty, wx, wy, lr, lg, lb; int16_t sx, w, h, top, fy; const char *const *art; uint8_t aw, ah, kind; int8_t flash; };
+  static Spr spr[Z_MOBS * 2 + Z_ITEMS + Z_SHOTS + 6];  // robots + fumees, objets, tirs, etincelles
   int ns = 0;
   float inv = 1.0f / (plX * dirY - dirX * plY);
   auto addSpr = [&](float x, float y, float hgt, float lift, const char *const *art, uint8_t aw, uint8_t ah, uint8_t kind, int8_t fl) {
@@ -5338,16 +5437,21 @@ void zDraw() {
     s.w = max(1, s.h * aw / ah);
     s.top = horizon + (int)(K * 0.5f / ty) - s.h - (int)(K * lift / ty);
     s.art = art; s.aw = aw; s.ah = ah; s.kind = kind; s.flash = fl;
+    s.wx = x; s.wy = y; s.lr = s.lg = s.lb = 0;
+    s.fy = horizon + (int)(K * 0.5f / ty);  // niveau du sol sous l'objet (ombre)
   };
   for (auto &m : zMob) {
     if (!m.on) continue;
     if (m.type == 3) addSpr(m.x, m.y, 1.0f, 0, ZS_COLUMN, 16, 16, 0, 0);
     else if (m.type == 4 && m.state == 3) addSpr(m.x, m.y, 0.4f + m.t * 0.07f, 0.1f, nullptr, 1, 1, 2, m.t);  // grosse explosion
     else if (m.type == 4) addSpr(m.x, m.y, 0.55f, 0, ZS_BARREL, 16, 16, 0, m.flash);
-    else if (m.state == 4) addSpr(m.x, m.y, 0.6f, 0, ZS_SCRAP, 16, 16, 0, 0);
+    else if (m.state == 4) {
+      addSpr(m.x, m.y, 0.6f, 0, ZS_SCRAP, 16, 16, 0, 0);
+      if (m.t < 100) addSpr(m.x, m.y + 0.01f, 0.3f + (m.t - 15) * 0.006f, 0.25f + (m.t - 15) * 0.012f, nullptr, 1, 1, 6, m.t);  // fumee qui monte de l'epave
+    }
     else if (m.state == 3) addSpr(m.x, m.y, 0.25f + m.t * 0.04f, 0.25f, nullptr, 1, 1, 2, m.t);  // explosion
-    else if (m.type == 0) addSpr(m.x, m.y, 0.5f, 0.35f + sinf(m.t * 0.1f) * 0.06f, ZS_DRONE[(m.t >> 2) & 1], 16, 16, m.atk ? 3 : 0, m.flash);
-    else addSpr(m.x, m.y, m.type == 2 ? 0.95f : 0.8f, 0, (m.type == 1 ? ZS_SENT : ZS_BRUTE)[(m.walk >> 3) & 1], 16, 16, m.atk ? 3 : 0, m.flash);
+    else if (m.type == 0) addSpr(m.x, m.y, 0.5f, 0.35f + sinf(m.t * 0.1f) * 0.06f, ZS_DRONE[(m.t >> 2) & 1], 24, 24, m.atk ? 3 : 0, m.flash);
+    else addSpr(m.x, m.y, m.type == 2 ? 0.95f : 0.8f, 0, (m.type == 1 ? ZS_SENT : ZS_BRUTE)[(m.walk >> 3) & 1], 24, 24, m.atk ? 3 : 0, m.guard ? -1 : m.flash);
   }
   for (auto &it : zItem)
     if (it.on) addSpr(it.x + 0.5f, it.y + 0.5f, 0.28f, 0, ZS_ITEM[it.type], 8, 8, 0, 0);
@@ -5375,12 +5479,15 @@ void zDraw() {
       r += lt[i].r * k; g += lt[i].g * k; b += lt[i].b * k;
     }
   };
+  if (nl)  // lumiere recue par chaque objet (plasma, explosions, tir)
+    for (int i = 0; i < ns; i++)
+      if (spr[i].art) lightAt(spr[i].wx, spr[i].wy, spr[i].lr, spr[i].lg, spr[i].lb);
   static float vigY[256];  // vignettage : les bords de l'image un peu plus sombres
   for (int y = 0; y < VH; y++) { float v = (y - VH / 2.0f) / (VH / 2.0f); vigY[y] = v * v * 0.28f; }
   static float rowD[256];
   for (int y = 0; y < VH; y++) rowD[y] = y == horizon ? 99 : (K * 0.5f) / fabsf(y - horizon + 0.5f);
   float light = 1 + (zFlash > 2 ? 0.25f : 0);
-  int gs = VH >= 100 ? 2 : 1, gw = 28 * gs, ghh = 16 * gs, gx = W / 2 - gw / 2 + (int)bobX, gy = VH - ghh + 2 + (int)bobY;
+  int gs = VH >= 100 ? 2 : 1, gw = 28 * gs, ghh = 16 * gs, gx = W / 2 - gw / 2 + (int)bobX, gy = VH - ghh + 2 + (int)bobY + (zFlash > 1 ? (zFlash - 1) * gs : 0);  // recul au tir
   int mapS = VH >= 100 ? 3 : 2, mapX0 = W - Z_N * mapS - 2, mapY0 = 1;
   uint16_t col[256];
   for (int x = 0; x < W; x++) {
@@ -5414,6 +5521,11 @@ void zDraw() {
     float hX = zPX + rdx * dist, hY = zPY + rdy * dist, lr = 0, lg = 0, lb = 0;
     if (nl) lightAt(hX, hY, lr, lg, lb);  // lumiere recue par ce mur
     float vx = (x - W / 2.0f) / (W / 2.0f), vigX = vx * vx * 0.28f;
+    float hurtK = 0;  // voile rouge : sur tout l'ecran, ou du cote d'ou vient le tir
+    if (zHurt) {
+      float side = zHurtDir < 0 ? -vx : zHurtDir > 0 ? vx : 0;
+      hurtK = constrain(zHurt * (zHurtDir ? 0.02f + max(0.0f, side - 0.2f) * 0.09f : 0.05f), 0.0f, 0.85f);
+    }
     uint32_t wid = mx * 131 + my * 71 + side * 7;
     float fog = light / (1 + dist * dist * 0.035f), shade = (side ? 0.72f : 1.0f) * fog;
     for (int y = 0; y < VH; y++) {
@@ -5435,10 +5547,12 @@ void zDraw() {
           int tn = zHash((int)floorf(fx * 2) * 57 + (int)floorf(fy * 2) * 113) & 15;
           float v = (sx < 0.05f || sy < 0.05f) ? 40 : (sx < 0.12f || sy < 0.12f) ? 105 + tn : 78 + tn + n / 2;
           float wall = 1;
-          if (ux < 0.25f && zMap[cy][max(0, cx - 1)]) wall = min(wall, 0.55f + ux * 1.8f);
-          if (ux > 0.75f && zMap[cy][min(Z_N - 1, cx + 1)]) wall = min(wall, 0.55f + (1 - ux) * 1.8f);
-          if (uy < 0.25f && zMap[max(0, cy - 1)][cx]) wall = min(wall, 0.55f + uy * 1.8f);
-          if (uy > 0.75f && zMap[min(Z_N - 1, cy + 1)][cx]) wall = min(wall, 0.55f + (1 - uy) * 1.8f);
+          if (cx >= 0 && cy >= 0 && cx < Z_N && cy < Z_N) {  // ombre au pied des murs (jamais hors de la carte)
+            if (ux < 0.25f && zMap[cy][max(0, cx - 1)]) wall = min(wall, 0.55f + ux * 1.8f);
+            if (ux > 0.75f && zMap[cy][min(Z_N - 1, cx + 1)]) wall = min(wall, 0.55f + (1 - ux) * 1.8f);
+            if (uy < 0.25f && zMap[max(0, cy - 1)][cx]) wall = min(wall, 0.55f + uy * 1.8f);
+            if (uy > 0.75f && zMap[min(Z_N - 1, cy + 1)][cx]) wall = min(wall, 0.55f + (1 - uy) * 1.8f);
+          }
           r = v * wall; g = v * wall; b = (v + 7) * wall;
         } else {
           bool lamp = (cx % 3 == 1) && (cy % 3 == 1) && ux > 0.3f && ux < 0.7f && uy > 0.3f && uy < 0.7f;
@@ -5454,7 +5568,7 @@ void zDraw() {
         r *= fg; g *= fg; b *= fg;
       }
       { float v = 1 - vigX - vigY[y]; r *= v; g *= v; b *= v; }
-      if (zHurt) { float k = zHurt * 0.05f; r += (255 - r) * k; g *= 1 - k; b *= 1 - k; }
+      if (zHurt) { r += (255 - r) * hurtK; g *= 1 - hurtK; b *= 1 - hurtK; }
       if (zPick) { float k = zPick * 0.03f; g += (255 - g) * k; }
       col[y] = rgb(constrain(r, 0.0f, 255.0f), constrain(g, 0.0f, 255.0f), constrain(b, 0.0f, 255.0f));
     }
@@ -5464,6 +5578,29 @@ void zDraw() {
       int x0 = s.sx - s.w / 2;
       if (x < x0 || x >= x0 + s.w) continue;
       float fog2 = light / (1 + s.ty * s.ty * 0.035f);
+      if (s.art) {  // ombre au sol, sous l'objet
+        float hw = s.w * 0.42f + 0.5f, du = (x - s.sx) / hw;
+        if (du > -1 && du < 1) {
+          int hh2 = max(1, (int)(s.w * 0.09f)), y0 = max(0, s.fy - hh2), y1 = min(VH - 1, s.fy + hh2);
+          for (int y = y0; y <= y1; y++) {
+            float dv = (float)(y - s.fy) / hh2;
+            if (du * du + dv * dv < 1) col[y] = (col[y] >> 1) & 0x7BEF;
+          }
+        }
+      }
+      if (s.kind == 6) {  // fumee : nuage trame gris, de plus en plus leger
+        float u = (x - s.sx) / (s.w / 2.0f + 0.01f);
+        static const uint8_t BAYER[4][4] = { { 0, 8, 2, 10 }, { 12, 4, 14, 6 }, { 3, 11, 1, 9 }, { 15, 7, 13, 5 } };
+        float dens = s.flash < 50 ? 10 : 10 - (s.flash - 50) * 0.16f;  // la fumee se dissipe
+        uint16_t gr = (rgb(110, 110, 118) >> 1) & 0x7BEF;
+        for (int y = max(0, (int)s.top); y < min(VH, (int)(s.top + s.h)); y++) {
+          float v = (y - s.top - s.h / 2.0f) / (s.h / 2.0f + 0.01f);
+          float d2 = u * u + v * v;
+          if (d2 > 1 || BAYER[(y + (s.flash >> 3)) & 3][x & 3] >= (int)(dens * (1 - d2 * 0.75f))) continue;  // plus dense au centre
+          col[y] = ((col[y] >> 1) & 0x7BEF) + gr;
+        }
+        continue;
+      }
       if (s.kind == 1 || s.kind == 2 || s.kind == 4) {  // plasma, explosion ou etincelle : disque lumineux
         float u = (x - s.sx) / (s.w / 2.0f + 0.01f);
         for (int y = max(0, (int)s.top); y < min(VH, (int)(s.top + s.h)); y++) {
@@ -5477,15 +5614,22 @@ void zDraw() {
       }
       int ax = (x - x0) * s.aw / s.w;
       for (int y = max(0, (int)s.top); y < min(VH, (int)(s.top + s.h)); y++) {
-        char ch = s.art[(y - s.top) * s.ah / s.h][ax];
+        int ay = (y - s.top) * s.ah / s.h;
+        const char *row = s.art[ay];
+        char ch = row[ax];
         if (ch == '.') continue;
         uint8_t r, g, b;
         zPal(ch, r, g, b);
-        if (s.flash) col[y] = rgb(255, 255, 255);
+        if (s.flash > 0) col[y] = rgb(255, 255, 255);
+        else if (s.flash < 0) col[y] = (ch == 'v' || ch == 'h') ? rgb(150, 200, 255) : rgb(60, 90, 160);  // garde du colosse : le tir ricoche
         else if (s.kind == 3 && (ch == 'c' || ch == 'R' || ch == 'W')) col[y] = rgb(255, 245, 160);  // canon ou oeil qui flambe au tir
-        else {
-          float f = (ch == 'c' || ch == 'R' || ch == 'W') ? max(fog2, 0.8f) : fog2;  // les yeux et voyants brillent dans le noir
+        else if (ch == 'c' || ch == 'R' || ch == 'W' || ch == 'o' || ch == 'y') {  // yeux, voyants, reacteur : brillent dans le noir
+          float f = max(fog2, 0.8f);
           col[y] = rgb(r * f, g * f, b * f);
+        } else {  // volume : bord gauche et dessus eclaires, bord droit assombri, lumiere du plafond en haut
+          float sh = (ax + 1 >= s.aw || row[ax + 1] == '.') ? 0.68f : (ax == 0 || row[ax - 1] == '.') ? 1.3f : (ay == 0 || s.art[ay - 1][ax] == '.') ? 1.25f : 1.0f;
+          float f = fog2 * sh * (1.12f - 0.3f * ay / s.ah);
+          col[y] = rgb(constrain(r * f + s.lr * fog2 * 0.45f, 0.0f, 255.0f), constrain(g * f + s.lg * fog2 * 0.45f, 0.0f, 255.0f), constrain(b * f + s.lb * fog2 * 0.45f, 0.0f, 255.0f));
         }
       }
     }
@@ -5498,7 +5642,8 @@ void zDraw() {
         if (ch == '.') continue;
         uint8_t r, g, b;
         zPal(ch, r, g, b);
-        col[y] = rgb(r, g, b);
+        if (zFlash > 1) col[y] = rgb(min(255, r * 3 / 2 + 30), min(255, g * 4 / 3 + 15), b);  // l'arme eclairee par le tir
+        else col[y] = rgb(r, g, b);
       }
       if (zFlash > 1) {
         int fx = gx + gw / 2, fy = gy - 2 * gs, rr = (zFlash + 2) * gs;
@@ -5506,9 +5651,11 @@ void zDraw() {
           if ((x - fx) * (x - fx) + (y - fy) * (y - fy) <= rr * rr) col[y] = (x - fx) * (x - fx) + (y - fy) * (y - fy) <= rr * rr / 3 ? rgb(255, 255, 220) : rgb(255, 170, 30);
       }
     }
-    if (abs(x - W / 2) <= 1 && !zMapOn) {  // viseur
-      col[horizon] = rgb(255, 255, 255);
-      if (x == W / 2) { col[horizon - 2] = rgb(255, 255, 255); col[horizon + 2] = rgb(255, 255, 255); }
+    if (!zMapOn && horizon >= 4 && horizon < VH - 4) {  // viseur : rouge quand tu touches, il s'ouvre quand tu detruis
+      int sp = zHitKill ? 3 : zHitT ? 2 : 1, cxh = W / 2;
+      uint16_t vc = zHitKill ? rgb(255, 210, 0) : zHitT ? rgb(255, 40, 40) : rgb(255, 255, 255);
+      if (x == cxh) { col[horizon - sp - 1] = vc; col[horizon + sp + 1] = vc; if (!zHitT && !zHitKill) col[horizon] = vc; }
+      else if (abs(x - cxh) == sp + 1 || (zHitT && abs(x - cxh) == sp + 2)) col[horizon] = vc;
     }
     if (zMapOn && x >= mapX0 && x < mapX0 + Z_N * mapS) {  // mini-carte
       int cxm = (x - mapX0) / mapS;
@@ -6053,6 +6200,12 @@ void handleSerial() {
       Serial.println("Manettes associees oubliees : PS + Share sur chaque manette pour l'associer de nouveau");
     } else if (cmd == 'm') {
       pairStart(60000);
+    } else if (cmd == 'j') {  // test : demo du jeu N (0 a N_GAMES - 1)
+      int g = atoi(arg);
+      if (*arg && g >= 0 && g < N_GAMES) {
+        gGame = g; topLoad(); gDemo = true; startAttract();
+        Serial.printf("Demo du jeu %d (%s), memoire libre %u\n", g, GAME_NAME[g], ESP.getFreeHeap());
+      } else Serial.printf("Format : j 0 a j %d\n", N_GAMES - 1);
     } else if (cmd == 'c') {
       if (strlen(arg) == 4 && arg[0] >= '1' && arg[0] <= '4' && arg[1] >= '0' && arg[1] <= '2') {
         prefs.putUChar("nb", arg[0] - '0');

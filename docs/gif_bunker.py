@@ -22,14 +22,15 @@ def arr(name, n):
 
 
 SCRAP, COLUMN, BARREL = (arr(n, 16) for n in ('ZS_SCRAP[16]', 'ZS_COLUMN[16]', 'ZS_BARREL[16]'))
-DRONE, SENT, BRUTE = (arr(n, 32)[:16] for n in ('ZS_DRONE[2][16]', 'ZS_SENT[2][16]', 'ZS_BRUTE[2][16]'))
+DRONE, SENT, BRUTE = (arr(n, 48)[:24] for n in ('ZS_DRONE[2][24]', 'ZS_SENT[2][24]', 'ZS_BRUTE[2][24]'))
 items = arr('ZS_ITEM[5][8]', 40)
 ITEM = [items[i * 8:(i + 1) * 8] for i in range(5)]
 guns = arr('ZS_GUN[2][16]', 32)
 GUN = [guns[:16], guns[16:]]
-PALC = "kSscRrWovyGgbhd"
+PALC = "kSscRrWovyGgbhdmae"
 PAL = [(18, 18, 22), (150, 155, 170), (95, 100, 115), (80, 230, 255), (255, 40, 30), (150, 20, 20), (255, 255, 255), (255, 140, 0),
-       (120, 95, 70), (255, 210, 0), (60, 200, 70), (85, 95, 60), (60, 120, 255), (210, 215, 230), (62, 65, 78)]
+       (120, 95, 70), (255, 210, 0), (60, 200, 70), (85, 95, 60), (60, 120, 255), (210, 215, 230), (62, 65, 78),
+       (120, 126, 142), (176, 146, 104), (34, 36, 44)]
 
 
 def pal(ch):
@@ -166,14 +167,91 @@ def wall(x, y):
     return not (0 <= x < len(GRID[0]) and 0 <= y < len(GRID)) or GRID[y][x] != 0
 
 
-def render(px_, py_, a, frame, sprites, weapon=0, flash=0, bob=0.0):
+# police 3 x 5 du firmware (tinyText)
+def _tf():
+    g = {}
+    dig = re.search(r'TF_DIG\[10\]\[5\] = \{(.*?)\};', SRC, re.S).group(1)
+    for i, m in enumerate(re.findall(r'\{([^}]*)\}', dig)):
+        g[str(i)] = [int(v) for v in m.split(',')]
+    names = dict(re.findall(r"case '(.)': return (TF_\w+);", SRC))
+    for ch, nm in names.items():
+        m = re.search(nm + r'\[5\] = \{([^}]*)\}', SRC)
+        if m:
+            g[ch] = [int(v) for v in m.group(1).split(',')]
+    g['O'] = g['0']
+    return g
+
+
+TF = _tf()
+
+
+def tiny(d, x, y, s, col):
+    for ch in s:
+        gl = TF.get(ch)
+        if gl:
+            for r in range(5):
+                for c in range(3):
+                    if gl[r] & (4 >> c):
+                        d.point((x + c, y + r), fill=col)
+        x += 4
+
+
+def hud(im, hp=100, armor=0, ammo=50, lives=3, score=0, key=False, weapon=0, frame=0):  # zHudDraw du firmware
+    d = ImageDraw.Draw(im)
+    hh = H - VH
+    for yy in range(hh):
+        v = 50 - yy * 2
+        d.line((0, VH + yy, W - 1, VH + yy), fill=(v, v, v + 12))
+    d.line((0, VH, W - 1, VH), fill=(140, 140, 155))
+    d.line((0, VH + 1, W - 1, VH + 1), fill=(16, 16, 22))
+    for sx in (20, 41, 62):
+        d.line((sx, VH + 2, sx, H - 1), fill=(16, 16, 22))
+        d.line((sx + 1, VH + 2, sx + 1, H - 1), fill=(70, 70, 84))
+    y = VH + (3 if hh >= 12 else 2)
+    if hh >= 12:
+        def bar(x, v, vmax, col):
+            d.line((x, VH + 9, x + 17, VH + 9), fill=(16, 16, 22))
+            d.line((x, VH + 10, x + 17, VH + 10), fill=(16, 16, 22))
+            w = max(0, min(18, v * 18 // vmax))
+            if w:
+                d.line((x, VH + 9, x + w - 1, VH + 9), fill=col)
+                d.line((x, VH + 10, x + w - 1, VH + 10), fill=tuple(c // 2 for c in col))
+        bar(1, hp, 100, (60, 220, 70) if hp > 60 else (255, 200, 0) if hp > 30 else (255, 40, 30))
+        bar(22, armor, 100, (60, 140, 255))
+        bar(43, ammo, 200, (255, 200, 0))
+
+    def icon(x, rows, col):
+        for r in range(5):
+            for q in range(5):
+                if rows[r][q] != '.':
+                    d.point((x + q, y + r), fill=col)
+    icon(1, (".r.r.", "rrrrr", "rrrrr", ".rrr.", "..r.."), (255, 50, 40))
+    tiny(d, 7, y, str(hp), (255, 90, 80))
+    icon(22, ("bbbbb", "bbbbb", "bbbbb", ".bbb.", "..b.."), (60, 140, 255))
+    tiny(d, 28, y, str(armor), (120, 180, 255))
+    icon(43, (".y.y.", "yyyyy", "yyyyy", "yyyyy", "yyyyy"), (255, 140, 0) if weapon else (255, 210, 0))
+    tiny(d, 49, y, str(ammo), (255, 220, 80))
+    if key:
+        d.rectangle((65, y, 70, y + 3), fill=(230, 30, 30))
+        d.line((66, y + 1, 67, y + 1), fill=(255, 255, 255))
+    for i in range(min(lives, 4)):
+        d.rectangle((74 + i * 4, y + 1, 76 + i * 4, y + 3), fill=(60, 200, 70))
+    sc = str(score)
+    tiny(d, W - 1 - (len(sc) * 4 - 1), y, sc, (230, 230, 230))
+
+
+BAYER = ((0, 8, 2, 10), (12, 4, 14, 6), (3, 11, 1, 9), (15, 7, 13, 5))
+
+
+def render(px_, py_, a, frame, sprites, weapon=0, flash=0, bob=0.0, hurt=0, hurt_dir=0, hit=0, shake=0, msg=None, hudv=None):
     im = Image.new('RGB', (W, H))
     pix = im.load()
     plane = min(1.0, W / (2.0 * VH * 1.35))
     K = W / (2 * plane)
+    a += (((frame * 7919) % (2 * shake + 1)) - shake) * 0.0035 if shake else 0  # tremblement
     dx, dy = math.cos(a), math.sin(a)
     plx, ply = -dy * plane, dx * plane
-    horizon = VH // 2 + int(math.sin(bob) * 1.2)
+    horizon = VH // 2 + int(math.sin(bob) * 1.2) + ((frame % 3) - 1 if shake else 0)
     inv = 1 / (plx * dy - dx * ply)
     spr = []
     for (sx, sy, hgt, lift, art, aw, ah, kind) in sprites:
@@ -182,13 +260,14 @@ def render(px_, py_, a, frame, sprites, weapon=0, flash=0, bob=0.0):
         if ty < .15:
             continue
         h = max(1, int(K * hgt / ty))
-        spr.append((ty, int(W / 2 * (1 + tx / ty)), max(1, h * aw // ah), h, horizon + int(K * .5 / ty) - h - int(K * lift / ty), art, aw, ah, kind))
+        spr.append((ty, int(W / 2 * (1 + tx / ty)), max(1, h * aw // ah), h, horizon + int(K * .5 / ty) - h - int(K * lift / ty), art, aw, ah, kind,
+                    horizon + int(K * .5 / ty), sx, sy))
     spr.sort(key=lambda s: -s[0])
     lights = [(sx, sy, 20, 80, 30, 1.6) for (sx, sy, hgt, lift, art, aw, ah, kind) in sprites if kind == 1]
     if flash > 1:
         lights.append((px_ + dx * .5, py_ + dy * .5, 55, 40, 15, 2.5))
 
-    def light_at(x0, y0):
+    def light_at(x0, y0):  # noqa
         r = g = b = 0
         for lx, ly, lr, lg, lb, rad in lights:
             dd = math.hypot(x0 - lx, y0 - ly)
@@ -196,8 +275,9 @@ def render(px_, py_, a, frame, sprites, weapon=0, flash=0, bob=0.0):
                 k = 1 - dd / rad
                 r, g, b = r + lr * k, g + lg * k, b + lb * k
         return r, g, b
-    gs, gw, gh = 1, 28, 16
-    gx, gy = W // 2 - gw // 2 + int(math.sin(bob * .5) * 2), VH - gh + 2 + int(abs(math.cos(bob * .5)) * 2)
+    gs = 2 if VH >= 100 else 1
+    gw, gh = 28 * gs, 16 * gs
+    gx, gy = W // 2 - gw // 2 + int(math.sin(bob * .5) * 2), VH - gh + 2 + int(abs(math.cos(bob * .5)) * 2) + ((flash - 1) * gs if flash > 1 else 0)
     light = 1.25 if flash > 2 else 1.0
     for x in range(W):
         cam = 2 * x / W - 1
@@ -224,7 +304,12 @@ def render(px_, py_, a, frame, sprites, weapon=0, flash=0, bob=0.0):
         shade = (0.72 if side else 1.0) * fog
         wid = mx * 131 + my * 71 + side * 7
         lr, lg, lb = light_at(px_ + rdx * dist, py_ + rdy * dist)
-        vgx = ((x - W / 2) / (W / 2)) ** 2 * .28
+        vx_ = (x - W / 2) / (W / 2)
+        vgx = vx_ ** 2 * .28
+        hk = 0
+        if hurt:
+            sd = -vx_ if hurt_dir < 0 else vx_ if hurt_dir > 0 else 0
+            hk = min(.85, hurt * (.02 + max(0, sd - .2) * .09 if hurt_dir else .05))
         col = []
         for y in range(VH):
             if top <= y < top + lh:
@@ -274,53 +359,91 @@ def render(px_, py_, a, frame, sprites, weapon=0, flash=0, bob=0.0):
                 r, g, b = r * fg, g * fg, b * fg
             vg = 1 - vgx - ((y - VH / 2) / (VH / 2)) ** 2 * .28
             r, g, b = r * vg, g * vg, b * vg
+            if hk:
+                r, g, b = r + (255 - r) * hk, g * (1 - hk), b * (1 - hk)
             col.append((r, g, b))
-        for (ty, ssx, sw, sh, stop, art, aw, ah, kind) in spr:
+        for (ty, ssx, sw, sh, stop, art, aw, ah, kind, sfy, swx, swy) in spr:
             if ty >= dist:
                 continue
             x0 = ssx - sw // 2
             if not x0 <= x < x0 + sw:
                 continue
             f2 = light / (1 + ty * ty * .035)
-            if kind == 1:
+            if art:  # ombre au sol
+                hw = sw * .42 + .5
+                du = (x - ssx) / hw
+                if -1 < du < 1:
+                    hh2 = max(1, int(sw * .09))
+                    for y in range(max(0, sfy - hh2), min(VH - 1, sfy + hh2) + 1):
+                        if du * du + ((y - sfy) / hh2) ** 2 < 1:
+                            col[y] = tuple(c / 2 for c in col[y])
+            if kind == 6:  # fumee
+                u = (x - ssx) / (sw / 2 + .01)
+                for y in range(max(0, stop), min(VH, stop + sh)):
+                    vv = (y - stop - sh / 2) / (sh / 2 + .01)
+                    d2 = u * u + vv * vv
+                    if d2 <= 1 and BAYER[y & 3][x & 3] < int(10 * (1 - d2 * .75)):
+                        col[y] = tuple(c / 2 + g2 / 2 for c, g2 in zip(col[y], (110, 110, 118)))
+                continue
+            slr, slg, slb = light_at(swx, swy) if (art and lights) else (0, 0, 0)
+            if kind in (1, 4):
                 u = (x - ssx) / (sw / 2 + .01)
                 for y in range(max(0, stop), min(VH, stop + sh)):
                     vv = (y - stop - sh / 2) / (sh / 2 + .01)
                     d2 = u * u + vv * vv
                     if d2 <= 1:
-                        col[y] = (255, 255, 255) if d2 < .35 else (120, 255, 120)
+                        if kind == 1:
+                            col[y] = (255, 255, 255) if d2 < .35 else (120, 255, 120)
+                        elif (x + y) & 1 or d2 < .3:
+                            col[y] = (255, 255, 220) if d2 < .5 else (255, 170, 40)
                 continue
             ax = (x - x0) * aw // sw
             for y in range(max(0, stop), min(VH, stop + sh)):
-                ch = art[(y - stop) * ah // sh][ax]
+                ay = (y - stop) * ah // sh
+                row = art[ay]
+                ch = row[ax]
                 if ch == '.':
                     continue
-                f = max(f2, .8) if ch in 'cRW' else f2
+                if kind == 5:  # garde du colosse : le tir ricoche
+                    col[y] = (150, 200, 255) if ch in 'vh' else (60, 90, 160)
+                    continue
+                if kind == 3 and ch in 'cRW':  # canon qui flambe
+                    col[y] = (255, 245, 160)
+                    continue
                 c = pal(ch)
-                col[y] = (c[0] * f, c[1] * f, c[2] * f)
+                if ch in 'cRWoy':
+                    f = max(f2, .8)
+                    col[y] = (c[0] * f, c[1] * f, c[2] * f)
+                    continue
+                shd = .68 if (ax + 1 >= aw or row[ax + 1] == '.') else 1.3 if (ax == 0 or row[ax - 1] == '.') else 1.25 if (ay == 0 or art[ay - 1][ax] == '.') else 1.0
+                f = f2 * shd * (1.12 - .3 * ay / ah)
+                col[y] = (c[0] * f + slr * f2 * .45, c[1] * f + slg * f2 * .45, c[2] * f + slb * f2 * .45)
         if gx <= x < gx + gw:
-            ax = x - gx
+            ax = (x - gx) // gs
             for y in range(max(0, gy), VH):
-                ay = y - gy
+                ay = (y - gy) // gs
                 if ay < 16 and GUN[weapon][ay][ax] != '.':
                     col[y] = pal(GUN[weapon][ay][ax])
             if flash > 1:
-                fx_, fy_, rr = gx + gw // 2, gy - 2, flash + 2
+                fx_, fy_, rr = gx + gw // 2, gy - 2 * gs, (flash + 2) * gs
                 for y in range(max(0, fy_ - rr), min(VH, fy_ + rr + 1)):
                     d2 = (x - fx_) ** 2 + (y - fy_) ** 2
                     if d2 <= rr * rr:
                         col[y] = (255, 255, 220) if d2 <= rr * rr / 3 else (255, 170, 30)
-        if abs(x - W // 2) <= 1:
-            col[horizon] = (255, 255, 255)
-            if x == W // 2:
-                col[horizon - 2] = col[horizon + 2] = (255, 255, 255)
+        sp_ = 3 if hit == 2 else 2 if hit == 1 else 1
+        vc = (255, 210, 0) if hit == 2 else (255, 40, 40) if hit == 1 else (255, 255, 255)
+        if x == W // 2:
+            col[horizon - sp_ - 1] = col[horizon + sp_ + 1] = vc
+            if not hit:
+                col[horizon] = vc
+        elif abs(x - W // 2) == sp_ + 1 or (hit == 1 and abs(x - W // 2) == sp_ + 2):
+            col[horizon] = vc
         for y in range(VH):
             pix[x, y] = tuple(max(0, min(255, int(c))) for c in col[y])
     d = ImageDraw.Draw(im)
-    d.rectangle((0, VH, W - 1, H - 1), fill=(36, 36, 44))
-    d.line((0, VH, W - 1, VH), fill=(110, 110, 125))
-    for xx, c in ((1, (255, 50, 40)), (22, (60, 140, 255)), (43, (255, 210, 0))):
-        d.rectangle((xx, VH + 2, xx + 4, VH + 6), fill=c)
+    if msg:
+        tiny(d, (W - (len(msg) * 4 - 1)) // 2, 2, msg, (255, 220, 0))
+    hud(im, **(hudv or {}))
     return im
 
 
@@ -363,7 +486,7 @@ if __name__ == '__main__':
     # trajet : salle en briques, porte, couloir de metal, sortie
     path = [(1.6 + t * 0.17, 2.5, 0.3 * math.sin(t * 0.12)) for t in range(0, 62)]
     path += [(12.1, 2.5, t * 0.05) for t in range(0, 30)]
-    sprites_base = [(9.5, 1.7, .5, .35, DRONE, 16, 16, 0), (14.3, 3.3, .8, 0, SENT, 16, 16, 0), (11.5, 6.5, .95, 0, BRUTE, 16, 16, 0),
+    sprites_base = [(9.5, 1.7, .5, .35, DRONE, 24, 24, 0), (14.3, 3.3, .8, 0, SENT, 24, 24, 0), (11.5, 6.5, .95, 0, BRUTE, 24, 24, 0),
                     (5.5, 1.4, .55, 0, BARREL, 16, 16, 0), (6.1, 1.3, .55, 0, BARREL, 16, 16, 0), (13.6, 1.5, 1.0, 0, COLUMN, 16, 16, 0),
                     (8.5, 3.3, .28, 0, ITEM[0], 8, 8, 0), (11.0, 1.5, .28, 0, ITEM[3], 8, 8, 0)]
     for f, (x, y, a) in enumerate(path):

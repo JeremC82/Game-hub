@@ -18,7 +18,7 @@ Depuis la V3.84, le Game-hub utilise **Bluepad32** : jusqu'à **4 manettes Bluet
 - **Menu « JOUEURS 1 / 2 »** (2e ligne, une étoile par manette connectée) : seuls les jeux à deux joueurs utilisent la 2e manette.
   - **RAQUETTES** : match à deux (raquette de droite pour le joueur 2), **le premier à 7 points gagne**.
   - **SPACE DEFENDER** : coopération, un 2e vaisseau **vert** pour le joueur 2, vies et score communs ; les ennemis piquent sur l'un ou l'autre ; la manette du joueur touché vibre.
-- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V3.88_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
+- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V3.89_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
 - **Mémoire** : environ 81 Ko libres avec 2 dalles en 3 bits et deux manettes connectées.
 
 # SPACE DEFENDER
@@ -214,12 +214,14 @@ Un jeu de tir original **en vue subjective** (V3.88) : tu avances dans une base 
 - **Moteur 3D** (lancer de rayons, calculé colonne par colonne, sans effacement donc sans scintillement) : murs texturés calculés à pleine résolution, sol en dalles et plafond avec plafonniers en perspective, brouillard avec la distance, ombre en haut et en bas des murs et le long des murs au sol, balancement de la marche.
 - **Murs :** briques en relief (certaines noircies), plaques de métal rivetées avec bandes de danger, panneaux techniques (écran qui clignote, bande lumineuse qui défile), pierre taillée moussue, appliques lumineuses avec halo ; portes coulissantes à bandes jaunes, porte rouge fermée à clé, panneau de sortie vert.
 - **Commandes :** stick gauche (ou croix) pour avancer, reculer et faire un pas de côté, **stick droit** (ou croix gauche / droite) pour pivoter, **L1 / R1** pas de côté, **✕ ou R2 tirer**, **□ ouvrir une porte / actionner la sortie**, **○ changer d'arme**, **△ mini-carte**. L2 ou OPTIONS : pause.
-- **Ennemis (robots originaux, 2 images de marche, reflets et ombres) :** drone flottant à l'œil rouge (rotors qui tournent), sentinelle à canons, colosse blindé qui frappe au contact.
-- **Ils se défendent :** ils te repèrent quand ils te voient, ouvrent les portes et te poursuivent ; **ils esquivent** par des pas de côté quand tu les vises, **ripostent** dès qu'ils sont touchés et **préviennent leurs voisins** ; blessés, **ils reculent en tirant** ; ils gardent leurs distances. La sentinelle tire en **rafales de 3**, le drone **vise là où tu vas être**, le colosse **charge en zigzag**.
+- **Ennemis (robots originaux dessinés en 24 × 24, V3.89) :** drone flottant à l'œil rouge rond (rotor qui tourne, bras-canons, flamme du réacteur), sentinelle à visière cyan et canons d'épaule, colosse blindé (casque, épaulières, poings) qui frappe au contact. **Volume** (bord éclairé, bord dans l'ombre, lumière du plafond), **ombre au sol**, éclairés par le plasma et les explosions ; leurs yeux et voyants brillent dans le noir. Les épaves **fument**.
+- **Ils se défendent :** ils te repèrent quand ils te voient, ouvrent les portes et te poursuivent ; **ils esquivent** par des pas de côté quand tu les vises, **ripostent** dès qu'ils sont touchés et **préviennent leurs voisins** ; blessés, **ils reculent en tirant** ; ils gardent leurs distances. La sentinelle tire en **rafales de 3** puis se décale, le drone **vise là où tu vas être** et louvoie, le colosse **charge en zigzag**.
+- **Toujours en mouvement (V3.89) :** avant de te voir, ils **patrouillent** dans leur salle ; au combat ils **tournent autour de toi** et changent de sens, ne se marchent pas dessus, **reculent sous l'impact**, et ceux que tu manques de peu font un pas de côté. **Le colosse se protège** : de loin, ta balle ricoche en bleu (moitié des dégâts), il n'est vraiment vulnérable qu'en chargeant.
+- **Sensations (V3.89) :** la vue **tremble** sur les explosions et quand tu es touché, l'écran **rougit du côté d'où vient le tir**, le **viseur devient rouge** quand tu touches et **s'ouvre en jaune** quand tu détruis, débris qui volent, **combos** (DOUBLE, TRIPLE, CARNAGE : points en bonus), l'arme **recule** et s'éclaire à chaque tir.
 - **Lumières :** le plasma éclaire en vert les murs et le sol, les explosions en orange, ton tir réchauffe la pièce ; étincelles quand tu touches un mur ; bords de l'image légèrement assombris.
 - **Barils explosifs :** un tir les fait sauter ; l'explosion détruit les robots autour (et te blesse si tu es trop près), et fait sauter les barils voisins en chaîne.
 - **Objets :** soin (+30), munitions (+25), armure (+50, encaisse la moitié des dégâts), **carte rouge** (ouvre la porte rouge et actionne la sortie), arme lourde (3 tirs en éventail, 3 munitions).
-- **Stages :** chaque stage est un nouveau bunker (salles reliées par des couloirs et des portes), avec plus de robots. Barre du bas : vie, armure, munitions, carte, vies, score.
+- **Stages :** chaque stage est un nouveau bunker (salles reliées par des couloirs et des portes), avec plus de robots. Barre du bas (dégradé métal, cases séparées) : vie, armure, munitions avec **jauges** (la vie passe du vert au rouge, écran 128x128), carte, vies, score.
 
 ### CRUCH
 
@@ -352,6 +354,7 @@ De la V2.01 à la V2.22, le son passait par un ampli I2S MAX98357A (GPIO 22, 21,
 | `p N` | couleurs des dalles sur N bits (3 à 6) |
 | `v N` | volume du son, de 0 à 10 |
 | `e 0` / `e 1` / `e x` | test des pertes Bluetooth : LED éteintes / rallumées / transfert vers les dalles arrêté (jusqu'au redémarrage) |
+| `j N` | test : lance la démo du jeu N (0 SPACE DEFENDER ... 12 BUNKER 3D), sans manette |
 
 Les commandes `a`, `c` et `p` redémarrent l'ESP32. Les réglages sont gardés en mémoire.
 
@@ -370,8 +373,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V3.88_complet.bin](firmware/GameHub_V3.88_complet.bin) | 0x0 | `90c6530e875199b44cb57b1c7203ba22` |
-| [firmware/GameHub_V3.88.bin](firmware/GameHub_V3.88.bin) | 0x10000 | `2a1c5dc7a47901a004a72a0ba67a21c8` |
+| [firmware/GameHub_V3.89_complet.bin](firmware/GameHub_V3.89_complet.bin) | 0x0 | `6e0b75315f4031fcb8073388646a4cac` |
+| [firmware/GameHub_V3.89.bin](firmware/GameHub_V3.89.bin) | 0x10000 | `ef331ea026aae3a88a7ba1af35db30d4` |
 
 Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB SPIFFS)** dans Outils → Partition Scheme.
 
