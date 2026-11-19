@@ -6,9 +6,31 @@ Jeux d'arcade sur 1 à 4 dalles LED 128x64, avec un ESP32 classique et une **man
 - **Partition unique de 3 Mo :** il reste de la place pour d'autres jeux.
 - **Son en option :** une broche PWM vers un petit ampli et un haut-parleur.
 
-**15 jeux originaux**, à choisir dans le menu (gauche / droite sur la ligne JOUER). Au démarrage, c'est toujours **SPACE DEFENDER** qui est proposé.
+**15 jeux originaux**, à choisir dans le menu (gauche / droite sur la ligne JOUER). Au démarrage, c'est toujours le **1er jeu de la liste** qui est proposé. Les noms affichés au menu se changent dans le tableau `GAME_NAME` en haut de `games/games.ino`.
 
 Les 15 jeux ont en commun les niveaux de difficulté, les stages, les vies, les meilleurs scores avec les noms et la démo automatique.
+
+## Les 15 jeux en un coup d'œil
+
+Dans tous les jeux : **OPTIONS ou L2 = pause** ; en pause, **○ revient au menu** (le score est enregistré). Les deux manettes pilotent le menu. « Sans fin » : les stages continuent tant qu'il reste des vies ; la difficulté monte puis **plafonne** au stage indiqué.
+
+| N° | Au menu | Jeu | Touches | Bonus | Niveaux |
+|---|---|---|---|---|---|
+| 0 | GALAGA | [SPACE DEFENDER](#space-defender) | gauche / droite (croix ou stick), **✕ tirer** | vaisseau qui évolue (tir rapide, double, triple canon) ; ennemis abattus en vol ×2 ; fin de stage 500 × stage ; boss 2000 × n° ; une vie par stage | sans fin ; 4 mondes en boucle ; boss tous les 4 stages ; difficulté plafonnée au stage 12 |
+| 1 | SHOOTME | [RAID](#raid) | croix / stick : bouger, **✕ tirer**, **○ bombe** | capsules **P** (arme, jusqu'à 5 tirs), **S** bouclier, **B** bombe ; boss : 2000 × stage + une vie | sans fin ; boss après 8 vagues à chaque stage |
+| 2 | PONG | [RAQUETTES](#raquettes) | haut / bas (stick : vitesse proportionnelle) | point gagné 100 × stage ; effet donné par la raquette | sans fin ; stage suivant tous les 5 points ; 3 points encaissés = fin (à deux : premier à 7) |
+| 3 | BULLES | [BULLES](#bulles) | gauche / droite, **haut ou ○ sauter**, **✕ bulle** | cristal 500 ; bonus de chaîne ; une vie par niveau | sans fin ; un nouveau plan de plateformes à chaque niveau |
+| 4 | PAC MAN | [LABYRINTHE](#labyrinthe) | croix / stick | grosse graine : créatures bleues 200, 400, 800, 1600 ; une vie par stage | sans fin ; vitesse plafonnée au stage 8 |
+| 5 | ORBITUS | [ORBITUS](#orbitus) | stick : glisser sur l'orbite, croix gauche / droite : tourner, **✕ tirer** | ennemis en piqué ×2 ; capsule de l'ennemi blanc : double tir ; une vie par stage | sans fin ; de 4 à 7 vagues (7 au stage 7) |
+| 6 | CASSE BRIQUES | [CASSE BRIQUES](#casse-briques) | gauche / droite (stick proportionnel), **✕ lancer / tirer** | capsules : raquette large, balle lente, 3 balles, tir, vie | 6 tableaux en boucle, sans fin ; vitesse de la balle plafonnée au stage 10 |
+| 7 | TETRIS | [BLOCS](#blocs) | gauche / droite, **bas** accélère, **haut** chute directe, **✕ / ○ tourner** | 1 à 4 lignes : 100, 300, 500, 800 × niveau | niveau suivant toutes les 10 lignes ; vitesse maximale au niveau 12 ; une seule partie |
+| 8 | CANDY CRUCH | [CRUCH](#cruch) | croix / stick : curseur, **✕ prendre**, direction : échanger, **○ annuler** | 4 alignés : bonbon rayé ; 5 : bombe ; chaînes ; coups restants ; une vie par niveau | sans fin ; objectif +700 points à chaque niveau |
+| 9 | DIG DUG | [TAUPE](#taupe) | croix / stick, **✕ ou ○ jet de boue** | rocher qui écrase : gros bonus ; plus la créature est profonde, plus elle rapporte | sans fin ; jusqu'à 5 rochers ; vitesse plafonnée au stage 8 |
+| 10 | BILLES | [BILLES](#billes) | gauche / droite : viser (stick direct), **✕ tirer** | billes qui tombent : gros bonus | sans fin ; de 4 à 6 couleurs (6 au stage 6) ; une seule partie |
+| 11 | 1945 | [ESCADRILLE](#escadrille) | croix / stick, **✕ (□, R1, R2) tirer**, **○ tonneau** | capsules **P** arme (5 tirs), **T** tonneau, **+** vie ; boss 2000 × stage | sans fin ; boss après 10 vagues (2 avions en alternance) |
+| 12 | BUNKER 3D | [BUNKER 3D](#bunker-3d) | stick gauche : avancer / pas de côté, stick droit : pivoter, L1 / R1 pas de côté, **✕ / R2 tirer**, **□ ouvrir**, **○ arme**, **△ carte** | soin, munitions, armure, carte rouge, arme lourde ; combos DOUBLE, TRIPLE, CARNAGE ; barils en chaîne | sans fin ; un nouveau bunker généré à chaque stage |
+| 13 | TURBO ROUTE | [TURBO ROUTE](#turbo-route) | gauche / droite : braquer, **✕ / R2 / haut accélérer**, **bas freiner**, stick droit : accélérer / freiner, **○ turbo** | pièce 250 ; voiture doublée 50 ; bidon de turbo ; police semée 2000, police KO 3000 ; secondes restantes × 100 | sans fin ; 4 décors en boucle ; distance plafonnée au stage 6, circulation au stage 8 |
+| 14 | PINCAB | [PINCAB](#pincab) | **croix gauche (ou L1)** flipper gauche, **○ (ou R1)** flipper droit, **✕ maintenu puis relâché** : lanceur | 3 cibles : +2000 et multiplicateur jusqu'à x5 ; **multiball** (3 balles, tout ×2) ; gueule 1500 ; poisson 500 ; balle rendue dans les 4 s | sans fin ; stage suivant toutes les 2 séries de cibles |
 
 
 ## Deux manettes (Bluepad32)
@@ -18,7 +40,7 @@ Depuis la V3.84, le Game-hub utilise **Bluepad32** : jusqu'à **4 manettes Bluet
 - **Menu « JOUEURS 1 / 2 »** (2e ligne, une étoile par manette connectée) : seuls les jeux à deux joueurs utilisent la 2e manette.
   - **RAQUETTES** : match à deux (raquette de droite pour le joueur 2), **le premier à 7 points gagne**.
   - **SPACE DEFENDER** : coopération, un 2e vaisseau **vert** pour le joueur 2, vies et score communs ; les ennemis piquent sur l'un ou l'autre ; la manette du joueur touché vibre.
-- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V4.06_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
+- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V4.09_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
 - **Mémoire** : environ 81 Ko libres avec 2 dalles en 3 bits et deux manettes connectées.
 
 # SPACE DEFENDER
@@ -92,7 +114,6 @@ Un shoot vertical : tu te déplaces partout dans le bas de l'écran, et les vagu
   - **bombe rouge** : ajoute une bombe. Les bombes restantes s'affichent en bas à gauche.
 - **Bombe (○) :** elle détruit les ennemis à l'écran, efface leurs tirs et blesse le boss.
 - **Boss (V3.93) :** après 8 vagues, **le même vaisseau-mère que dans le 1er jeu**, en double taille, avec sa barre de vie en haut. Il se balance et tire en éventail (3 tirs, puis 5 sous la moitié de sa vie, coque rouge) ; touché, il devient blanc. Détruit, il **éclate en 5 petits vaisseaux** qui plongent sur toi.
-  - Sous la moitié de sa vie, le boss passe en **2ᵉ phase** : plus rapide, avec des tirs en spirale.
   - Le détruire termine le stage : gros bonus et une vie en plus.
 
 ### BULLES
@@ -200,7 +221,7 @@ Un jeu de tir de billes original, dans un puits.
 ![ESCADRILLE](docs/jeu-escadrille.gif)
 
 Un shoot vertical original au-dessus de la mer (V3.85, remplace ESCALADE ; nouveaux sprites et fond marin en V3.86, décor enrichi en V3.87).
-- **Décor :** la mer défile avec sa houle, ses crêtes, ses moutons d'écume et des reflets du soleil ; des îles de formes variées avec lagon en deux tons, plage, prairie, forêt, palmiers, maisons au toit rouge et rochers. Rien ne déborde sur la ligne du score.
+- **Décor :** la mer défile avec sa houle, ses crêtes, ses moutons d'écume et des reflets du soleil (pas de vagues sur les îles) ; des îles de formes variées avec lagon en deux tons, plage, prairie, forêt, palmiers, maisons au toit rouge et rochers. Rien ne déborde sur la ligne du score.
 - **Commandes :** croix ou stick pour voler dans le bas de l'écran, **✕ (ou carré, R1, R2) pour tirer**, **○ pour un tonneau** : l'avion tourne sur lui-même, il est invincible pendant 1 s mais ne tire pas. 3 tonneaux par stage (les ronds cyan en bas à gauche).
 - **Boss (V3.98) :** deux avions qui alternent selon le stage : un **bombardier lourd à 4 moteurs** (liseré rouge) et un **bimoteur à double queue** (liseré jaune), en métal argenté avec contour, reflets, verrière et **hélices qui tournent**.
 - **Navires (V3.99) :** coque en relief (bord éclairé, bord dans l'ombre, bastingage, ombre portée), passerelles vitrées, **radars qui tournent**, cheminées à bande rouge, canots orange ; porte-avions au pont gris avec axe jaune, piste en biais, ascenseur et îlot.
@@ -208,9 +229,9 @@ Un shoot vertical original au-dessus de la mer (V3.85, remplace ESCALADE ; nouve
 - **Hélices qui tournent (V4.02)** sur ton avion, les chasseurs et les bombardiers ; tes tirs en trait blanc et jaune.
 - **Dalle à 3 ou 4 bits (V4.01) :** toutes les couleurs de 1945 évitent le niveau le plus faible (qui scintille ou disparaît). Mer unie : bleu d'origine en 3 bits (V4.05), bleu nuit en 4 bits.
 - **Ton avion :** un chasseur **vert foncé** à étoiles blanches (V3.93 ; les chasseurs ennemis sont rouge brique), hélice qui tourne, avec un **contour sombre** et une **ombre sur la mer** pour bien le voir. Les avions ennemis ont aussi leur ombre.
-- **Ennemis :** des chasseurs (verts, argent ou jaunes) en V, en vague sinueuse, par le côté ou en piqué ; des **bombardiers bimoteurs** qui tirent en éventail ; des **navires** qui avancent sur la mer (vague d'étrave, sillage d'écume, tourelles qui suivent ton avion) : vedette, destroyer à cheminées qui fument, et **porte-avions** (pont en bois, îlot, avions posés) qui fait décoller des chasseurs.
+- **Ennemis :** des chasseurs (rouge brique, argent ou jaunes) en V, en vague sinueuse, par le côté ou en piqué ; des **bombardiers bimoteurs** qui tirent en éventail ; des **navires** qui avancent sur la mer (vague d'étrave, sillage d'écume, tourelles qui suivent ton avion) : vedette, destroyer à cheminées qui fument, et **porte-avions** (pont gris, îlot, avions posés) qui fait décoller des chasseurs.
 - **Capsules :** **P** jaune = arme (2, 3, 4 puis 5 tirs en éventail), **T** bleue = un tonneau de plus, **+** rouge = une vie (laissée par le porte-avions). Une vie perdue fait baisser l'arme d'un niveau.
-- **Boss :** après 10 vagues, un **grand quadrimoteur vert** ; il tire peu (éventail de 3 balles et un tir visé de temps en temps) ; sous la moitié de sa vie, il bouge plus vite, tire en éventail de 5 et en spirale lente.
+- **Boss :** après 10 vagues ; il tire peu (éventail de 3 balles et un tir visé de temps en temps) ; sous la moitié de sa vie, il bouge plus vite, tire en éventail de 5 et en spirale lente.
 - **Points :** chasseur 100, piqueur 150, vedette 300, bombardier 500, destroyer 600, porte-avions 1500, boss 2000 × le stage.
 
 ### BUNKER 3D
@@ -253,13 +274,16 @@ Un jeu de voiture original vu de dessus (V3.94) : tu doubles voitures et camions
 
 ![PINCAB](docs/jeu-pincab.gif)
 
-Un flipper original (V4.06).
-- **Table :** 2 flippers, 3 bumpers champignons, 2 rebonds triangulaires, 3 cibles qui tombent, un lanceur à droite. Plateau bleu en perspective, losange central, points lumineux qui s'allument à tour de rôle, bille chromée.
-- **Grand écran (128x128) :** la table occupe toute la largeur et **défile** : la vue suit la balle. En haut, un **fronton** avec le logo PINCAB, les étoiles, les comètes et l'afficheur (score, balle, multiplicateur). Chaque image est dessinée en mémoire puis envoyée d'un bloc (32 Ko pendant le jeu seulement) : pas de scintillement.
-- **Commandes :** **gauche ou L1** flipper gauche, **droite ou R1** flipper droit, **✕ maintenu puis relâché** pour lancer la balle (plus tu tiens, plus elle part fort).
-- **Points :** bumper 100, rebond 10, cible 250 ; les 3 cibles : +2000 et **multiplicateur** (x2 à x5). Deux séries de cibles : stage suivant. Une balle perdue dans les 4 s après le lancement est rendue. 3 balles.
+Un flipper original sur le thème d'un **lagon maudit** (V4.06, thème et multiball en V4.08, obstacles en V4.09), avec sa propre créature des marais.
+- **Fronton :** une créature originale qui sort de l'eau (crête de nageoires, yeux jaunes à pupille fendue qui clignent, crocs), pleine lune, roseaux, logo PINCAB vert et jaune qui coule, afficheur vert (score, balle, multiplicateur) avec les griffes de la créature agrippées au cadre. Elle **réagit** : yeux rouges quand un bumper sonne, gueule ouverte quand elle avale la balle.
+- **Plateau :** eau bleu profond avec des vagues turquoise qui avancent, murs en roseaux, feuilles de nénuphar, touffes de roseaux dans les coins, bulles qui montent, algues qui luisent. Au centre, **l'œil de la créature** (iris jaune, pupille fendue) qui cligne et luit tant qu'il reste des cibles.
+- **Éléments :** 3 **bumpers nénuphars** (onde de choc au contact), 2 **rochers moussus** qui renvoient la balle, 2 **plots en caoutchouc**, 3 **cibles** orange, la **gueule de la créature** (elle avale la balle, la garde une seconde en grondant puis la recrache : +1500), un **poisson** qui nage d'un bord à l'autre (+500, il fait demi-tour), le lanceur à droite. Les points gagnés s'affichent au point de choc.
+- **Grand écran (128x128) :** la table occupe toute la largeur et **défile** : la vue suit la balle (la plus basse en multiball). Chaque image est dessinée en mémoire puis envoyée d'un bloc (32 Ko pendant le jeu seulement) : pas de scintillement.
+- **Commandes :** **croix gauche (ou L1)** flipper gauche, **○ (ou R1)** flipper droit, **✕ maintenu puis relâché** pour lancer la balle (plus tu tiens, plus elle part fort).
+- **Points :** bumper 100, rebond 10, plot 10, cible 250, poisson 500, gueule 1500 ; les 3 cibles : +2000 et **multiplicateur** (x2 à x5).
+- **Multiball :** la 1re série de cibles d'un stage lance **2 balles de plus** (3 en jeu) : tout compte **double** ; une vie n'est perdue qu'à la chute de la dernière balle. Deux séries de cibles : stage suivant. Une balle perdue dans les 4 s après le lancement est rendue. 3 balles.
 
-![PINCAB : fronton, milieu et bas de la table](docs/pincab-rendus.png)
+![PINCAB : fronton, multiball et bas de la table](docs/pincab-rendus.png)
 
 ### CRUCH
 
@@ -419,8 +443,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V4.06_complet.bin](firmware/GameHub_V4.06_complet.bin) | 0x0 | `75d6b5763d573e10941f6345e3f72968` |
-| [firmware/GameHub_V4.06.bin](firmware/GameHub_V4.06.bin) | 0x10000 | `1d363ecc8d80d855024742a3fc5ecd58` |
+| [firmware/GameHub_V4.09_complet.bin](firmware/GameHub_V4.09_complet.bin) | 0x0 | `31d101322af7e30daeb47a9ba7d12cc1` |
+| [firmware/GameHub_V4.09.bin](firmware/GameHub_V4.09.bin) | 0x10000 | `81ec35eab9345e23b9557fafdbf86ac4` |
 | [firmware/GameHub_V3.86_complet.bin](firmware/GameHub_V3.86_complet.bin) | 0x0 | `dc451b01c498df647da822a1427a1a5e` |
 | [firmware/GameHub_V3.86.bin](firmware/GameHub_V3.86.bin) | 0x10000 | `ee1945d390b91eb82240245a1e52821f` |
 

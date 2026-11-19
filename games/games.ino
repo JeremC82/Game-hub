@@ -28,7 +28,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "4.06"
+#define GAMES_VERSION "4.09"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -4731,6 +4731,7 @@ void aIsland(int i) {
   int rx = x0 + r + 3, ry = y0 - r / 2;  // rochers dans le lagon
   aH(rx, ry, 2, rgb(160, 155, 145));
   aP(rx, ry + 1, rgb(90, 88, 80));
+  gMark(rx, ry, 2, 2);  // les rochers depassent de l'ile : effaces a chaque image (sinon ils laissaient un trait)
 }
 void aFire() {  // explosions en boules de feu (blanc, jaune, orange, rouge, fumee)
   for (auto &b : gBoom) {
@@ -6358,8 +6359,8 @@ void vDraw() {
 }
 
 // ---------------------------------------------------------------- PINCAB
-// Flipper original : table vue de dessus (virtuelle 64 x 96, mise a l'echelle de l'ecran). 2 flippers (gauche / L1,
-// droite / R1), 3 bumpers, 2 rebonds triangulaires, 3 cibles qui tombent (toutes : bonus et multiplicateur x2 a x5),
+// Flipper original, theme "lagon maudit" (creature des marais originale) : table vue de dessus (virtuelle 64 x 96, mise a
+// l'echelle de l'ecran). 2 flippers (croix gauche ou L1 ; rond ou R1), 3 bumpers, 2 rebonds triangulaires, 3 cibles qui tombent (toutes : bonus et multiplicateur x2 a x5),
 // lanceur a droite (maintenir X puis relacher). Balle perdue dans les 4 s apres le lancement : rendue. Deux series de
 // cibles : stage suivant. 3 balles.
 #define PB_R 1.7f  // rayon de la balle (table virtuelle)
@@ -6381,6 +6382,11 @@ int pbTX = 0, pbTY = 10, pbSave = 0, pbMsgT = 0, pbMult = 1, pbClears = 0, pbLau
 uint8_t pbFlash[6] = {};  // bumpers 0-2, rebonds 3-4
 bool pbTgt[3] = { true, true, true };
 const char *pbMsg = "";
+// creature du lagon (originale), 20 x 18 : moitie gauche, l'autre en miroir. F nageoire, G vert, g vert sombre, Y oeil,
+// k noir, W croc
+const char *const PB_BEAST[18] = { ".......FF.", "......FGGF", "....FGGGGG", "..FGGgGGGG", ".FGGgGGGGg", "FGGgYYYGGG",
+                                   "FGGYYkYGGG", ".GGYYkYGGg", ".GGgYYYGGG", "..GGGGGGgG", "..GgGGGGGG", "...GGkkkkk",
+                                   "...GkWkWkW", "....Gkkkkk", "....GGGGGG", ".....gGGGG", "......gGGG", "........gG" };
 // affichage : grand plateau qui defile (la vue suit la balle), fronton au-dessus de la table sur un grand ecran.
 // Chaque image est dessinee dans un tampon (32 Ko, reserve seulement pendant PINCAB) puis envoyee d'un bloc : pas de
 // scintillement malgre le defilement.
@@ -6396,7 +6402,26 @@ int pbX(float x) { return pbSX(x, 60); }
 int pbY(float y) { return pbSY(y); }
 const uint16_t PB_BLUE_RGB[3] = { 0, 30, 180 };  // plateau bleu (niveau franc sur une dalle a 3 bits)
 void pbRelease() { if (pbCv) { delete pbCv; pbCv = nullptr; } }
-void pbNewBall() { pbBX = 60; pbBY = 92; pbVX = pbVY = 0; pbPow = 0; pbLaunchHold = 0; }
+// plusieurs balles (multiball) : la balle en cours de calcul est copiee dans pbBX, pbBY, pbVX, pbVY
+#define PB_BALLS 3
+struct PbBall { float x, y, vx, vy; int still; bool on; };
+PbBall pbBall[PB_BALLS];
+int pbMulti = 0, pbQueue = 0, pbQueueT = 0;  // multiball en cours ; balles encore a lancer
+// obstacles et reactions : plots en caoutchouc, gueule de la creature (avale et recrache la balle), poisson qui nage,
+// points qui s'affichent au point de choc, creature du fronton qui reagit
+const float PB_POST[2][3] = { { 9, 44, 1.6f }, { 47, 44, 1.6f } };
+#define PB_MX 28.0f
+#define PB_MY 19.0f
+float pbFishX = 28, pbFishD = 1, pbPopX = 0, pbPopY = 0;
+int pbFishFlash = 0, pbHoldT = 0, pbHoldBall = -1, pbMouthCD = 0, pbPopT = 0, pbRoar = 0;
+char pbPop[8] = "";
+void pbPopup(float x, float y, int pts) { pbPopX = x; pbPopY = y; pbPopT = 22; snprintf(pbPop, sizeof(pbPop), "+%d", pts); }
+void pbNewBall() {
+  pbHoldT = 0; pbHoldBall = -1;
+  for (auto &b : pbBall) b.on = false;
+  pbBall[0] = { 60, 92, 0, 0, 0, true };
+  pbBX = 60; pbBY = 92; pbVX = pbVY = 0; pbPow = 0; pbLaunchHold = 0; pbMulti = 0; pbQueue = 0;
+}
 void pbReset() {
   gLives = (!gDemo && gDiff == 0) ? 5 : 3;
   gPaused = false;
@@ -6453,7 +6478,7 @@ uint8_t pbAuto() {
   uint8_t k = 0;
   if (pbBY > 72 && pbVY > -0.5f && pbBX < 56) {
     if (pbBX < 29 && pbBX > 8) k |= 1;
-    if (pbBX >= 27 && pbBX < 50) k |= 2;
+    if (pbBX >= 27 && pbBX < 50) k |= 32;
   }
   return k;
 }
@@ -6461,6 +6486,13 @@ void pbStep() {
   gFrame++;
   if (pbMsgT > 0) pbMsgT--;
   for (auto &f : pbFlash) if (f) f--;
+  if (pbFishFlash) pbFishFlash--;
+  if (pbPopT) pbPopT--;
+  if (pbRoar) pbRoar--;
+  if (pbMouthCD) pbMouthCD--;
+  pbFishX += pbFishD * 0.12f;  // le poisson nage d'un bord a l'autre
+  if (pbFishX < 15) { pbFishX = 15; pbFishD = 1; }
+  if (pbFishX > 41) { pbFishX = 41; pbFishD = -1; }
   if (gDead > 0) {
     if (--gDead == 0) {
       if (gLives <= 0) {
@@ -6473,20 +6505,38 @@ void pbStep() {
     }
     return;
   }
+  int lead = -1;  // la balle la plus basse : la demo et la vue la suivent
+  for (int i = 0; i < PB_BALLS; i++)
+    if (pbBall[i].on && (lead < 0 || pbBall[i].y > pbBall[lead].y)) lead = i;
+  if (lead < 0) { pbNewBall(); lead = 0; }
+  pbBX = pbBall[lead].x; pbBY = pbBall[lead].y; pbVX = pbBall[lead].vx; pbVY = pbBall[lead].vy;
   uint8_t k = gDemo ? pbAuto() : keysPs4;
-  bool fl = (k & 1) || (!gDemo && PS4.L1()), fr = (k & 2) || (!gDemo && PS4.R1());
+  bool fl = (k & 1) || (!gDemo && PS4.L1()), fr = (k & 32) || (!gDemo && PS4.R1());  // gauche : croix gauche ; droite : rond
+  int mul = pbMult * (pbMulti ? 2 : 1);  // multiball : tout compte double
   // lanceur : X maintenu tend le ressort, relache : la balle part (demo : tout seul)
-  bool inLane = pbBX > 56.5f && pbBY > 85 && fabsf(pbVY) < 0.4f;
-  if (inLane && gStageT < 60) {
+  for (auto &bl : pbBall) {
+    if (!bl.on || !(bl.x > 56.5f && bl.y > 85 && fabsf(bl.vy) < 0.4f) || gStageT >= 60) continue;
     bool hold = gDemo ? (++pbLaunchHold < 30 + (gFrame % 25)) : (PS4.Cross() || (k & 16));
     if (hold) pbPow = min(1.0f, pbPow + 0.025f);
     else if (pbPow > 0.05f || gDemo) {
-      pbVY = -(5.2f + 2.3f * max(pbPow, gDemo ? 0.5f : 0.0f));
-      pbPow = 0; pbLaunchHold = 0; pbSave = 160;
+      bl.vy = -(5.2f + 2.3f * max(pbPow, gDemo ? 0.5f : 0.0f));
+      pbPow = 0; pbLaunchHold = 0; pbSave = max(pbSave, 160);
       sndPlay(300, 1200, 180, 0.35f, true, 1);
     }
+    break;
+  }
+  if (pbQueue > 0 && ++pbQueueT > 35) {  // multiball : les balles en plus partent l'une apres l'autre
+    pbQueueT = 0;
+    for (auto &bl : pbBall)
+      if (!bl.on) { bl = { 60, 90, 0, -6.6f, 0, true }; pbQueue--; sndPlay(300, 1200, 180, 0.35f, true, 1); break; }
   }
   if (pbSave > 0) pbSave--;
+  if (pbHoldT > 0 && --pbHoldT == 0 && pbHoldBall >= 0) {  // la gueule recrache la balle
+    PbBall &hb = pbBall[pbHoldBall];
+    hb.x = PB_MX; hb.y = PB_MY + 2.5f; hb.vx = (random(31) - 15) / 10.0f; hb.vy = 2.6f;
+    pbHoldBall = -1; pbMouthCD = 40;
+    sndPlay(200, 900, 160, 0.4f, true, 1);
+  }
   // flippers : montent vite, redescendent moins vite ; son au depart
   float tL = fl ? PB_UP : PB_REST, tR = fr ? PB_UP : PB_REST;
   float dL = constrain(tL - pbAL, -0.33f, 0.18f), dR = constrain(tR - pbAR, -0.33f, 0.18f);
@@ -6494,75 +6544,125 @@ void pbStep() {
   if (dR < -0.2f && pbAR > 0.3f) sndPlay(500, 200, 30, 0.3f, true, 0);
   for (int sub = 0; sub < 4; sub++) {
     pbAL += dL / 4; pbAR += dR / 4;
-    pbVY += 0.06f / 4;  // pente de la table
-    float sp = sqrtf(pbVX * pbVX + pbVY * pbVY);
-    if (sp > 7) { pbVX *= 7 / sp; pbVY *= 7 / sp; }
-    pbBX += pbVX / 4; pbBY += pbVY / 4;
-    float nx, ny;
-    for (auto &s : PB_SEG) pbHit(s[0], s[1], s[2], s[3], PB_R, 0.5f, 0, 0, nx, ny);
-    for (int i = 0; i < 2; i++) {  // rebonds : la balle repart plus vite
-      const float *s = PB_KICK[i];
-      if (pbHit(s[0], s[1], s[2], s[3], PB_R, 0.5f, 0, 0, nx, ny) && pbFlash[3 + i] == 0) {
-        pbVX += nx * 2.4f; pbVY += ny * 2.4f;
-        pbFlash[3 + i] = 6; gScore += 10 * pbMult;
-        sndPlay(1200, 700, 40, 0.3f, false, 0);
+    for (auto &bl : pbBall) {
+      if (!bl.on || (pbHoldT > 0 && &bl == &pbBall[pbHoldBall])) continue;  // balle dans la gueule : elle attend
+      pbBX = bl.x; pbBY = bl.y; pbVX = bl.vx; pbVY = bl.vy;
+      pbVY += 0.06f / 4;  // pente de la table
+      float sp = sqrtf(pbVX * pbVX + pbVY * pbVY);
+      if (sp > 7) { pbVX *= 7 / sp; pbVY *= 7 / sp; }
+      pbBX += pbVX / 4; pbBY += pbVY / 4;
+      float nx, ny;
+      for (auto &sg : PB_SEG) pbHit(sg[0], sg[1], sg[2], sg[3], PB_R, 0.5f, 0, 0, nx, ny);
+      for (int i = 0; i < 2; i++) {  // rebonds : la balle repart plus vite
+        const float *sg = PB_KICK[i];
+        if (pbHit(sg[0], sg[1], sg[2], sg[3], PB_R, 0.5f, 0, 0, nx, ny) && pbFlash[3 + i] == 0) {
+          pbVX += nx * 2.4f; pbVY += ny * 2.4f;
+          pbFlash[3 + i] = 6; gScore += 10 * mul;
+          sndPlay(1200, 700, 40, 0.3f, false, 0);
+        }
       }
-    }
-    for (int i = 0; i < 3; i++) {  // bumpers : la balle est repoussee fort
-      const float *b = PB_BUMP[i];
-      float cx = pbBX - b[0], cy = pbBY - b[1], d = sqrtf(cx * cx + cy * cy), rr = b[2] + PB_R;
-      if (d < rr && d > 1e-3f) {
-        nx = cx / d; ny = cy / d;
-        pbBX = b[0] + nx * rr; pbBY = b[1] + ny * rr;
-        pbVX = nx * 3.6f; pbVY = ny * 3.6f;
-        if (!pbFlash[i]) { gScore += 100 * pbMult; sndPlay(900, 500, 70, 0.35f, false, 1); }
-        pbFlash[i] = 8;
+      for (int i = 0; i < 3; i++) {  // bumpers : la balle est repoussee fort
+        const float *bp = PB_BUMP[i];
+        float cx = pbBX - bp[0], cy = pbBY - bp[1], d = sqrtf(cx * cx + cy * cy), rr = bp[2] + PB_R;
+        if (d < rr && d > 1e-3f) {
+          nx = cx / d; ny = cy / d;
+          pbBX = bp[0] + nx * rr; pbBY = bp[1] + ny * rr;
+          pbVX = nx * 3.6f; pbVY = ny * 3.6f;
+          if (!pbFlash[i]) { gScore += 100 * mul; pbPopup(bp[0], bp[1] - bp[2] - 2, 100 * mul); sndPlay(900, 500, 70, 0.35f, false, 1); }
+          pbFlash[i] = 8;
+        }
       }
-    }
-    for (int i = 0; i < 3; i++) {  // cibles
-      if (!pbTgt[i]) continue;
-      const float *t = PB_TGT[i];
-      if (pbHit(t[0], t[1], t[2], t[3], PB_R + 0.5f, 0.6f, 0, 0, nx, ny)) {
-        pbTgt[i] = false;
-        gScore += 250 * pbMult;
-        sndPlay(1500, 2000, 60, 0.35f, false, 1);
-        if (!pbTgt[0] && !pbTgt[1] && !pbTgt[2]) {  // les 3 cibles : bonus, multiplicateur, cibles relevees
-          gScore += 2000UL * pbMult;
-          pbMult = min(5, pbMult + 1);
-          for (auto &tt : pbTgt) tt = true;
-          pbMsg = "CIBLES ! BONUS"; pbMsgT = 80;
-          sndMelody(JINGLE_ARME, 4);
-          if (++pbClears >= 2) {  // deux series : stage suivant
-            pbClears = 0;
-            altStageClear(3000UL * gWave);
-            gWave++;
-            gStageT = 100;
-            sndMelody(JINGLE_STAGE, 4);
+      for (auto &po : PB_POST) {  // plots en caoutchouc : ricochet vif
+        float cx = pbBX - po[0], cy = pbBY - po[1], d = sqrtf(cx * cx + cy * cy), rr = po[2] + PB_R;
+        if (d < rr && d > 1e-3f) {
+          nx = cx / d; ny = cy / d;
+          pbBX = po[0] + nx * rr; pbBY = po[1] + ny * rr;
+          float vn = pbVX * nx + pbVY * ny;
+          if (vn < 0) { pbVX -= 1.8f * vn * nx; pbVY -= 1.8f * vn * ny; pbVX += nx * 0.8f; pbVY += ny * 0.8f; gScore += 10 * mul; sndPlay(1800, 1400, 25, 0.25f, false, 0); }
+        }
+      }
+      {  // poisson : touche, il fait demi-tour
+        float cx = pbBX - pbFishX, cy = pbBY - 62, d = sqrtf(cx * cx + cy * cy), rr = 1.8f + PB_R;
+        if (d < rr && d > 1e-3f) {
+          nx = cx / d; ny = cy / d;
+          pbBX = pbFishX + nx * rr; pbBY = 62 + ny * rr;
+          float vn = pbVX * nx + pbVY * ny;
+          if (vn < 0) { pbVX -= 1.6f * vn * nx; pbVY -= 1.6f * vn * ny; }
+          pbVX += nx * 1.5f; pbVY += ny * 1.5f;
+          if (!pbFishFlash) { pbFishFlash = 12; pbFishD = -pbFishD; gScore += 500 * mul; pbPopup(pbFishX, 59, 500 * mul); sndPlay(600, 1500, 90, 0.35f, false, 1); }
+        }
+      }
+      if (!pbHoldT && !pbMouthCD) {  // la gueule de la creature avale la balle (si elle n'arrive pas trop vite)
+        float cx = pbBX - PB_MX, cy = pbBY - PB_MY;
+        if (cx * cx + cy * cy < 2.4f * 2.4f && pbVX * pbVX + pbVY * pbVY < 4.5f * 4.5f) {
+          pbBX = PB_MX; pbBY = PB_MY; pbVX = pbVY = 0;
+          pbHoldT = 50; pbHoldBall = &bl - pbBall; pbRoar = 60;
+          gScore += 1500UL * mul; pbPopup(PB_MX, PB_MY - 3, 1500 * mul);
+          pbMsg = "GUEULE ! +1500"; pbMsgT = 60;
+          sndPlay(150, 60, 400, 0.5f, true, 2);  // grondement
+        }
+      }
+      for (int i = 0; i < 3; i++) {  // cibles
+        if (!pbTgt[i]) continue;
+        const float *t = PB_TGT[i];
+        if (pbHit(t[0], t[1], t[2], t[3], PB_R + 0.5f, 0.6f, 0, 0, nx, ny)) {
+          pbTgt[i] = false;
+          gScore += 250 * mul;
+          sndPlay(1500, 2000, 60, 0.35f, false, 1);
+          if (!pbTgt[0] && !pbTgt[1] && !pbTgt[2]) {  // les 3 cibles : bonus, multiplicateur, cibles relevees
+            gScore += 2000UL * mul;
+            pbMult = min(5, pbMult + 1);
+            for (auto &tt : pbTgt) tt = true;
+            pbClears++;
+            if (pbClears == 1 && !pbMulti) {  // 1re serie du stage : MULTIBALL, 2 balles en plus
+              pbMulti = 1; pbQueue = 2; pbQueueT = 20; pbSave = 400;
+              pbMsg = "MULTIBALL !"; pbMsgT = 100;
+              sndMelody(JINGLE_STAGE, 4);
+            } else {
+              pbMsg = "CIBLES ! BONUS"; pbMsgT = 80;
+              sndMelody(JINGLE_ARME, 4);
+            }
+            if (pbClears >= 2) {  // deux series : stage suivant
+              pbClears = 0;
+              altStageClear(3000UL * gWave);
+              gWave++;
+              gStageT = 100;
+              sndMelody(JINGLE_STAGE, 4);
+            }
           }
         }
       }
+      for (int f = 0; f < 2; f++) {  // flippers : segments qui tournent, ils frappent la balle
+        float an = f ? pbAR : pbAL, w = (f ? dR : dL);
+        float px = PB_PIV[f][0], py = PB_PIV[f][1], ux = f ? -cosf(an) : cosf(an), uy = sinf(an);
+        float tx = px + ux * PB_FL, ty = py + uy * PB_FL;
+        float dx = tx - px, dy = ty - py, l2 = dx * dx + dy * dy;
+        float t = constrain(((pbBX - px) * dx + (pbBY - py) * dy) / l2, 0.0f, 1.0f), sl = t * PB_FL;
+        float svx = f ? sl * w * sinf(an) : -sl * w * sinf(an), svy = sl * w * cosf(an);
+        pbHit(px, py, tx, ty, PB_R + 1.2f, 0.35f, svx, svy, nx, ny);
+      }
+      bl.x = pbBX; bl.y = pbBY; bl.vx = pbVX; bl.vy = pbVY;
     }
-    for (int f = 0; f < 2; f++) {  // flippers : segments qui tournent, ils frappent la balle
-      float a = f ? pbAR : pbAL, w = (f ? dR : dL);  // vitesse de rotation (par image)
-      float px = PB_PIV[f][0], py = PB_PIV[f][1], ux = f ? -cosf(a) : cosf(a), uy = sinf(a);
-      float tx = px + ux * PB_FL, ty = py + uy * PB_FL;
-      // vitesse de la surface au point le plus proche
-      float dx = tx - px, dy = ty - py, l2 = dx * dx + dy * dy;
-      float t = constrain(((pbBX - px) * dx + (pbBY - py) * dy) / l2, 0.0f, 1.0f), s = t * PB_FL;
-      float svx = f ? s * w * sinf(a) : -s * w * sinf(a), svy = f ? s * w * cosf(a) : s * w * cosf(a);
-      pbHit(px, py, tx, ty, PB_R + 1.2f, 0.35f, svx, svy, nx, ny);
+  }
+  int alive = 0;
+  for (auto &bl : pbBall) {
+    if (!bl.on) continue;
+    // securite : balle immobile plus de 2 s hors du lanceur -> petit coup sur la table
+    if (fabsf(bl.vx) + fabsf(bl.vy) < 0.08f && !(bl.x > 56.5f && bl.y > 85)) bl.still++;
+    else bl.still = 0;
+    if (bl.still > 80) { bl.still = 0; bl.vx += (random(21) - 10) / 10.0f; bl.vy -= 1.2f; }
+    if (bl.y > 99) {  // balle perdue
+      if (pbSave > 0) { bl = { 60, 92, 0, 0, 0, true }; if (!pbMulti) { pbMsg = "BALLE RENDUE"; pbMsgT = 70; } sfxMenu(); }
+      else bl.on = false;
     }
+    alive += bl.on;
   }
-  {  // securite : balle immobile plus de 2 s hors du lanceur -> petit coup sur la table
-    static int still = 0;
-    if (fabsf(pbVX) + fabsf(pbVY) < 0.08f && !(pbBX > 56.5f && pbBY > 85)) still++;
-    else still = 0;
-    if (still > 80) { still = 0; pbVX += (random(21) - 10) / 10.0f; pbVY -= 1.2f; }
-  }
-  if (pbBY > 99) {  // balle perdue
-    if (pbSave > 0) { pbNewBall(); pbMsg = "BALLE RENDUE"; pbMsgT = 70; sfxMenu(); }
-    else { altLoseLife(pbSX(28, 92), max(10, pbSY(92))); pbMult = 1; }
-  }
+  if (pbMulti && alive <= 1 && pbQueue == 0) pbMulti = 0;  // multiball fini
+  if (alive == 0) { pbBall[0].on = false; altLoseLife(pbSX(28, 92), max(10, pbSY(92))); pbMult = 1; pbMulti = 0; pbQueue = 0; }
+  lead = -1;  // pour la vue : la balle la plus basse
+  for (int i = 0; i < PB_BALLS; i++)
+    if (pbBall[i].on && (lead < 0 || pbBall[i].y > pbBall[lead].y)) lead = i;
+  if (lead >= 0) { pbBX = pbBall[lead].x; pbBY = pbBall[lead].y; }
   if (!gDemo && gScore > gHi) gHi = gScore;
   if (gStageT > 0) gStageT--;
 }
@@ -6572,52 +6672,103 @@ void pbDraw() {
   gNOld = 0;
   if (!pbCv) return;
   GFXcanvas16 &c = *pbCv;
-  // la vue suit la balle (en douceur), sans sortir de la table
-  if (!gPaused) {
+  if (!gPaused) {  // la vue suit la balle (en douceur), sans sortir de la table
     float by = pbPY0 + pbBY * pbPH / 96.0f, want = constrain(by - H * 0.55f, 0.0f, (float)max(0, pbSceneH - H));
     pbCam += (want - pbCam) * 0.12f;
   }
-  // couleurs choisies pour une dalle a 3 bits : chaque composante eteinte ou franche
-  uint16_t white = rgb(255, 255, 255), yel = rgb(255, 220, 0), red = rgb(230, 30, 30), dred = rgb(150, 0, 0), blue = rgb(PB_BLUE_RGB[0], PB_BLUE_RGB[1], PB_BLUE_RGB[2]);
+  // theme "lagon maudit" ; couleurs franches pour une dalle a 3 bits (chaque composante eteinte ou assez forte)
+  uint16_t white = rgb(255, 255, 255), yel = rgb(255, 220, 0), green = rgb(40, 220, 80), dgreen = rgb(0, 150, 0);
+  uint16_t teal = rgb(0, 160, 140), pink = rgb(255, 80, 180), orange = rgb(255, 150, 0), red = rgb(255, 30, 20);
   c.fillScreen(0);
-  for (int y = 0; y < H; y++) {  // plateau bleu (en perspective)
-    float vy = (y + pbCam - pbPY0) * 96.0f / pbPH;
+  int cam = (int)pbCam;
+  uint16_t deep = rgb(0, 0, 170);
+  for (int y = 0; y < H; y++) {  // eau du lagon : bleu profond
+    float vy = (y + cam - pbPY0) * 96.0f / pbPH;
     if (vy < 0 || vy > 96) continue;
     int xl = pbSX(-1, vy), xr = pbSX(65, vy);
-    c.drawFastHLine(xl, y, xr - xl + 1, blue);
+    c.drawFastHLine(xl, y, xr - xl + 1, deep);
   }
-  int cam = (int)pbCam;
-  if (pbGlass && cam < pbGlassH) {  // fronton : etoiles, cometes, logo, bille chromee, afficheur
-    int oy = -cam;
-    c.drawRect(0, oy, W, 34, rgb(0, 90, 255));
-    c.drawRect(1, oy + 1, W - 2, 32, rgb(0, 0, 160));
-    uint32_t sd = 12345;
-    for (int i = 0; i < 26; i++) {
-      sd = sd * 1103515245u + 12345u;
-      static const uint16_t SC[3] = { 0xFFFF, 0x07FF, 0xFFE0 };
-      c.drawPixel(3 + (sd >> 16) % (W - 6), oy + 3 + (sd >> 8) % 16, ((gFrame >> 3) + i) % 7 ? SC[i % 3] : 0);
+  for (int row = 0; row < 40; row++) {  // vagues ondulees turquoise qui avancent doucement
+    float vy0 = 3 + row * 2.4f;
+    int y0 = pbSY(vy0);
+    if (y0 < -2 || y0 > H + 2) continue;
+    int xl = pbSX(1, vy0), xr = pbSX(63, vy0);
+    for (int x = xl; x <= xr; x++) {
+      float ph = x * 0.35f + row * 1.7f + gFrame * 0.06f;
+      if (sinf(ph * 0.5f) < -0.2f) continue;  // vagues en morceaux
+      c.drawPixel(x, y0 + (int)lroundf(sinf(ph) * 1.2f), teal);
     }
-    static const uint8_t CC[3][3] = { { 255, 200, 0 }, { 255, 40, 40 }, { 0, 220, 255 } };
-    for (int k = 0; k < 3; k++) c.drawLine(8 + k * 6, oy + 19 - k, W - 30 + k * 4, oy + 6 + k * 3, rgb(CC[k][0], CC[k][1], CC[k][2]));
-    int lx = (W - 80) / 2 - 6, ly = oy + 2;
+  }
+  for (int k = 0; k < 2; k++) {  // touffes de roseaux dans les coins du bas
+    for (int j = 0; j < 4; j++) {
+      float rx = k ? 53 - j * 1.6f : 3 + j * 1.6f, ry = 88 - (j & 1) * 3;
+      int x0, y0, x1, y1;
+      x0 = pbSX(rx, ry + 6); y0 = pbSY(ry + 6); x1 = pbSX(rx + (k ? -1 : 1), ry); y1 = pbSY(ry);
+      c.drawLine(x0, y0, x1, y1, dgreen);
+      c.fillCircle(x1, y1, 1, rgb(150, 90, 0));  // massette
+    }
+  }
+  static const float LEAF[5][2] = { { 9, 16 }, { 50, 42 }, { 6, 50 }, { 30, 26 }, { 49, 14 } };
+  for (auto &lf : LEAF) {  // feuilles de nenuphar qui flottent
+    int x = pbSX(lf[0], lf[1]), y = pbSY(lf[1]), r = max(1, (int)lroundf(1.8f * pbS(lf[1])));
+    c.fillCircle(x, y, r, dgreen);
+    c.drawLine(x, y, x + r, y - 1, deep);
+  }
+  if (pbGlass && cam < pbGlassH) {  // fronton : lune, roseaux, creature qui sort de l'eau, logo qui coule, afficheur
+    int oy = -cam;
+    c.drawRect(0, oy, W, 34, dgreen);
+    c.drawRect(1, oy + 1, W - 2, 32, rgb(0, 0, 150));
+    c.fillCircle(10, oy + 8, 5, rgb(255, 230, 150));  // pleine lune
+    c.fillCircle(8, oy + 7, 1, rgb(200, 180, 100));
+    uint32_t sd = 777;
+    for (int i = 0; i < 14; i++) {  // etoiles
+      sd = sd * 1103515245u + 12345u;
+      c.drawPixel(18 + (sd >> 16) % (W - 40), oy + 2 + (sd >> 8) % 8, ((gFrame >> 3) + i) % 6 ? white : 0);
+    }
+    for (int k = 0; k < 7; k++) {  // roseaux en silhouette
+      int x = 3 + k * 4 + (k & 1), h = 6 + (k * 5) % 7;
+      c.drawFastVLine(x, oy + 20 - h, h, dgreen);
+      c.drawPixel(x, oy + 19 - h, orange);
+    }
+    int bx = W - 26, by = oy + 2;  // la creature
+    bool blinkEye = (gFrame % 160) < 6;
+    for (int r = 0; r < 18; r++)
+      for (int q = 0; q < 20; q++) {
+        char ch = PB_BEAST[r][q < 10 ? q : 19 - q];
+        if (ch == '.') continue;
+        bool anger = pbFlash[0] || pbFlash[1] || pbFlash[2] || pbRoar;
+        uint16_t col = ch == 'F' ? teal : ch == 'G' ? green : ch == 'g' ? dgreen : ch == 'Y' ? (blinkEye ? green : anger ? red : yel) : ch == 'W' ? white : 0;
+        if (pbRoar && r >= 11 && r <= 13 && ch != '.' && (ch == 'k' || ch == 'W')) col = (r == 12 && (pbRoar & 4)) ? red : 0;  // gueule ouverte
+        c.drawPixel(bx + q, by + r, col);
+      }
+    for (int x = 2; x < W - 2; x++)  // l'eau ou elle surgit
+      if ((x + (gFrame >> 2)) % 6 < 4) c.drawPixel(x, oy + 19 + ((x + (gFrame >> 3)) & 1), teal);
+    int lx = (W - 80) / 2 - 14, ly = oy + 2;  // logo : vert -> jaune, penche, avec des coulures
     for (int pass = 0; pass < 2; pass++)
       for (int r = 0; r < 16; r++) {
-        int sh = (15 - r) / 3;  // italique
-        uint16_t col = pass == 0 ? rgb(150, 0, 0) : r < 5 ? rgb(255, 230, 0) : r < 10 ? rgb(255, 150, 0) : rgb(255, 30, 20);
+        int sh = (15 - r) / 3;
+        uint16_t col = pass == 0 ? rgb(0, 0, 0) : r < 6 ? yel : r < 11 ? rgb(150, 230, 0) : green;
         for (int x = 0; x < 80; x++)
-          if (pbLogo[r][x / 8] & (0x80 >> (x % 8))) c.drawPixel(lx + x + sh + (pass ? 0 : 1), ly + r + (pass ? 0 : 1), col);
+          if (pbLogo[r][x / 8] & (0x80 >> (x % 8))) {
+            c.drawPixel(lx + x + sh + (pass ? 0 : 1), ly + r + (pass ? 0 : 1), col);
+            if (pass && r == 15 && (x * 7) % 5 == 0) c.drawFastVLine(lx + x + sh, ly + 16, 1 + (x * 3) % 3, green);  // coulures
+          }
       }
-    int bx = W - 14, by = oy + 10;
-    c.fillCircle(bx, by, 6, rgb(150, 155, 170));
-    c.fillCircle(bx - 1, by - 1, 4, rgb(220, 225, 235));
-    c.fillCircle(bx - 2, by - 2, 1, white);
-    c.drawRect(W / 2 - 50, oy + 20, 100, 13, rgb(255, 150, 0));
+    c.drawRect(W / 2 - 50, oy + 21, 100, 12, green);  // afficheur
+    for (int k = 0; k < 2; k++) {  // griffes de la creature agrippees au cadre
+      int gx = k ? W / 2 + 42 : W / 2 - 50;
+      for (int f = 0; f < 3; f++) {
+        c.drawFastVLine(gx + f * 3, oy + 18, 4, green);
+        c.drawPixel(gx + f * 3, oy + 22, white);
+      }
+      c.drawFastHLine(gx - 1, oy + 18, 9, dgreen);
+    }
     char num[16], b[16];
     snprintf(num, sizeof(num), "%lu", (unsigned long)gScore);
-    int n = strlen(num), j = 0;  // points tous les 3 chiffres : 1.234.567
+    int n = strlen(num), j = 0;
     for (int i = 0; i < n; i++) { b[j++] = num[i]; if ((n - i - 1) % 3 == 0 && i < n - 1) b[j++] = '.'; }
     b[j] = 0;
-    tinyText(c, (W - tinyWidth(b)) / 2, oy + 21, b, rgb(255, 40, 40));
+    tinyText(c, (W - tinyWidth(b)) / 2, oy + 22, b, rgb(40, 255, 80));
     snprintf(num, sizeof(num), "BALL %d", max(1, (gDiff == 0 && !gDemo ? 5 : 3) - gLives + 1));
     tinyText(c, W / 2 - 46, oy + 27, num, yel);
     snprintf(num, sizeof(num), "X%d", pbMult);
@@ -6627,63 +6778,101 @@ void pbDraw() {
   auto R = [&](float r, float y) { return max(1, (int)lroundf(r * pbS(y))); };
   auto line = [&](float x0, float y0, float x1, float y1, uint16_t col) { int a, b, cx, cy; P(x0, y0, a, b); P(x1, y1, cx, cy); c.drawLine(a, b, cx, cy, col); };
   auto dot = [&](float x, float y, float r, uint16_t col) { int X, Y; P(x, y, X, Y); c.fillCircle(X, Y, R(r, y), col); };
-  bool blink = (gFrame >> 3) & 1;
-  {  // losange central : jaune, orange, bande cyan
-    int tx, ty, rx, ry, bx, by, lx, ly;
-    P(28, 43, tx, ty); P(33, 51, rx, ry); P(28, 60, bx, by); P(23, 51, lx, ly);
-    c.fillTriangle(tx, ty, rx, ry, lx, ly, yel);
-    c.fillTriangle(bx, by, rx, ry, lx, ly, rgb(255, 150, 0));
-    line(25, 54, 31, 54, rgb(0, 220, 255));
-    line(26, 56, 30, 56, rgb(0, 220, 255));
-    dot(28, 48, 1, (pbTgt[0] || pbTgt[1] || pbTgt[2]) && blink ? white : rgb(255, 30, 20));
+  auto ring = [&](float x, float y, float r, uint16_t col) { int X, Y; P(x, y, X, Y); c.drawCircle(X, Y, R(r, y), col); };
+  {  // l'oeil de la creature au centre : peau ecailleuse, iris jaune cercle d'orange, pupille fendue ; il cligne,
+     // et une lueur pulse autour tant qu'il reste des cibles
+    int cx, cy; P(28, 51, cx, cy);
+    int rx = R(7, 51), ry = R(4.5f, 51);
+    auto ell = [&](int ex, int ey, uint16_t col, bool fill) {
+      for (int dy = -ey; dy <= ey; dy++) {
+        int hw = (int)(ex * sqrtf(1.0f - (float)(dy * dy) / (ey * ey)) + 0.5f);
+        if (fill) c.drawFastHLine(cx - hw, cy + dy, 2 * hw + 1, col);
+        else { c.drawPixel(cx - hw, cy + dy, col); c.drawPixel(cx + hw, cy + dy, col); }
+      }
+    };
+    bool glow = (pbTgt[0] || pbTgt[1] || pbTgt[2]) && ((gFrame >> 3) & 1);
+    ell(rx + 3, ry + 3, glow ? orange : dgreen, true);  // peau (ou lueur)
+    ell(rx + 2, ry + 2, green, true);
+    for (int k = -rx; k <= rx; k += 3) c.drawPixel(cx + k, cy - ry - 2, dgreen);  // ecailles
+    if ((gFrame % 200) < 8) c.drawFastHLine(cx - rx, cy, 2 * rx + 1, dgreen);  // paupiere fermee
+    else {
+      ell(rx, ry, orange, true);
+      ell(max(1, rx - 2), max(1, ry - 1), yel, true);
+      c.fillRect(cx - max(1, rx / 6), cy - ry + 1, max(2, rx / 3), 2 * ry - 1, 0);  // pupille fendue
+      c.drawPixel(cx - rx / 2, cy - ry / 2, white);
+      c.drawPixel(cx - rx / 2 + 1, cy - ry / 2, white);
+    }
   }
-  static const float YD[][2] = { { 12, 22 }, { 10, 30 }, { 10, 38 }, { 46, 22 }, { 47, 30 }, { 47, 38 }, { 20, 47 }, { 36, 47 },
-                                 { 17, 54 }, { 39, 54 }, { 15, 62 }, { 41, 62 }, { 28, 33 } };
-  for (int i = 0; i < (int)(sizeof(YD) / sizeof(YD[0])); i++) dot(YD[i][0], YD[i][1], 0.9f, ((gFrame >> 2) % 13) == i ? white : yel);
-  dot(13, 46, 1.0f, rgb(40, 220, 80)); dot(43, 46, 1.0f, rgb(40, 220, 80)); dot(28, 72, 1.0f, rgb(40, 220, 80));
+  for (int i = 0; i < 13; i++) {  // bulles qui montent
+    static const float BX[13] = { 12, 10, 46, 47, 20, 36, 17, 39, 15, 41, 28, 24, 32 };
+    float y = 64 - fmodf(gFrame * 0.08f + i * 4.7f, 46);
+    ring(BX[i] + sinf(gFrame * 0.05f + i) * 0.8f, y, 0.9f, rgb(0, 220, 255));
+  }
+  dot(13, 46, 1.0f, green); dot(43, 46, 1.0f, green); dot(28, 72, 1.0f, green);  // algues qui luisent
   for (int i = 0; i < 3; i++) dot(22 + i * 6, 7, 1.0f, ((gFrame >> 2) + i) % 3 == 0 ? rgb(0, 220, 255) : rgb(0, 0, 150));
-  for (auto &sg : PB_SEG) {  // murs : rail chrome
+  for (auto &sg : PB_SEG) {  // murs : roseaux
     int a, b, cc, d; P(sg[0], sg[1], a, b); P(sg[2], sg[3], cc, d);
-    c.drawLine(a, b, cc, d, rgb(170, 220, 255));
-    c.drawLine(a + (sg[0] < 32 ? -1 : 1), b, cc + (sg[2] < 32 ? -1 : 1), d, rgb(0, 150, 255));
+    c.drawLine(a, b, cc, d, green);
+    c.drawLine(a + (sg[0] < 32 ? -1 : 1), b, cc + (sg[2] < 32 ? -1 : 1), d, dgreen);
   }
-  line(1, 75, 12, 82.6f, red); line(55, 75, 44, 82.6f, red);
-  for (int i = 0; i < 2; i++) {  // rebonds : rouges, triangle bleu, caoutchouc blanc
+  line(1, 75, 12, 82.6f, orange); line(55, 75, 44, 82.6f, orange);
+  for (int i = 0; i < 2; i++) {  // rebonds : rochers moussus, caoutchouc blanc
     const float *k0 = PB_KICK[i];
     int a, b, cc, d, e, f; P(k0[0], k0[1], a, b); P(k0[2], k0[3], cc, d); P(i ? 51 : 5, 70, e, f);
     bool fl = pbFlash[3 + i];
-    c.fillTriangle(a, b, cc, d, e, f, fl ? white : red);
+    c.fillTriangle(a, b, cc, d, e, f, fl ? white : rgb(150, 150, 160));
     int ma = (a + cc + e) / 3, mb = (b + d + f) / 3;
-    c.fillTriangle(ma, mb - 4, ma - 2, mb + 2, ma + 2, mb + 2, rgb(0, 90, 255));
+    c.fillTriangle(ma, mb - 4, ma - 3, mb + 3, ma + 3, mb + 3, dgreen);  // mousse
     c.drawLine(a, b, cc, d, fl ? yel : white);
     c.drawLine(a + (i ? 1 : -1), b, cc + (i ? 1 : -1), d, fl ? yel : white);
   }
-  for (int i = 0; i < 3; i++) {  // bumpers champignons
+  for (int i = 0; i < 3; i++) {  // bumpers : nenuphars (feuille entaillee, fleur rose au coeur jaune)
     const float *bp = PB_BUMP[i];
     int x, y; P(bp[0], bp[1], x, y);
     int r = max(2, R(bp[2], bp[1]));
     bool f = pbFlash[i];
-    c.fillCircle(x + 1, y + 2, r, rgb(0, 0, 90));
-    c.fillCircle(x, y, r, f ? yel : white);
-    c.fillCircle(x, y, max(1, r - 1), f ? white : red);
+    if (f) c.drawCircle(x, y, r + 1 + (8 - pbFlash[i]) / 2, (pbFlash[i] & 2) ? white : teal);  // onde de choc
+    c.fillCircle(x, y, r, f ? white : green);
+    c.drawCircle(x, y, r, dgreen);
+    c.fillTriangle(x, y, x + r, y - r / 2, x + r, y + r / 3, 0);  // entaille de la feuille
     if (r >= 3) {
-      c.fillCircle(x, y - 1, max(1, r / 2), f ? yel : white);
-      c.fillCircle(x, y - 1, max(1, r / 3), f ? white : red);
-      c.drawPixel(x - r / 3, y - r / 2, white);
+      c.fillCircle(x, y, max(1, r / 2), f ? yel : pink);
+      c.fillCircle(x, y, max(1, r / 4), yel);
     }
   }
-  for (int i = 0; i < 3; i++) {  // cibles
+  for (auto &po : PB_POST) {  // plots en caoutchouc
+    int x, y; P(po[0], po[1], x, y);
+    int r = max(1, R(po[2], po[1]));
+    c.fillCircle(x, y, r, white);
+    if (r >= 2) c.fillCircle(x, y, r - 1, orange);
+  }
+  {  // gueule de la creature : trou noir borde de crocs, orange quand elle tient la balle
+    int x, y; P(PB_MX, PB_MY, x, y);
+    int r = max(2, R(2.6f, PB_MY));
+    c.fillCircle(x, y, r + 1, pbHoldT ? orange : green);
+    c.fillCircle(x, y, r, 0);
+    for (int k = -r + 1; k < r; k += 2) { c.drawPixel(x + k, y - r + 1, white); c.drawPixel(x + k, y + r - 1, white); }
+  }
+  {  // poisson orange qui nage (blanc quand il est touche)
+    int x, y; P(pbFishX, 62, x, y);
+    int u = max(1, R(1.0f, 62)), dir = pbFishD > 0 ? 1 : -1;
+    uint16_t fc = pbFishFlash ? white : orange;
+    c.fillCircle(x, y, u + 1, fc);
+    c.fillTriangle(x - dir * (u + 1), y, x - dir * (u + 4), y - u - 1, x - dir * (u + 4), y + u + 1, fc);  // queue
+    c.drawPixel(x + dir * u, y - 1, 0);  // oeil
+  }
+  for (int i = 0; i < 3; i++) {  // cibles orange
     const float *t = PB_TGT[i];
     int x0, y0, x1, y1; P(t[0], t[1], x0, y0); P(t[2], t[3], x1, y1);
     int u = max(1, R(0.8f, t[1]));
     if (pbTgt[i]) {
-      c.fillRect(x0, y0 - u, x1 - x0 + 1, 2 * u + 1, rgb(255, 200, 0));
+      c.fillRect(x0, y0 - u, x1 - x0 + 1, 2 * u + 1, orange);
       c.drawFastHLine(x0, y0 - u, x1 - x0 + 1, white);
-      c.drawFastHLine(x0, y0 + u, x1 - x0 + 1, rgb(170, 0, 0));
-    } else c.drawFastHLine(x0, y0, x1 - x0 + 1, 0);
+      c.drawFastHLine(x0, y0 + u, x1 - x0 + 1, rgb(160, 0, 0));
+    } else c.drawFastHLine(x0, y0, x1 - x0 + 1, dgreen);
   }
-  for (int i = 0; i < 5; i++) dot(20 + i * 4, 66 + (i == 0 || i == 4 ? -1 : 0), 1.1f, i < pbMult ? rgb(255, 40, 40) : dred);
-  for (int f = 0; f < 2; f++) {  // flippers effiles
+  for (int i = 0; i < 5; i++) dot(20 + i * 4, 66 + (i == 0 || i == 4 ? -1 : 0), 1.1f, i < pbMult ? rgb(40, 255, 80) : dgreen);
+  for (int f = 0; f < 2; f++) {  // flippers : blancs bordes de vert sombre
     float an = f ? pbAR : pbAL, px = PB_PIV[f][0], py = PB_PIV[f][1];
     float ux = f ? -cosf(an) : cosf(an), uy = sinf(an), nx = -uy, ny = ux;
     float tx = px + ux * PB_FL, ty = py + uy * PB_FL, w0 = 1.7f, w1 = 0.8f;
@@ -6692,28 +6881,33 @@ void pbDraw() {
     P(tx + nx * w1, ty + ny * w1, cx, cy); P(tx - nx * w1, ty - ny * w1, dx, dy);
     c.fillTriangle(ax, ay, bx, by, cx, cy, white);
     c.fillTriangle(bx, by, cx, cy, dx, dy, white);
-    c.drawLine(ax, ay, cx, cy, red);
-    c.drawLine(bx, by, dx, dy, red);
+    c.drawLine(ax, ay, cx, cy, dgreen);
+    c.drawLine(bx, by, dx, dy, dgreen);
     int pxs, pys; P(px, py, pxs, pys);
-    c.fillCircle(pxs, pys, max(1, R(1.2f, py)), red);
+    c.fillCircle(pxs, pys, max(1, R(1.2f, py)), green);
   }
   if (pbPow > 0) {  // lanceur : ressort tendu
     int x, yb; P(58, 95, x, yb);
     int h = max(1, (int)(pbPow * 14 * pbPH / 96)), w = max(2, R(4, 95));
-    for (int k = 0; k < h; k += 2) c.drawFastHLine(x, yb - h + k, w, k & 2 ? rgb(255, 150, 0) : yel);
+    for (int k = 0; k < h; k += 2) c.drawFastHLine(x, yb - h + k, w, k & 2 ? green : yel);
   }
-  if (gDead == 0) {  // bille chromee
-    int bx, by; P(pbBX, pbBY, bx, by);
-    int r = max(1, R(PB_R, pbBY));
+  for (auto &bl : pbBall) {  // billes chromees
+    if (gDead || !bl.on) continue;
+    int bx, by; P(bl.x, bl.y, bx, by);
+    int r = max(1, R(PB_R, bl.y));
     c.fillCircle(bx, by, r, rgb(150, 155, 170));
     if (r >= 2) c.fillCircle(bx - 1, by - 1, r - 1, rgb(220, 225, 235));
     c.drawPixel(bx - (r > 1), by - (r > 1), white);
   }
-  if (cam > pbGlassH - 8) {  // le fronton est sorti de la vue : score et multiplicateur dans un bandeau
+  if (pbPopT > 0) {  // points gagnes, au point de choc (ils montent un peu)
+    int x, y; P(pbPopX, pbPopY - (22 - pbPopT) * 0.15f, x, y);
+    tinyText(c, x - tinyWidth(pbPop) / 2, y, pbPop, (pbPopT & 4) ? white : yel);
+  }
+  if (cam > pbGlassH - 8) {  // fronton hors de la vue : score et multiplicateur dans un bandeau
     char b[16];
     snprintf(b, sizeof(b), "%lu", (unsigned long)gScore);
     c.fillRect(0, 0, W, 7, 0);
-    tinyText(c, 2, 1, b, rgb(255, 40, 40));
+    tinyText(c, 2, 1, b, rgb(40, 255, 80));
     snprintf(b, sizeof(b), "X%d", pbMult);
     tinyText(c, W - 2 - tinyWidth(b), 1, b, yel);
     for (int i = 0; i < min(gLives, 5); i++) c.fillCircle(W / 2 - 8 + i * 4, 3, 1, rgb(220, 225, 235));
