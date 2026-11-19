@@ -28,7 +28,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "3.90"
+#define GAMES_VERSION "3.91"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -4783,14 +4783,14 @@ uint32_t zHash(uint32_t x) { x ^= x >> 16; x *= 0x7feb352d; x ^= x >> 15; x *= 0
 void zTexel(int t, float u, float v, uint32_t id, float &r, float &g, float &b) {
   int px = (int)(u * 32), py = (int)(v * 32);
   float n = (zHash(id * 1031 + py * 37 + px) & 31) - 16;  // grain fin
-  if (t == 1) {  // briques en relief
+  if (t == 1) {  // briques bleues en relief
     int row = py / 5, iy = py % 5, bx = px + (row & 1) * 5, col = bx / 10, ix = bx % 10;
     uint32_t bh = zHash(id * 97 + row * 13 + col);
-    if (ix == 9 || iy == 4) { r = 62 + n * 0.3f; g = 50; b = 42; }
+    if (ix == 9 || iy == 4) { r = 30; g = 36 + n * 0.2f; b = 62 + n * 0.3f; }  // joint sombre
     else {
       float k = 0.82f + (bh & 15) / 50.0f;
-      r = 158 * k + n; g = 92 * k + n * 0.6f; b = 58 * k + n * 0.4f;
-      if (iy == 0 || ix == 0) { r += 32; g += 22; b += 14; }      // arete eclairee
+      r = 62 * k + n * 0.3f; g = 98 * k + n * 0.5f; b = 210 * k + n;
+      if (iy == 0 || ix == 0) { r += 18; g += 28; b += 40; }      // arete eclairee
       else if (iy == 3 || ix == 8) { r *= 0.75f; g *= 0.75f; b *= 0.75f; }  // ombre
       if ((bh >> 8) % 11 == 0) { r *= 0.62f; g *= 0.58f; b *= 0.55f; }    // brique noircie
     }
@@ -4894,7 +4894,7 @@ void zGenerate() {
     zNRooms++;
   }
   for (int k = 0; k < zNRooms; k++) {  // salles : murs d'une texture par salle
-    uint8_t tex = 1 + random(4);
+    uint8_t tex = 1;  // murs en briques bleues (textures 2 metal, 3 technique, 4 pierre : en reserve)
     for (int y = zRoom[k][1] - 1; y <= zRoom[k][1] + zRoom[k][3]; y++)
       for (int x = zRoom[k][0] - 1; x <= zRoom[k][0] + zRoom[k][2]; x++) {
         bool in = x >= zRoom[k][0] && x < zRoom[k][0] + zRoom[k][2] && y >= zRoom[k][1] && y < zRoom[k][1] + zRoom[k][3];
@@ -5424,7 +5424,7 @@ void zDraw() {
   float bobX = sinf(zBob * 0.5f) * 2.0f, bobY = fabsf(cosf(zBob * 0.5f)) * 2.0f;
   // sprites visibles, du plus loin au plus proche
   struct Spr { float tx, ty, wx, wy, lr, lg, lb; int16_t sx, w, h, top, fy; const char *const *art; uint8_t aw, ah, kind; int8_t flash; };
-  static Spr spr[Z_MOBS * 2 + Z_ITEMS + Z_SHOTS + 6];  // robots + fumees, objets, tirs, etincelles
+  static Spr spr[Z_MOBS + Z_ITEMS + Z_SHOTS + 6 + 8];  // robots, objets, tirs, etincelles, et 8 fumees au plus
   int ns = 0;
   float inv = 1.0f / (plX * dirY - dirX * plY);
   auto addSpr = [&](float x, float y, float hgt, float lift, const char *const *art, uint8_t aw, uint8_t ah, uint8_t kind, int8_t fl) {
@@ -5445,10 +5445,7 @@ void zDraw() {
     if (m.type == 3) addSpr(m.x, m.y, 1.0f, 0, ZS_COLUMN, 16, 16, 0, 0);
     else if (m.type == 4 && m.state == 3) addSpr(m.x, m.y, 0.4f + m.t * 0.07f, 0.1f, nullptr, 1, 1, 2, m.t);  // grosse explosion
     else if (m.type == 4) addSpr(m.x, m.y, 0.55f, 0, ZS_BARREL, 16, 16, 0, m.flash);
-    else if (m.state == 4) {
-      addSpr(m.x, m.y, 0.6f, 0, ZS_SCRAP, 16, 16, 0, 0);
-      if (m.t < 100) addSpr(m.x, m.y + 0.01f, 0.3f + (m.t - 15) * 0.006f, 0.25f + (m.t - 15) * 0.012f, nullptr, 1, 1, 6, m.t);  // fumee qui monte de l'epave
-    }
+    else if (m.state == 4) addSpr(m.x, m.y, 0.6f, 0, ZS_SCRAP, 16, 16, 0, 0);
     else if (m.state == 3) addSpr(m.x, m.y, 0.25f + m.t * 0.04f, 0.25f, nullptr, 1, 1, 2, m.t);  // explosion
     else if (m.type == 0) addSpr(m.x, m.y, 0.5f, 0.35f + sinf(m.t * 0.1f) * 0.06f, ZS_DRONE[(m.t >> 2) & 1], 24, 24, m.atk ? 3 : 0, m.flash);
     else addSpr(m.x, m.y, m.type == 2 ? 0.95f : 0.8f, 0, (m.type == 1 ? ZS_SENT : ZS_BRUTE)[(m.walk >> 3) & 1], 24, 24, m.atk ? 3 : 0, m.guard ? -1 : m.flash);
@@ -5459,6 +5456,8 @@ void zDraw() {
     if (s.on) addSpr(s.x, s.y, 0.18f, 0.35f, nullptr, 1, 1, 1, 0);  // boule de plasma
   for (auto &k : zSpark)
     if (k.on) addSpr(k.x, k.y, 0.08f + k.t * 0.02f, 0.45f, nullptr, 1, 1, 4, k.t);  // etincelles
+  for (auto &m : zMob)  // fumee qui monte des epaves (en dernier : elle ne prend jamais la place d'un tir ou d'un objet)
+    if (m.on && m.type < 3 && m.state == 4 && m.t < 100) addSpr(m.x, m.y + 0.01f, 0.3f + (m.t - 15) * 0.006f, 0.25f + (m.t - 15) * 0.012f, nullptr, 1, 1, 6, m.t);
   for (int i = 1; i < ns; i++)  // tri du plus loin au plus proche
     for (int j = i; j > 0 && spr[j].ty > spr[j - 1].ty; j--) { Spr t = spr[j]; spr[j] = spr[j - 1]; spr[j - 1] = t; }
   struct Lt { float x, y, r, g, b, rad; };
@@ -5979,21 +5978,28 @@ void pairOverlay() {  // sur la dalle, dans un cadre : ASSOCIATION 45 / SHARE + 
   gText(H / 2 + 1, "SHARE + PS", rgb(0, 220, 255));
 }
 // bouton "config wifi" du shield (le meme que l'horloge, GPIO 34, actif a l'etat haut, resistance de tirage sur le shield) :
-// un appui ouvre le mode association 60 s (nouvel appui : 60 s de nouveau)
+// un appui ouvre le mode association 60 s (nouvel appui : 60 s de nouveau).
+// L'appui est capte par interruption : meme bref, il n'est jamais perdu pendant le calcul d'une image (BUNKER 3D...).
 #define CFG_BTN_PIN 34
+volatile bool cfgBtnHit = false;
+volatile uint32_t cfgBtnAt = 0;
+void IRAM_ATTR cfgBtnIsr() {
+  uint32_t t = millis();
+  if (t - cfgBtnAt > 400) cfgBtnHit = true;  // anti-rebond : un seul appui par 0,4 s
+  cfgBtnAt = t;
+}
+void cfgButtonBegin() {
+  pinMode(CFG_BTN_PIN, INPUT);  // GPIO 34 : entree seule, tirage par la resistance du shield
+  attachInterrupt(digitalPinToInterrupt(CFG_BTN_PIN), cfgBtnIsr, RISING);
+}
 void cfgButton() {
-  static uint32_t downAt = 0;
-  static bool done = true;  // ignore le bouton tant qu'il n'a pas ete lu relache une fois (bouton tenu au demarrage)
-  uint32_t now = millis();
-  if (digitalRead(CFG_BTN_PIN) == LOW) { downAt = 0; done = false; return; }
-  if (!downAt) downAt = now;
-  if (!done && now - downAt > 60) {  // 60 ms d'appui : anti-rebond
-    done = true;
-    lastInput = now;
-    sfxMenu();
-    pairStart(60000);
-    Serial.println("Bouton du shield : mode association");
-  }
+  if (!cfgBtnHit) return;
+  cfgBtnHit = false;
+  if (millis() < 3000) return;  // parasites au demarrage
+  lastInput = millis();
+  sfxMenu();
+  pairStart(60000);
+  Serial.println("Bouton du shield : mode association");
 }
 // Bluepad32 : association simple, PS + Share sur la manette (la barre lumineuse clignote vite), plus d'adresse a recopier
 void ps4Begin() {
@@ -6345,7 +6351,7 @@ void setup() {
   gDiff = prefs.getUChar("diff", 1) % 3;
   gPlayers = constrain(prefs.getUChar("players", 1), 1, 2);
   gGame = 0;  // demarrage toujours sur ESSAIM (choix d'un autre jeu : gauche / droite dans le menu)
-  pinMode(CFG_BTN_PIN, INPUT);  // bouton du shield (GPIO 34 : entree seule, tirage par la resistance du shield)
+  cfgButtonBegin();  // bouton du shield (GPIO 34)
   ps4Begin();
   audioBegin();
   pairStart(60000);  // 60 s pour associer une manette, son coupe (le Bluetooth a tout son temps)

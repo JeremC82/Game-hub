@@ -18,7 +18,7 @@ Depuis la V3.84, le Game-hub utilise **Bluepad32** : jusqu'à **4 manettes Bluet
 - **Menu « JOUEURS 1 / 2 »** (2e ligne, une étoile par manette connectée) : seuls les jeux à deux joueurs utilisent la 2e manette.
   - **RAQUETTES** : match à deux (raquette de droite pour le joueur 2), **le premier à 7 points gagne**.
   - **SPACE DEFENDER** : coopération, un 2e vaisseau **vert** pour le joueur 2, vies et score communs ; les ennemis piquent sur l'un ou l'autre ; la manette du joueur touché vibre.
-- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V3.90_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
+- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V3.91_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
 - **Mémoire** : environ 81 Ko libres avec 2 dalles en 3 bits et deux manettes connectées.
 
 # SPACE DEFENDER
@@ -212,7 +212,7 @@ Un shoot vertical original au-dessus de la mer (V3.85, remplace ESCALADE ; nouve
 
 Un jeu de tir original **en vue subjective** (V3.88) : tu avances dans une base souterraine comme si tu y étais.
 - **Moteur 3D** (lancer de rayons, calculé colonne par colonne, sans effacement donc sans scintillement) : murs texturés calculés à pleine résolution, sol en dalles et plafond avec plafonniers en perspective, brouillard avec la distance, ombre en haut et en bas des murs et le long des murs au sol, balancement de la marche.
-- **Murs :** briques en relief (certaines noircies), plaques de métal rivetées avec bandes de danger, panneaux techniques (écran qui clignote, bande lumineuse qui défile), pierre taillée moussue, appliques lumineuses avec halo ; portes coulissantes à bandes jaunes, porte rouge fermée à clé, panneau de sortie vert.
+- **Murs :** briques bleues en relief (V3.91 : dans toutes les salles), arêtes éclairées, joints sombres, certaines briques noircies, appliques lumineuses avec halo ; portes coulissantes à bandes jaunes, porte rouge fermée à clé, panneau de sortie vert.
 - **Commandes :** stick gauche (ou croix) pour avancer, reculer et faire un pas de côté, **stick droit** (ou croix gauche / droite) pour pivoter, **L1 / R1** pas de côté, **✕ ou R2 tirer**, **□ ouvrir une porte / actionner la sortie**, **○ changer d'arme**, **△ mini-carte**. L2 ou OPTIONS : pause.
 - **Ennemis (robots originaux dessinés en 24 × 24, V3.89) :** drone flottant à l'œil rouge rond (rotor qui tourne, bras-canons, flamme du réacteur), sentinelle à visière cyan et canons d'épaule, colosse blindé (casque, épaulières, poings) qui frappe au contact. **Volume** (bord éclairé, bord dans l'ombre, lumière du plafond), **ombre au sol**, éclairés par le plasma et les explosions ; leurs yeux et voyants brillent dans le noir. Les épaves **fument**.
 - **Ils se défendent :** ils te repèrent quand ils te voient, ouvrent les portes et te poursuivent ; **ils esquivent** par des pas de côté quand tu les vises, **ripostent** dès qu'ils sont touchés et **préviennent leurs voisins** ; blessés, **ils reculent en tirant** ; ils gardent leurs distances. La sentinelle tire en **rafales de 3** puis se décale, le drone **vise là où tu vas être** et louvoie, le colosse **charge en zigzag**.
@@ -297,7 +297,7 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. **La démo cha
 
 **Associer une manette, une seule fois.** Ensuite, le bouton **PS** suffit pour la reconnecter.
 
-1. **Mode association** : il est actif **60 s après chaque démarrage**. On peut aussi le relancer avec **le bouton « config wifi » du shield** (le même que l'horloge, GPIO 34, V3.90), en maintenant **Share 3 s** sur une manette déjà connectée, ou avec la commande `m` du moniteur série. La dalle affiche « ASSOCIATION 45 / SHARE + PS » dans un cadre ; le son est coupé et **la luminosité baisse à environ 10 %** pendant ce temps (moins de courant dans les dalles, le Bluetooth a tout pour lui). Ton réglage de luminosité revient dès la fin de l'association.
+1. **Mode association** : il est actif **60 s après chaque démarrage**. On peut aussi le relancer avec **le bouton « config wifi » du shield** (le même que l'horloge, GPIO 34, V3.90 ; capté par interruption en V3.91, même un appui bref), en maintenant **Share 3 s** sur une manette déjà connectée, ou avec la commande `m` du moniteur série. La dalle affiche « ASSOCIATION 45 / SHARE + PS » dans un cadre ; le son est coupé et **la luminosité baisse à environ 10 %** pendant ce temps (moins de courant dans les dalles, le Bluetooth a tout pour lui). Ton réglage de luminosité revient dès la fin de l'association.
 2. Sur la manette : **PS4** : maintenir **Share puis PS** jusqu'au clignotement rapide de la barre lumineuse. **PS5** : **Create + PS**. **Xbox** : le bouton d'association sur le dessus.
 3. La dalle affiche « MANETTE 1 OK » (puis « MANETTE 2 OK » pour la suivante). La 1re manette connectée est le joueur 1 (barre bleue), la 2e le joueur 2 (rouge).
 
@@ -374,8 +374,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V3.90_complet.bin](firmware/GameHub_V3.90_complet.bin) | 0x0 | `f78e6154330a94ca034d31a0687b1a85` |
-| [firmware/GameHub_V3.90.bin](firmware/GameHub_V3.90.bin) | 0x10000 | `ab963d67f189d7b4a35034839e60e371` |
+| [firmware/GameHub_V3.91_complet.bin](firmware/GameHub_V3.91_complet.bin) | 0x0 | `5d738e4fb0a927ca4944ea74ab815b11` |
+| [firmware/GameHub_V3.91.bin](firmware/GameHub_V3.91.bin) | 0x10000 | `d2f628fddda29b60f4b46f78275d71f8` |
 
 Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB SPIFFS)** dans Outils → Partition Scheme.
 
