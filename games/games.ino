@@ -28,7 +28,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "3.91"
+#define GAMES_VERSION "3.92"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -204,6 +204,8 @@ PadShim PS4(0), PAD2(1);
 char padToast[20] = "";      // message sur la dalle : MANETTE 2 OK...
 uint32_t padToastUntil = 0;
 bool rumbleReq2 = false;  // le vaisseau du joueur 2 est touche : sa manette vibre
+int8_t padScanWant = -1;  // nouvelles connexions a activer (1) ou couper (0) dans ps4Poll, -1 : rien a faire
+uint32_t padScanAt = 0;
 void onPadConnected(ControllerPtr c) {
   for (int i = 0; i < BP32_MAX_GAMEPADS; i++)
     if (!gPads[i]) {
@@ -417,6 +419,11 @@ GEnemy gEn[G_MAXE];
 GDot gShot[G_SHOTS], gBomb[G_BOMBS];
 GBoom gBoom[G_BOOMS];
 GStar gStar[G_STARS];
+// ---- memoire des jeux : chaque jeu (sauf le 1er, dont les etoiles servent aussi au menu) range ses tableaux dans un bloc
+// reserve seulement quand il tourne (partie ou demo) et rendu des qu'on passe a un autre jeu : le Bluetooth garde la memoire.
+void *gMem = nullptr;     // bloc du jeu en cours
+int8_t gMemGame = -1;     // jeu a qui appartient le bloc
+#define GMEM(T) ((T *)gMem)
 GRect gOld[G_RECTS];
 int gNE = 0, gCols = 4, gRows = 3, gTop = 13, gPY = 49, gNStar = 0, gNOld = 0, gLives = 0, gWave = 0, gDead = 0, gCool = 0;
 uint32_t gFrame = 0, gScore = 0, gHi = 0, gLastStep = 0;
@@ -1241,10 +1248,12 @@ void altBooms(uint16_t *palFull) {  // explosions (anneau qui grandit)
 struct REnemy { float x, y, vx, vy, t; uint8_t type, pat; int8_t hp, flash; bool on, carrier; };
 struct RDot { float x, y, vx, vy; bool on; };
 struct RCap { float x, y; uint8_t kind; bool on; };  // kind 0 : arme (P), 1 : bouclier (S), 2 : bombe (B)
-REnemy rEn[R_EN];
-RDot rShot[R_SHOTS], rBomb[R_BOMBS];
+struct RMem { REnemy en[R_EN]; RDot shot[R_SHOTS], bomb[R_BOMBS]; int16_t fr[R_FAR][2]; };
+#define rEn (GMEM(RMem)->en)
+#define rShot (GMEM(RMem)->shot)
+#define rBomb (GMEM(RMem)->bomb)
+#define rFar (GMEM(RMem)->fr)
 RCap rCap;
-int16_t rFar[R_FAR][2];
 float rX, rY;
 int rTier = 0, rCool = 0, rGroups = 0, rSpawnT = 0, rInv = 0, rShield = 0, rBombs = 0, rFlash = 0;
 bool rBoss = false, rPrevBomb = false;
@@ -1781,11 +1790,12 @@ struct BPlat { int16_t x0, x1, y; };
 struct BEnemy { float x, y, vx, vy; uint8_t type; bool on, fly, angry; };
 struct BBubble { float x, y, vx; int16_t t; int8_t en; bool on; };  // en : ennemi enferme (-1 : vide)
 struct BGem { float x, y, vy; int16_t t; bool on; };
-BPlat bPlat[B_PLAT];
+struct BMem { BPlat plat[B_PLAT]; BEnemy en[B_EN]; BBubble bub[B_BUB]; BGem gem[B_GEM]; };
+#define bPlat (GMEM(BMem)->plat)
+#define bEn (GMEM(BMem)->en)
+#define bBub (GMEM(BMem)->bub)
+#define bGem (GMEM(BMem)->gem)
 int bNPlat = 0;
-BEnemy bEn[B_EN];
-BBubble bBub[B_BUB];
-BGem bGem[B_GEM];
 float bX, bY, bVY;
 int bDir = 1, bCool = 0, bInv = 0, bLevelT = 0, bChain = 0, bChainT = 0;
 bool bGround = false, bPrevJump = false, bPrevFire = false;
@@ -2108,7 +2118,8 @@ const char *const L_MAZE[L_ROWS] = {
   "#...................#",
   "#####################"
 };
-uint8_t lDot[L_ROWS][L_COLS];  // 0 rien, 1 graine, 2 grosse graine
+struct LMem { uint8_t dot[L_ROWS][L_COLS], from[L_ROWS][L_COLS]; int16_t q[L_ROWS * L_COLS]; };
+#define lDot (GMEM(LMem)->dot)  // 0 rien, 1 graine, 2 grosse graine
 LMob lP, lE[4];
 int lTile = 6, lOX = 0, lOY = 12, lDots = 0, lFright = 0, lChain = 0, lCamY = 0;  // lCamY : defilement vertical (une seule dalle)
 int8_t lWantDx = 0, lWantDy = 0;
@@ -2236,8 +2247,8 @@ void lMove(LMob &m, float sp, int who) {
 }
 // pilote automatique (demo) : plus court chemin vers la graine la plus proche, en evitant les creatures
 uint8_t lAuto() {
-  static uint8_t from[L_ROWS][L_COLS];
-  static int16_t q[L_ROWS * L_COLS];
+  auto &from = GMEM(LMem)->from;
+  int16_t *q = GMEM(LMem)->q;
   memset(from, 0xFF, sizeof(from));
   int head = 0, tail = 0;
   q[tail++] = lP.r * L_COLS + lP.c;
@@ -2420,8 +2431,12 @@ void lDraw() {
 #define O_SHOTS 8
 #define O_BUL 12
 #define O_STARS 40
-OEn oEn[O_EN];
-OShot oShot[O_SHOTS], oBul[O_BUL], oStar[O_STARS], oCap;
+struct OMem { OEn en[O_EN]; OShot shot[O_SHOTS], bul[O_BUL], star[O_STARS]; };
+#define oEn (GMEM(OMem)->en)
+#define oShot (GMEM(OMem)->shot)
+#define oBul (GMEM(OMem)->bul)
+#define oStar (GMEM(OMem)->star)
+OShot oCap;
 float oPa = 1.5708f, oRot = 0;  // angle du vaisseau (en bas), rotation de l'anneau
 int oCool = 0, oSpawnT = 0, oDiveT = 0, oPower = 0;
 float ocx() { return W / 2.0f; }
@@ -2725,8 +2740,9 @@ void oDraw() {
 #define K_MAXR 12
 #define K_BALLS 3
 #define K_CAPS 4
-uint8_t kBrick[K_MAXR][K_MAXC];  // 0 vide, 1 a 6 couleur, 7 argent (vie dans kHp), 8 or
-uint8_t kHp[K_MAXR][K_MAXC];
+struct KMem { uint8_t brick[K_MAXR][K_MAXC], hp[K_MAXR][K_MAXC]; };
+#define kBrick (GMEM(KMem)->brick)  // 0 vide, 1 a 6 couleur, 7 argent (vie dans kHp), 8 or
+#define kHp (GMEM(KMem)->hp)
 KBall kBall[K_BALLS];
 KCap kCap[K_CAPS];
 int kCols = 12, kRows = 6, kOX = 4, kOY = 11, kLeft = 0, kWide = 0, kSlow = 0, kStuck = 0, kLaser = 0, kLzCool = 0;
@@ -2994,7 +3010,8 @@ const uint16_t T_SHAPE[7][4] = {  // 4x4, bit 15 = ligne 0 colonne 0
 };
 const uint8_t T_COL[8][3] = { { 0, 0, 0 }, { 0, 220, 255 }, { 255, 220, 0 }, { 200, 70, 255 }, { 40, 220, 80 }, { 255, 50, 50 },
                               { 50, 100, 255 }, { 255, 140, 0 } };
-uint8_t tB[T_MAXR][T_COLS];
+struct TMem { uint8_t b[T_MAXR][T_COLS], save[T_MAXR][T_COLS]; };
+#define tB (GMEM(TMem)->b)
 int tRows = 18, tC = 3, tBX = 0, tBY = 8, tPiece = 0, tNext = 0, tRot = 0, tX = 3, tY = 0, tFall = 0, tLock = 0, tLines = 0;
 int tFlash = 0, tDas = 0, tAiRot = 0, tAiX = 3, tAiT = 0;
 uint8_t tBag[7], tBagN = 0, tPrevK = 0;
@@ -3022,7 +3039,7 @@ int tDropY(int p, int rot, int x, int y) { while (tFits(p, rot, x, y + 1)) y++; 
 void tAiPlan() {
   float best = -1e9;
   tAiRot = tRot; tAiX = tX;
-  static uint8_t save[T_MAXR][T_COLS];
+  auto &save = GMEM(TMem)->save;
   for (int rot = 0; rot < 4; rot++)
     for (int x = -2; x < T_COLS; x++) {
       if (!tFits(tPiece, rot, x, 0)) continue;
@@ -3239,8 +3256,9 @@ void tDraw() {
 #define Y_N 8
 #define Y_EMPTY 0xFF
 uint8_t yG[Y_N][Y_N];       // bits 0-2 : sorte (0-5, 6 = bombe) ; bit 4 : raye horizontal ; bit 5 : raye vertical
-uint8_t yMark[Y_N][Y_N];
-float yOff[Y_N][Y_N];       // decalage vertical pendant la chute (pixels)
+struct YMem { uint8_t mark[Y_N][Y_N]; float off[Y_N][Y_N]; };
+#define yMark (GMEM(YMem)->mark)
+#define yOff (GMEM(YMem)->off)  // decalage vertical pendant la chute (pixels)
 int yS = 7, yBX = 2, yBY = 8, yCR = 3, yCC = 3, yState = 0, yT = 0, yCombo = 0, yMoves = 20, yGoal = 1500, yRep = 0;
 int yAR = 0, yAC = 0, yBR = 0, yBC = 0;  // echange en cours (a <-> b)
 uint32_t yStageScore = 0;
@@ -3592,13 +3610,14 @@ void yDraw() {
 #define D_MAXR 18
 #define D_EN 8
 #define D_ROCKS 5
-uint8_t dGrid[D_MAXR][D_MAXC];  // 1 terre, 0 galerie
 int dTS = 5, dCols = 25, dRows = 10, dX0 = 1, dY0 = 14;
 float dPX, dPY;
 int8_t dPC, dPR, dDX = 1, dDY = 0, dFace = 1;
 int8_t dWantX = 0, dWantY = 0;
 struct DShot { float x, y; int8_t dx, dy; uint8_t left; bool on; } dShot;
-DEn dEn[D_EN];
+struct DMem { uint8_t grid[D_MAXR][D_MAXC]; DEn en[D_EN]; };
+#define dGrid (GMEM(DMem)->grid)  // 1 terre, 0 galerie
+#define dEn (GMEM(DMem)->en)
 DRock dRock[D_ROCKS];
 bool dPrevFire = false;
 float dcx(int c) { return dX0 + c * dTS + dTS / 2.0f; }
@@ -3864,7 +3883,8 @@ void dDraw() {
 // plus au plafond tombent (gros bonus). Le plafond descend tous les 8 tirs ; une bille sur la ligne du bas : fin.
 #define P_COLS 16  // colonnes au plus (le puits prend la largeur de l'ecran : pNC colonnes)
 #define P_ROWS 14
-uint8_t pG[P_ROWS][P_COLS];  // 0 vide, 1..6 couleur
+struct PMem { uint8_t g[P_ROWS][P_COLS], mk1[P_ROWS][P_COLS], mk2[P_ROWS][P_COLS]; int16_t q[P_ROWS * P_COLS]; };
+#define pG (GMEM(PMem)->g)  // 0 vide, 1..6 couleur
 int pNC = 8, pB = 6, pRH = 5, pX0 = 30, pY0 = 9, pRowsVis = 9, pShots = 0, pDrop = 0, pNColors = 4;
 float pAng = 0, pBX, pBY, pVX, pVY;
 uint8_t pCur = 1, pNext = 2, pPrevK = 0;
@@ -3917,7 +3937,7 @@ void pReset() {
 }
 // trouve les billes de meme couleur reliees (ou toutes celles reliees au plafond si col = 0) ; marque 1 dans mk
 int pFlood(int r0, int c0, uint8_t col, uint8_t mk[P_ROWS][P_COLS]) {
-  static int16_t q[P_ROWS * P_COLS];
+  int16_t *q = GMEM(PMem)->q;
   int h = 0, t = 0, n = 0;
   q[t++] = r0 * P_COLS + c0; mk[r0][c0] = 1;
   while (h < t) {
@@ -3933,7 +3953,7 @@ int pFlood(int r0, int c0, uint8_t col, uint8_t mk[P_ROWS][P_COLS]) {
 void pLand(int r, int c) {
   pG[r][c] = pCur;
   pFlying = false;
-  static uint8_t mk[P_ROWS][P_COLS];
+  auto &mk = GMEM(PMem)->mk1;
   memset(mk, 0, sizeof(mk));
   int n = pFlood(r, c, pCur, mk);
   if (n >= 3) {  // eclatent
@@ -4009,7 +4029,7 @@ uint8_t pAuto() {  // demo : essaie les angles, garde celui qui fait eclater le 
     for (int a = -70; a <= 70; a += 4) {
       int r, c;
       if (!pTrace(a * 0.01745f, r, c, false, 0)) continue;
-      static uint8_t mk[P_ROWS][P_COLS];
+      auto &mk = GMEM(PMem)->mk2;
       memset(mk, 0, sizeof(mk));
       pG[r][c] = pCur;
       int n = pFlood(r, c, pCur, mk) * 10 + random(5) - r;
@@ -4132,10 +4152,12 @@ void pDraw() {
 #define A_WAVE 56
 #define A_GROUPS 10
 #define A_TOP 10  // bande du score (noire), la mer en dessous
-AEn aEn[A_EN];
-RDot aShot[A_SHOTS], aBomb[A_BOMBS];
+struct AMem { AEn en[A_EN]; RDot shot[A_SHOTS], bomb[A_BOMBS]; int16_t wave[A_WAVE][2]; };
+#define aEn (GMEM(AMem)->en)
+#define aShot (GMEM(AMem)->shot)
+#define aBomb (GMEM(AMem)->bomb)
+#define aWave (GMEM(AMem)->wave)
 RCap aCap;  // kind 0 : arme (P), 1 : tonneau (T), 2 : vie (+)
-int16_t aWave[A_WAVE][2];
 float aIsY[2], aX, aY;
 int8_t aIsX[2], aIsR[2];
 uint16_t aIsS[2];  // forme de chaque ile (graine)
@@ -4718,15 +4740,35 @@ void aDraw() {
 #define Z_ITEMS 24
 #define Z_ROOMS 9
 #define Z_TEXS 8     // textures : 1 briques, 2 metal, 3 technique, 4 pierre, 5 porte, 6 porte rouge, 7 sortie
-uint8_t zMap[Z_N][Z_N], zOpen[Z_N][Z_N], zRoomOf[Z_N][Z_N];
-uint16_t zDoorT[Z_N][Z_N];  // images avant fermeture d'une porte ouverte
-ZMob zMob[Z_MOBS];
-ZShot zShot[Z_SHOTS];
-ZItem zItem[Z_ITEMS];
-ZShot zSpark[6];  // etincelles d'impact (t : age)
+#define Z_SPR (Z_MOBS + Z_ITEMS + Z_SHOTS + 6 + 8)  // objets visibles : robots, objets, tirs, etincelles, 8 fumees
+struct ZSpr { float tx, ty, wx, wy, lr, lg, lb; int16_t sx, w, h, top, fy; const char *const *art; uint8_t aw, ah, kind; int8_t flash; };
+// Toute la memoire de BUNKER 3D (~12 Ko) dans un bloc reserve au lancement du jeu et rendu des qu'on change de jeu :
+// les autres jeux et le Bluetooth (connexion des manettes) gardent cette memoire libre.
+struct ZData {
+  uint8_t map[Z_N][Z_N], open[Z_N][Z_N], roomOf[Z_N][Z_N];
+  uint16_t doorT[Z_N][Z_N];  // images avant fermeture d'une porte ouverte
+  ZMob mob[Z_MOBS];
+  ZShot shot[Z_SHOTS];
+  ZItem item[Z_ITEMS];
+  ZShot spark[6];  // etincelles d'impact (t : age)
+  float zbuf[256], vigY[256], rowD[256];
+  ZSpr spr[Z_SPR];
+  uint8_t bfsFrom[Z_N][Z_N];
+  int16_t bfsQ[Z_N * Z_N];
+};
+ZData *zD = nullptr;
+#define zMap (zD->map)
+#define zOpen (zD->open)
+#define zRoomOf (zD->roomOf)
+#define zDoorT (zD->doorT)
+#define zMob (zD->mob)
+#define zShot (zD->shot)
+#define zItem (zD->item)
+#define zSpark (zD->spark)
+#define zZbuf (zD->zbuf)
 int8_t zRoom[Z_ROOMS][4];  // x, y, largeur, hauteur
 uint8_t zNRooms = 0;
-float zVX = 0, zVY = 0, zPX, zPY, zA, zBob = 0, zZbuf[256];
+float zVX = 0, zVY = 0, zPX, zPY, zA, zBob = 0;
 int zHp = 100, zArmor = 0, zAmmo = 50, zWeapon = 0, zFireT = 0, zFlash = 0, zHurt = 0, zPick = 0, zMsgT = 0;
 int zShake = 0, zHurtDir = 0, zHitT = 0, zHitKill = 0, zCombo = 0, zKillT = 0;  // tremblement, cote du tir recu, viseur touche, combo
 bool zKey = false, zHeavy = false, zMapOn = false, zPrevUse = false, zPrevSw = false, zPrevMap = false;
@@ -4972,15 +5014,27 @@ void zNewStage() {
   sndMelody(JINGLE_STAGE, 4);
   zGenerate();
 }
+// memoire de BUNKER 3D : reservee au lancement, rendue quand on passe a un autre jeu
+bool zAlloc() {
+  if (!zD) zD = (ZData *)calloc(1, sizeof(ZData));
+  if (zD && !zHudCv) {
+    zHudCv = new GFXcanvas16(W, H - zVH());
+    if (!zHudCv->getBuffer()) { delete zHudCv; zHudCv = nullptr; }
+  }
+  if (!zD || !zHudCv) { Serial.printf("BUNKER 3D : memoire insuffisante (%u libres)\n", ESP.getFreeHeap()); return false; }
+  return true;
+}
+void zRelease() {
+  if (zHudCv) { delete zHudCv; zHudCv = nullptr; }
+  if (zD) { free(zD); zD = nullptr; }
+}
 void zReset() {
+  if (!zAlloc()) { gGame = 0; topLoad(); gReset(); return; }  // pas assez de memoire : on joue au premier jeu
   gLives = (!gDemo && gDiff == 0) ? 5 : 3;
   gPaused = false;
   gScore = 0; gWave = 0; gDead = 0; gBonus = 0; gLifeUp = false;
   zHp = 100; zArmor = 0; zAmmo = 50; zWeapon = 0; zHeavy = false; zHurt = 0; zFlash = 0; zPick = 0; zMsgT = 0; zMapOn = false;
   zShake = 0; zHurtDir = 0; zHitT = 0; zCombo = 0; zKillT = 0;
-  static bool tex = false;
-  (void)tex;
-  if (!zHudCv) zHudCv = new GFXcanvas16(W, H - zVH());
   zNewStage();
 }
 // ligne de vue entre deux points (pas de mur ni de porte fermee)
@@ -5103,8 +5157,8 @@ void zShoot() {
 }
 // demo : chemin le plus court (portes comprises) vers la carte, puis vers la sortie ; vise et tire les ennemis vus
 uint8_t zBfsDir(int tx, int ty, int &nx, int &ny) {
-  static uint8_t from[Z_N][Z_N];
-  static int16_t q[Z_N * Z_N];
+  auto &from = zD->bfsFrom;
+  int16_t *q = zD->bfsQ;
   memset(from, 255, sizeof(from));
   int sx = zPX, sy = zPY, h = 0, t = 0;
   from[sy][sx] = 4;
@@ -5178,6 +5232,7 @@ void zUse() {  // carre : ouvre la porte en face, ou actionne la sortie
   }
 }
 void zStep() {
+  if (!zD) return;
   gFrame++;
   if (zFlash > 0) zFlash--;
   if (zHurt > 0) zHurt--;
@@ -5414,6 +5469,7 @@ void zHudDraw() {
   tinyText(c, W - 1 - tinyWidth(b), y, b, rgb(230, 230, 230));
 }
 void zDraw() {
+  if (!zD || !zHudCv) return;
   if (gPaused) return;  // image figee sous le cadre de pause
   zHudDraw();
   int VH = zVH(), hh = H - VH;
@@ -5423,13 +5479,13 @@ void zDraw() {
   int horizon = VH / 2 + (int)(sinf(zBob) * 1.2f) + (zShake ? (int)random(-(zShake + 2) / 3, (zShake + 2) / 3 + 1) : 0);
   float bobX = sinf(zBob * 0.5f) * 2.0f, bobY = fabsf(cosf(zBob * 0.5f)) * 2.0f;
   // sprites visibles, du plus loin au plus proche
-  struct Spr { float tx, ty, wx, wy, lr, lg, lb; int16_t sx, w, h, top, fy; const char *const *art; uint8_t aw, ah, kind; int8_t flash; };
-  static Spr spr[Z_MOBS + Z_ITEMS + Z_SHOTS + 6 + 8];  // robots, objets, tirs, etincelles, et 8 fumees au plus
+  typedef ZSpr Spr;
+  Spr *spr = zD->spr;
   int ns = 0;
   float inv = 1.0f / (plX * dirY - dirX * plY);
   auto addSpr = [&](float x, float y, float hgt, float lift, const char *const *art, uint8_t aw, uint8_t ah, uint8_t kind, int8_t fl) {
     float sx = x - zPX, sy = y - zPY, tx = inv * (dirY * sx - dirX * sy), ty = inv * (-plY * sx + plX * sy);
-    if (ty < 0.15f || ns >= (int)(sizeof(spr) / sizeof(spr[0]))) return;
+    if (ty < 0.15f || ns >= Z_SPR) return;
     Spr &s = spr[ns++];
     s.tx = tx; s.ty = ty;
     s.sx = (int)(W / 2 * (1 + tx / ty));
@@ -5481,9 +5537,9 @@ void zDraw() {
   if (nl)  // lumiere recue par chaque objet (plasma, explosions, tir)
     for (int i = 0; i < ns; i++)
       if (spr[i].art) lightAt(spr[i].wx, spr[i].wy, spr[i].lr, spr[i].lg, spr[i].lb);
-  static float vigY[256];  // vignettage : les bords de l'image un peu plus sombres
+  float *vigY = zD->vigY;  // vignettage : les bords de l'image un peu plus sombres
   for (int y = 0; y < VH; y++) { float v = (y - VH / 2.0f) / (VH / 2.0f); vigY[y] = v * v * 0.28f; }
-  static float rowD[256];
+  float *rowD = zD->rowD;
   for (int y = 0; y < VH; y++) rowD[y] = y == horizon ? 99 : (K * 0.5f) / fabsf(y - horizon + 0.5f);
   float light = 1 + (zFlash > 2 ? 0.25f : 0);
   int gs = VH >= 100 ? 2 : 1, gw = 28 * gs, ghh = 16 * gs, gx = W / 2 - gw / 2 + (int)bobX, gy = VH - ghh + 2 + (int)bobY + (zFlash > 1 ? (zFlash - 1) * gs : 0);  // recul au tir
@@ -5678,6 +5734,35 @@ void zDraw() {
   gNOld = 0;  // tout l'ecran est redessine a chaque image
 }
 
+// taille du bloc memoire de chaque jeu (0 : rien a reserver)
+size_t gMemSize(uint8_t g) {
+  switch (g) {
+    case G_RAID: return sizeof(RMem);
+    case G_BUL: return sizeof(BMem);
+    case G_LAB: return sizeof(LMem);
+    case G_ORB: return sizeof(OMem);
+    case G_BRI: return sizeof(KMem);
+    case G_BLO: return sizeof(TMem);
+    case G_CRU: return sizeof(YMem);
+    case G_TAU: return sizeof(DMem);
+    case G_BIL: return sizeof(PMem);
+    case G_ESQ: return sizeof(AMem);
+    default: return 0;
+  }
+}
+// rend la memoire de l'ancien jeu, reserve (a zero) celle du jeu choisi ; false si elle manque
+bool gMemFor(uint8_t g) {
+  if (gMemGame == g && (gMem || !gMemSize(g))) return true;
+  if (gMem) { free(gMem); gMem = nullptr; }
+  gMemGame = -1;
+  size_t n = gMemSize(g);
+  if (n) {
+    gMem = calloc(1, n);
+    if (!gMem) { Serial.printf("Jeu %u : memoire insuffisante (%u octets demandes, %u libres)\n", g, (unsigned)n, ESP.getFreeHeap()); return false; }
+  }
+  gMemGame = g;
+  return true;
+}
 // aiguillage selon le jeu choisi
 void altReset() {
   switch (gGame) {
@@ -5695,7 +5780,9 @@ void altReset() {
     default: zReset(); break;
   }
 }
+void resetCurrent();
 void altStep() {
+  if (gMemGame != gGame) { resetCurrent(); return; }  // jeu change sans remise a zero : sa memoire d'abord
   switch (gGame) {
     case G_RAID: rStep(); break;
     case G_RAQ: qStep(); break;
@@ -5712,6 +5799,7 @@ void altStep() {
   }
 }
 void altDraw() {
+  if (gMemGame != gGame) return;
   switch (gGame) {
     case G_RAID: rDraw(); break;
     case G_RAQ: qDraw(); break;
@@ -5728,7 +5816,13 @@ void altDraw() {
   }
 }
 // remise a zero du jeu choisi (partie ou demo)
-void resetCurrent() { if (gGame == 0) gReset(); else altReset(); }
+void resetCurrent() {
+  if (gGame != G_BUN) zRelease();  // la memoire de BUNKER 3D est rendue aux autres jeux et au Bluetooth
+  if (!gMemFor(gGame)) { gGame = 0; topLoad(); gMemFor(0); }  // memoire insuffisante : on revient au premier jeu
+  if (gGame == 0) gReset();
+  else altReset();
+  Serial.printf("Jeu %s : memoire libre %u (plus grand bloc %u)\n", GAME_NAME[gGame], ESP.getFreeHeap(), ESP.getMaxAllocHeap());
+}
 
 void startGame() {
   gDemo = false;
@@ -5943,7 +6037,11 @@ void gameUpdate() {
     demoSince = 0;
     if (menuGame >= 0 && screen == 0) { gGame = menuGame; menuGame = -1; topLoad(); resetCurrent(); }
   }
-  if (menuMode) { menuScreen(); return; }
+  if (menuMode) {  // menu sur son propre ecran : aucun jeu ne tourne, sa memoire est rendue (reprise au lancement)
+    if (gMemGame != -1 || zD) { zRelease(); gMemFor(255); }
+    menuScreen();
+    return;
+  }
   if (gGame) { altStep(); altDraw(); }
   else { gameStep(); gameDraw(); }
   gOverlay();
@@ -5959,12 +6057,13 @@ void pairStart(uint32_t ms) {
   if (dma) dma->setBrightness8(min<uint8_t>(bright, PAIR_BRIGHT));  // ton reglage (bright) n'est pas modifie
   if (sndTimer) timerAlarmDisable(sndTimer);  // son coupe : tout le coeur 0 pour le Bluetooth pendant l'association
   ledcWrite(SND_LEDC, 128);
-  BP32.enableNewBluetoothConnections(true);
+  padScanWant = 1; padScanAt = millis();  // nouvelles manettes acceptees pendant l'association
   Serial.printf("Mode association %lu s : Share + PS sur la manette (PS5 : Create + PS), son coupe\n", (unsigned long)(ms / 1000));
 }
 void pairStop(const char *why) {
   if (!pairUntil) return;
   pairUntil = 0;
+  padScanWant = 0; padScanAt = millis() + 2000;  // puis plus de recherche (2 s apres : jamais au milieu d'une connexion)
   if (dma) dma->setBrightness8(bright);  // luminosite normale de retour
   if (sndTimer) timerAlarmEnable(sndTimer);
   Serial.printf("Fin du mode association : %s\n", why);
@@ -6005,7 +6104,8 @@ void cfgButton() {
 void ps4Begin() {
   BP32.setup(&onPadConnected, &onPadDisconnected);
   BP32.enableVirtualDevice(false);  // pas de souris virtuelle pour le pave tactile (elle prendrait une place de manette)
-  BP32.enableNewBluetoothConnections(true);
+  BP32.enableNewBluetoothConnections(false);  // nouvelles manettes : seulement en mode association (bouton du shield) ;
+                                              // les manettes deja associees se reconnectent toujours (bouton PS)
   const uint8_t *a = BP32.localBdAddress();
   if (a) snprintf(ipText, sizeof(ipText), "%02x:%02x:%02x:%02x:%02x:%02x", a[0], a[1], a[2], a[3], a[4], a[5]);
   Serial.printf("Bluepad32 %s pret, adresse %s, memoire libre %u\n", BP32.firmwareVersion(), ipText, ESP.getFreeHeap());
@@ -6015,8 +6115,9 @@ void ps4Begin() {
 void ps4Poll() {
   BP32.update();  // nouvelles donnees des manettes (Bluepad32)
   if (pairUntil && (long)(millis() - pairUntil) > 0) pairStop("temps ecoule");
-  static uint32_t scanAt = 0;
-  if (!PAD2.isConnected() && millis() - scanAt > 5000) { scanAt = millis(); BP32.enableNewBluetoothConnections(true); }  // cherche encore une manette
+  // nouvelles manettes acceptees ou non : seulement au debut et a la fin du mode association (plus de relance toutes les 5 s :
+  // appelee pendant qu'une manette se connectait, elle faisait planter la pile Bluetooth -> redemarrage de l'ESP)
+  if (padScanWant >= 0 && (long)(millis() - padScanAt) >= 0) { BP32.enableNewBluetoothConnections(padScanWant == 1); padScanWant = -1; }
   static bool was = false;
   static int lastTier = -2;
   static uint32_t rumbleOff = 0, lastBr = 0, combo = 0, lastLog = 0, since = 0;
@@ -6105,14 +6206,6 @@ void ps4Poll() {
     dma->setBrightness8(bright);
     brightSaveAt = millis() + 2000;
   }
-  {  // Share seul maintenu 3 s : mode association 60 s (pour ajouter une manette)
-    static uint32_t shareSince = 0;
-    static bool shareUsed = false;
-    bool alone = PS4.Share() && !PS4.Options() && !PS4.Up() && !PS4.Down();
-    if (!alone) { shareSince = 0; shareUsed = false; }
-    else if (!shareSince) shareSince = millis();
-    else if (!shareUsed && millis() - shareSince > 3000) { shareUsed = true; pairStart(60000); sfxMenu(); }
-  }
   if (PS4.Share() && PS4.Options()) {  // Share + Options 3 s : redemarrage
     if (!combo) combo = millis();
     else if (millis() - combo > 3000) restartAt = millis();
@@ -6197,7 +6290,7 @@ void serialMenu() {
   Serial.printf("Dalles : %u, disposition %u, retourne %u, serpentin %u -> ecran %dx%d, couleurs %u bits\n", nPanels, arrange, flipAll,
                 serpent, W, H, colorBits);
   Serial.println("  a : oublier les manettes associees (pour en associer d'autres : PS + Share)");
-  Serial.println("  m : mode association 60 s (son coupe ; aussi : bouton du shield, Share maintenu 3 s, et 60 s au demarrage)");
+  Serial.println("  m : mode association 60 s (comme le bouton du shield : son coupe, luminosite reduite)");
   Serial.println("  c NDFS : dalles. N nombre 1-4, D 0 l'une sous l'autre / 1 cote a cote / 2 carre,");
   Serial.println("           F ecran retourne 0/1, S une dalle sur deux retournee 0/1. Ex. : c 2000");
   Serial.println("  p N : couleurs des dalles sur N bits (3 a 6, redemarre). 3 = le plus sur pour le Bluetooth,");
@@ -6226,7 +6319,7 @@ void handleSerial() {
     n = 0;
     if (cmd == 'a') {
       BP32.forgetBluetoothKeys();
-      Serial.println("Manettes associees oubliees : PS + Share sur chaque manette pour l'associer de nouveau");
+      Serial.println("Manettes associees oubliees : bouton du shield (ou m), puis PS + Share sur chaque manette pour l'associer de nouveau");
     } else if (cmd == 'm') {
       pairStart(60000);
     } else if (cmd == 'l') {  // luminosite des dalles en %, gardee en memoire (comme la ligne LUMINOSITE du menu)
@@ -6354,7 +6447,7 @@ void setup() {
   cfgButtonBegin();  // bouton du shield (GPIO 34)
   ps4Begin();
   audioBegin();
-  pairStart(60000);  // 60 s pour associer une manette, son coupe (le Bluetooth a tout son temps)
+  // pas de mode association au demarrage : seulement a la demande, avec le bouton du shield
   serialMenu();
   while (millis() - bootT0 < 2000) delay(10);  // la version reste 2 s a l'ecran
 

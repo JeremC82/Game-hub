@@ -18,7 +18,7 @@ Depuis la V3.84, le Game-hub utilise **Bluepad32** : jusqu'à **4 manettes Bluet
 - **Menu « JOUEURS 1 / 2 »** (2e ligne, une étoile par manette connectée) : seuls les jeux à deux joueurs utilisent la 2e manette.
   - **RAQUETTES** : match à deux (raquette de droite pour le joueur 2), **le premier à 7 points gagne**.
   - **SPACE DEFENDER** : coopération, un 2e vaisseau **vert** pour le joueur 2, vies et score communs ; les ennemis piquent sur l'un ou l'autre ; la manette du joueur touché vibre.
-- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V3.91_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
+- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V3.92_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
 - **Mémoire** : environ 81 Ko libres avec 2 dalles en 3 bits et deux manettes connectées.
 
 # SPACE DEFENDER
@@ -297,12 +297,14 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. **La démo cha
 
 **Associer une manette, une seule fois.** Ensuite, le bouton **PS** suffit pour la reconnecter.
 
-1. **Mode association** : il est actif **60 s après chaque démarrage**. On peut aussi le relancer avec **le bouton « config wifi » du shield** (le même que l'horloge, GPIO 34, V3.90 ; capté par interruption en V3.91, même un appui bref), en maintenant **Share 3 s** sur une manette déjà connectée, ou avec la commande `m` du moniteur série. La dalle affiche « ASSOCIATION 45 / SHARE + PS » dans un cadre ; le son est coupé et **la luminosité baisse à environ 10 %** pendant ce temps (moins de courant dans les dalles, le Bluetooth a tout pour lui). Ton réglage de luminosité revient dès la fin de l'association.
+1. **Mode association, seulement à la demande** (V3.92) : un appui sur **le bouton « config wifi » du shield** (le même que l'horloge, GPIO 34, capté par interruption : même un appui bref compte) ou la commande `m` du moniteur série. Il dure 60 s ; la dalle affiche « ASSOCIATION 45 / SHARE + PS » dans un cadre, le son est coupé et **la luminosité baisse à environ 10 %** (ton réglage revient à la fin). En dehors de ce mode, l'ESP32 n'accepte pas de nouvelle manette et ne cherche pas en permanence : la radio reste libre. **Les manettes déjà associées se reconnectent toujours avec le bouton PS.**
 2. Sur la manette : **PS4** : maintenir **Share puis PS** jusqu'au clignotement rapide de la barre lumineuse. **PS5** : **Create + PS**. **Xbox** : le bouton d'association sur le dessus.
 3. La dalle affiche « MANETTE 1 OK » (puis « MANETTE 2 OK » pour la suivante). La 1re manette connectée est le joueur 1 (barre bleue), la 2e le joueur 2 (rouge).
 
 - **Une manette PS4 qui refuse toujours** : écrire l'adresse Bluetooth de l'ESP32 dedans avec **SixaxisPairTool** (manette en USB sur un PC, « Change Master »), puis appuyer sur PS. L'adresse s'affiche dans le moniteur série au démarrage (« Bluepad32 ... pret, adresse ... »). C'est aussi la seule méthode pour une **manette PS3**.
-- **Oublier toutes les manettes associées** : commande `a` du moniteur série.
+- **Oublier toutes les manettes associées** : commande `a` du moniteur série. Pour en associer de nouveau : bouton du shield (ou `m`), puis Share + PS sur chaque manette.
+- **Mémoire (V3.92)** : chaque jeu ne réserve sa mémoire que lorsqu'il tourne (partie ou démo) et la rend dès qu'on change de jeu ; au menu, aucun jeu n'en garde. Il reste ainsi **96 à 98 Ko libres** (83 Ko dans BUNKER 3D) pour le Bluetooth, contre 71 Ko en V3.91. Le moniteur série l'affiche à chaque changement de jeu (« Jeu ... : memoire libre ... »).
+- **Plus de redémarrage à la connexion d'une manette** (V3.92) : l'ESP32 ne relance plus la recherche de manettes toutes les 5 s ; cet appel, quand il tombait pendant qu'une manette se connectait, pouvait faire planter la pile Bluetooth.
 
 ## Son (option) : une broche PWM
 
@@ -374,8 +376,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V3.91_complet.bin](firmware/GameHub_V3.91_complet.bin) | 0x0 | `5d738e4fb0a927ca4944ea74ab815b11` |
-| [firmware/GameHub_V3.91.bin](firmware/GameHub_V3.91.bin) | 0x10000 | `d2f628fddda29b60f4b46f78275d71f8` |
+| [firmware/GameHub_V3.92_complet.bin](firmware/GameHub_V3.92_complet.bin) | 0x0 | `c91f4aa8b951408e78c3cc97cc9c3116` |
+| [firmware/GameHub_V3.92.bin](firmware/GameHub_V3.92.bin) | 0x10000 | `1c89d6213cfc6bf791453c0d9fd7166a` |
 | [firmware/GameHub_V3.86_complet.bin](firmware/GameHub_V3.86_complet.bin) | 0x0 | `dc451b01c498df647da822a1427a1a5e` |
 | [firmware/GameHub_V3.86.bin](firmware/GameHub_V3.86.bin) | 0x10000 | `ee1945d390b91eb82240245a1e52821f` |
 
