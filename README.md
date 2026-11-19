@@ -304,7 +304,7 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. **La démo cha
 - **Une manette PS4 qui refuse toujours** : écrire l'adresse Bluetooth de l'ESP32 dedans avec **SixaxisPairTool** (manette en USB sur un PC, « Change Master »), puis appuyer sur PS. L'adresse s'affiche dans le moniteur série au démarrage (« Bluepad32 ... pret, adresse ... »). C'est aussi la seule méthode pour une **manette PS3**.
 - **Oublier toutes les manettes associées** : commande `a` du moniteur série. Pour en associer de nouveau : bouton du shield (ou `m`), puis Share + PS sur chaque manette.
 - **Mémoire (V3.92)** : chaque jeu ne réserve sa mémoire que lorsqu'il tourne (partie ou démo) et la rend dès qu'on change de jeu ; au menu, aucun jeu n'en garde. Il reste ainsi **96 à 98 Ko libres** (83 Ko dans BUNKER 3D) pour le Bluetooth, contre 71 Ko en V3.91. Le moniteur série l'affiche à chaque changement de jeu (« Jeu ... : memoire libre ... »).
-- **Plus de redémarrage à la connexion d'une manette** (V3.92) : l'ESP32 ne relance plus la recherche de manettes toutes les 5 s ; cet appel, quand il tombait pendant qu'une manette se connectait, pouvait faire planter la pile Bluetooth.
+- **Redémarrages à la connexion d'une manette** (V3.92) : l'ESP32 ne relance plus la recherche de manettes toutes les 5 s, un appel qui pouvait faire planter la pile Bluetooth (Bluepad32 4.1.0) pendant une connexion. Un plantage de ce type a encore été vu une fois, quand la manette se reconnectait dans les toutes premières secondes après un démarrage ; s'il se reproduit, le moniteur série affiche « assert failed: btstack_run_loop_base_add_timer ».
 
 ## Son (option) : une broche PWM
 
