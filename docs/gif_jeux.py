@@ -1938,10 +1938,10 @@ def escadrille():
     DEST = ("...S...", "..SSS..", "..SkS..", ".SSSSS.", ".SSkSS.", "SSSSSSS", "SSsssSS", "SSsssSS", "SSskSSS", "SSsssSS",
             "SSSSSSS", "SSSkSSS", "SSSSSSS", "SSsssSS", "SSSSSSS", ".SSkSS.", ".SSSSS.", "..SSS..", "..www..", ".w...w.")
     LIFE = ("..b..", "bwbwb", "..b..", ".bbb.")
-    SIZE = {0: (9, 7), 1: (17, 11), 2: (5, 12), 3: (7, 20), 4: (11, 30)}
+    SIZE = {0: (9, 7), 1: (17, 11), 2: (7, 18), 3: (9, 28), 4: (15, 40)}
 
     def col(ch, var):
-        return {'B': (20, 50, 170) if var == 3 else (60, 120, 255), 'b': (20, 50, 170), 'W': (255, 255, 255), 'y': (255, 220, 0),
+        return {'B': (30, 70, 190) if var == 3 else (100, 170, 255), 'b': (30, 70, 190), 'W': (255, 255, 255), 'y': (255, 220, 0),
                 'o': (255, 140, 0), 'c': (120, 220, 255), 'k': (40, 40, 50), 'G': GV[var % 3][0], 'g': GV[var % 3][1],
                 'S': (150, 155, 165), 's': (90, 95, 105), 'n': (160, 105, 55), 'N': (230, 210, 170)}.get(ch, (200, 230, 255))
 
@@ -1949,9 +1949,10 @@ def escadrille():
         for r, line in enumerate(rows):
             for cc, ch in enumerate(line):
                 if ch != '.':
-                    sc.px(int(x0) + cc, int(y0) + r, (255, 255, 255) if white else col(ch, var))
-    waves = [[rnd.randrange(W), rnd.randrange(TOP, HS)] for _ in range(40)]
-    isles = [[30, 22.0, 8], [95, -20.0, 6]]
+                    if int(y0) + r >= TOP:
+                        sc.px(int(x0) + cc, int(y0) + r, (255, 255, 255) if white else col(ch, var))
+    waves = [[rnd.randrange(W), rnd.randrange(TOP, HS)] for _ in range(56)]
+    isles = [[30, 26.0, 9, 7], [95, -30.0, 7, 3]]
     x, y, score, roll, rolls = 60.0, 52.0, 0, 0, 3
     en, shots, bombs, booms, frames = [], [], [], [], []
     spawn, grp, cap = 10, 0, None
@@ -1965,13 +1966,13 @@ def escadrille():
             elif pat == 1:
                 en.append({'t': 0, 'x': W / 2 - 8, 'y': -12, 'type': 1, 'hp': 8, 'pat': 3, 'fl': 0, 'var': grp % 2, 'cap': True})
             elif pat == 2:
-                en.append({'t': 0, 'x': 18, 'y': -21, 'type': 2, 'hp': 4, 'pat': 4, 'fl': 0, 'var': 0, 'cap': False})
-                en.append({'t': 0, 'x': 92, 'y': -40, 'type': 3, 'hp': 6, 'pat': 4, 'fl': 0, 'var': 0, 'cap': False})
+                en.append({'t': 0, 'x': 18, 'y': -20, 'type': 2, 'hp': 4, 'pat': 4, 'fl': 0, 'var': 0, 'cap': False})
+                en.append({'t': 0, 'x': 92, 'y': -54, 'type': 3, 'hp': 6, 'pat': 4, 'fl': 0, 'var': 0, 'cap': False})
             elif pat == 3:
                 for k in range(5):
                     en.append({'t': 0, 'x': W / 4, 'y': -8 - k * 10, 'type': 0, 'hp': 1, 'pat': 1, 'fl': 0, 'var': var, 'cap': False})
             else:
-                en.append({'t': 0, 'x': 70, 'y': -31, 'type': 4, 'hp': 14, 'pat': 4, 'fl': 0, 'var': 0, 'cap': True})
+                en.append({'t': 0, 'x': 70, 'y': -42, 'type': 4, 'hp': 14, 'pat': 4, 'fl': 0, 'var': 0, 'cap': True})
             grp += 1
             spawn = 105
         tgt = min((e for e in en if e['y'] > 8), key=lambda e: abs(e['x'] + SIZE[e['type']][0] / 2 - x - 5), default=None)
@@ -1995,8 +1996,8 @@ def escadrille():
                 wv[0], wv[1] = rnd.randrange(-2, W), TOP
         for isl in isles:
             isl[1] += 0.5
-            if isl[1] - isl[2] * 2 > HS:
-                isl[0], isl[1], isl[2] = rnd.randrange(12, W - 12), -30.0, rnd.randrange(5, 10)
+            if isl[1] - isl[2] * 2 - 6 > HS:
+                isl[0], isl[1], isl[2], isl[3] = rnd.randrange(14, W - 14), -34.0, rnd.randrange(6, 12), rnd.randrange(65536)
         if cap:
             cap[1] += 0.6
             if cap[1] > HS:
@@ -2021,7 +2022,7 @@ def escadrille():
             elif e['pat'] == 5:
                 e['x'] += e['vx']; e['y'] += e['vy']
             else:
-                e['y'] += 0.5
+                e['y'] += 0.35
                 if e['type'] < 4 and e['t'] % 60 == 30 and e['y'] > TOP:
                     dx, dy = x + 5 - e['x'], y + 4 - e['y']
                     dd = math.hypot(dx, dy) + .01
@@ -2044,7 +2045,7 @@ def escadrille():
                         if e['cap'] and not cap:
                             cap = [e['x'] + w_ / 2 - 3, e['y'], 2 if e['type'] == 4 else (grp % 2)]
                     break
-        en = [e for e in en if e['hp'] > 0 and -40 < e['y'] < HS and -20 < e['x'] < W + 20]
+        en = [e for e in en if e['hp'] > 0 and -60 < e['y'] < HS and -20 < e['x'] < W + 20]
         for b in bombs:
             b[0] += b[2]; b[1] += b[3]
         bombs = [b for b in bombs if TOP <= b[1] < HS and 0 <= b[0] < W]
@@ -2056,33 +2057,147 @@ def escadrille():
         sc = Screen(W, HS)
         d = ImageDraw.Draw(sc.im)
         d.rectangle((0, TOP, W - 1, HS - 1), fill=SEA)
-        for ix, iy, r in isles:
+
+        def P_(x_, y_, c_):  # dessin limite a la mer
+            if 0 <= x_ < W and TOP <= y_ < HS:
+                sc.px(x_, y_, c_)
+
+        def disc(cx_, cy_, r_, c_):
+            for dy in range(-r_, r_ + 1):
+                dx = int(math.sqrt(r_ * r_ - dy * dy + 0.5))
+                for xx in range(cx_ - dx, cx_ + dx + 1):
+                    P_(xx, cy_ + dy, c_)
+        for k, (wx, wy) in enumerate(waves):  # houle, cretes, moutons, reflets
+            kind = k % 7
+            if wy < TOP + 3:
+                continue
+            if kind < 2:
+                for xx in range(wx, wx + 6 + k % 5):
+                    P_(xx, wy, (5, 44, 122))
+            elif kind < 6:
+                c_ = (215, 235, 255) if kind == 5 else (70, 140, 225)
+                P_(wx, wy, c_); P_(wx + 3, wy, c_); P_(wx + 1, wy - 1, c_); P_(wx + 2, wy - 1, c_)
+                if kind == 5:
+                    P_(wx + 1 + ((f >> 3) & 1), wy - 2, (255, 255, 255))
+            else:
+                P_(wx, wy, (255, 250, 220) if ((f >> 2) + k) % 6 < 2 else (60, 120, 210))
+        for ix, iy, r, seed in isles:  # iles (comme aIsland)
             iy = int(iy)
-            x2, y2, r2 = ix + r * 3 // 5, iy + r * 3 // 5, r * 2 // 3
-            for rr, c_ in ((3, SHAL), (1, SAND), (-1, LEAF)):
-                d.ellipse((ix - r - rr, iy - r - rr, ix + r + rr, iy + r + rr), fill=c_)
-                d.ellipse((x2 - r2 - rr, y2 - r2 - rr, x2 + r2 + rr, y2 + r2 + rr), fill=c_)
-            d.ellipse((ix - r // 3 - r // 3, iy - r // 3 - r // 3, ix, iy), fill=LEAF2)
-        for k, (wx, wy) in enumerate(waves):
-            c_ = (190, 225, 255) if k % 4 == 0 else (70, 140, 225)
-            sc.px(wx, wy, c_); sc.px(wx + 3, wy, c_); sc.px(wx + 1, wy - 1, c_); sc.px(wx + 2, wy - 1, c_)
-        for e in en:
+            sd = [seed + 1]
+
+            def rn(n):
+                sd[0] = (sd[0] * 1103515245 + 12345) & 0xFFFFFFFF
+                return (sd[0] >> 16) % max(1, n)
+            nb = 2 + rn(3)
+            blobs = [(0, 0, r)] + [(rn(r * 2 + 1) - r, rn(r * 2 + 1) - r, r // 2 + rn(r // 2 + 1)) for _ in range(nb - 1)]
+            for off, c_ in ((4, (25, 105, 185)), (2, (60, 170, 215)), (0, (230, 205, 125)), (-2, (70, 170, 60)), (-4, (30, 120, 45)), (-6, (20, 85, 35))):
+                for bx_, by_, br_ in blobs:
+                    if br_ + off > 0:
+                        disc(ix + bx_, iy + by_, br_ + off, c_)
+            for bx_, by_, br_ in blobs:
+                rr = br_ + 1
+                n_ = rr * 6
+                for st_ in range(n_):
+                    if (st_ + (f >> 2)) % 4 == 0:
+                        a_ = st_ * 6.2832 / n_
+                        P_(ix + bx_ + round(math.cos(a_) * rr), iy + by_ + round(math.sin(a_) * rr), (235, 245, 255))
+            for _ in range(1 + rn(3)):
+                px_, py_ = ix + rn(r) - r // 2, iy + rn(r) - r // 2
+                P_(px_, py_ + 1, (130, 85, 35))
+                for qx, qy in ((-1, 0), (1, 0), (0, -1)):
+                    P_(px_ + qx, py_ + qy, (60, 210, 80))
+                P_(px_, py_, (35, 150, 50))
+            if r >= 8 and rn(2):
+                hx, hy = ix - r // 2 + rn(r // 2), iy + r // 3
+                for xx in range(3):
+                    P_(hx + xx, hy, (235, 230, 215)); P_(hx + xx, hy + 1, (235, 230, 215)); P_(hx + xx, hy - 1, (205, 55, 40))
+                for xx in range(2):
+                    P_(hx + 4 + xx, hy + 1, (235, 230, 215)); P_(hx + 4 + xx, hy + 2, (235, 230, 215)); P_(hx + 4 + xx, hy, (205, 55, 40))
+            P_(ix + r + 3, iy - r // 2, (125, 120, 110)); P_(ix + r + 4, iy - r // 2, (125, 120, 110)); P_(ix + r + 3, iy - r // 2 + 1, (90, 88, 80))
+
+        def turret(tx, ty, c_):
+            disc(tx, ty, 1, c_)
+            dx, dy = x + 5 - tx, y + 4 - ty
+            dd = math.hypot(dx, dy) + .01
+            for k in range(1, 4):
+                P_(tx + round(dx / dd * k), ty + round(dy / dd * k), (35, 35, 45))
+        for e in en:  # navires (comme aShip)
+            if e['type'] < 2:
+                continue
             ex, ey = int(e['x']), int(e['y'])
-            if e['type'] == 4:
-                hull = (255, 255, 255) if e['fl'] else col('S', 0)
-                d.rectangle((ex + 1, ey, ex + 9, ey + 29), fill=hull)
-                d.rectangle((ex, ey + 3, ex + 10, ey + 26), fill=hull)
-                d.rectangle((ex + 1, ey + 2, ex + 8, ey + 27), fill=hull if e['fl'] else col('n', 0))
-                for j in range(ey + 4, ey + 26, 4):
-                    d.line((ex + 5, j, ex + 5, j + 1), fill=col('N', 0))
-                d.rectangle((ex + 9, ey + 11, ex + 10, ey + 17), fill=col('s', 0))
-                for p in range(2):
-                    py = ey + 20 + p * 4
-                    d.line((ex + 1, py, ex + 3, py), fill=col('G', 1)); sc.px(ex + 2, py - 1, col('G', 1)); sc.px(ex + 2, py + 1, col('G', 1))
-                d.line((ex + 3, ey + 30, ex + 7, ey + 30), fill=col('w', 0))
-            elif e['type'] >= 2:
-                spr(sc, BOAT if e['type'] == 2 else DEST, ex, ey, 0, e['fl'] > 0)
-        d.rectangle((0, 0, W - 1, TOP - 1), fill=(0, 0, 0))
+            w_, h_ = SIZE[e['type']]
+            cx_, hw0 = ex + w_ // 2, w_ // 2
+            fl = e['fl'] > 0
+            wh = (255, 255, 255)
+            edge, hull, lite = (wh, wh, wh) if fl else ((55, 60, 72), (150, 156, 170), (200, 205, 215))
+            foam, foam2, dark = (225, 240, 255), (110, 175, 235), (40, 42, 52)
+            for k in range(14):
+                yy, sp_ = ey + h_ + k, hw0 - 1 + k // 2
+                c_ = foam if k < 6 else foam2
+                if (k + (f >> 2)) % 5:
+                    P_(cx_ - sp_, yy, c_); P_(cx_ + sp_, yy, c_)
+                if k < 10 and (k + (f >> 1)) % 3 == 0:
+                    P_(cx_ + int(math.sin(k * 1.7 + f * 0.25) * 1.5), yy, c_)
+            P_(cx_, ey - 1, foam)
+            for k in range(1, 4):
+                c_ = foam if ((f >> 2) + k) & 1 else foam2
+                P_(cx_ - k - 1, ey + k * 2 - 1, c_); P_(cx_ + k + 1, ey + k * 2 - 1, c_)
+            for j_ in range(h_):
+                hw = min(hw0, j_ // 2 + (j_ > 0))
+                if j_ == h_ - 1:
+                    hw = max(0, hw - 1)
+                for xx in range(cx_ - hw, cx_ + hw + 1):
+                    P_(xx, ey + j_, edge if xx in (cx_ - hw, cx_ + hw) else hull)
+            if e['type'] == 2:
+                turret(cx_, ey + 5, lite)
+                for yy in range(4):
+                    for xx in range(3):
+                        P_(cx_ - 1 + xx, ey + 8 + yy, dark if yy == 0 else lite)
+                turret(cx_, ey + 14, lite)
+            elif e['type'] == 3:
+                turret(cx_, ey + 5, lite); turret(cx_, ey + 9, lite)
+                for yy in range(4):
+                    for xx in range(5):
+                        P_(cx_ - 2 + xx, ey + 12 + yy, dark if yy == 0 else lite)
+                for yy in (17, 18, 20, 21):
+                    for xx in range(3):
+                        P_(cx_ - 1 + xx, ey + yy, dark)
+                for p in range(3):
+                    g_ = 150 - p * 25
+                    P_(cx_ + ((p + (f >> 3)) & 1) - (p == 2), ey + 19 + p * 2 + ((f >> 2) & 1), (g_, g_, g_ + 10))
+                turret(cx_, ey + 24, lite)
+            else:
+                deck, mark = ((wh, wh) if fl else ((165, 110, 60), (235, 220, 180)))
+                for yy in range(31):
+                    for xx in range(11):
+                        P_(ex + 2 + xx, ey + 7 + yy, mark if xx == 0 else deck)
+                for j_ in range(ey + 9, ey + 36, 4):
+                    P_(cx_, j_, mark); P_(cx_, j_ + 1, mark)
+                for xx in range(7):
+                    P_(ex + 4 + xx, ey + 33, mark)
+                for yy in range(9):
+                    for xx in range(3):
+                        P_(ex + 11 + xx, ey + 17 + yy, dark if yy == 1 else lite)
+                P_(ex + 12, ey + 15 + ((f >> 4) & 1), dark)
+                for p in range(3):
+                    px_, py_ = ex + 4 + (p & 1) * 3, ey + 26 + p * 4
+                    pc = wh if fl else col('G', 1)
+                    for xx in range(3):
+                        P_(px_ + xx, py_, pc)
+                    P_(px_ + 1, py_ - 1, pc); P_(px_ + 1, py_ + 1, pc)
+
+        def sil(rows, x0, y0, c_):
+            for r_, line in enumerate(rows):
+                for cc, ch in enumerate(line):
+                    if ch != '.':
+                        P_(int(x0) + cc, int(y0) + r_, c_)
+        SH = (4, 34, 95)
+        for e in en:  # ombres des avions
+            if e['type'] == 0:
+                sil(FIGHT[0], e['x'] + 3, e['y'] + 5, SH)
+            elif e['type'] == 1:
+                sil(BOMBER, e['x'] + 4, e['y'] + 6, SH)
+        sil(ROLL if roll else ME[0], x + 4, y + 6, SH)
         if cap:
             cx_, cy_ = int(cap[0]), int(cap[1])
             fillc = ((255, 200, 0), (60, 120, 255), (230, 30, 30))[cap[2]]
@@ -2110,10 +2225,13 @@ def escadrille():
             ri = r - 2 + (t & 1)
             if r > 1 and ri >= 0:
                 d.ellipse((bx_ - ri, by_ - ri, bx_ + ri, by_ + ri), fill=inn)
-        if roll:
-            spr(sc, ROLL, x, y, 3 if (roll >> 2) & 1 else 0)
-        else:
-            spr(sc, ME[(f >> 1) & 1], x, y)
+        me_ = ROLL if roll else ME[(f >> 1) & 1]
+        for ox, oy in ((-1, 0), (1, 0), (0, -1), (0, 1)):  # contour sombre de ton avion
+            for r_, line in enumerate(me_):
+                for cc, ch in enumerate(line):
+                    if ch != '.':
+                        sc.px(int(x) + ox + cc, int(y) + oy + r_, (0, 8, 30))
+        spr(sc, me_, x, y, 3 if roll and (roll >> 2) & 1 else 0)
         for k in range(rolls):
             d.ellipse((1 + k * 7, HS - 6, 5 + k * 7, HS - 2), outline=PAL['c'])
         hud(sc, score, 3, LIFE)

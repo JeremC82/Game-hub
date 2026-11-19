@@ -6,9 +6,9 @@ Jeux d'arcade sur 1 à 4 dalles LED 128x64, avec un ESP32 classique et une **man
 - **Partition unique de 3 Mo :** il reste de la place pour d'autres jeux.
 - **Son en option :** une broche PWM vers un petit ampli et un haut-parleur.
 
-**12 jeux originaux**, à choisir dans le menu (gauche / droite sur la ligne JOUER). Au démarrage, c'est toujours **SPACE DEFENDER** qui est proposé.
+**13 jeux originaux**, à choisir dans le menu (gauche / droite sur la ligne JOUER). Au démarrage, c'est toujours **SPACE DEFENDER** qui est proposé.
 
-Les 12 jeux ont en commun les niveaux de difficulté, les stages, les vies, les meilleurs scores avec les noms et la démo automatique.
+Les 13 jeux ont en commun les niveaux de difficulté, les stages, les vies, les meilleurs scores avec les noms et la démo automatique.
 
 
 ## Deux manettes (Bluepad32)
@@ -18,7 +18,7 @@ Depuis la V3.84, le Game-hub utilise **Bluepad32** : jusqu'à **4 manettes Bluet
 - **Menu « JOUEURS 1 / 2 »** (2e ligne, une étoile par manette connectée) : seuls les jeux à deux joueurs utilisent la 2e manette.
   - **RAQUETTES** : match à deux (raquette de droite pour le joueur 2), **le premier à 7 points gagne**.
   - **SPACE DEFENDER** : coopération, un 2e vaisseau **vert** pour le joueur 2, vies et score communs ; les ennemis piquent sur l'un ou l'autre ; la manette du joueur touché vibre.
-- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V3.86_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
+- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V3.88_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
 - **Mémoire** : environ 81 Ko libres avec 2 dalles en 3 bits et deux manettes connectées.
 
 # SPACE DEFENDER
@@ -197,14 +197,29 @@ Un jeu de tir de billes original, dans un puits.
 
 ![ESCADRILLE](docs/jeu-escadrille.gif)
 
-Un shoot vertical original au-dessus de la mer (V3.85, remplace ESCALADE ; nouveaux sprites et fond marin en V3.86).
-- **Décor :** la mer défile avec ses vagues et son écume, des îles entourées de hauts-fonds clairs.
+Un shoot vertical original au-dessus de la mer (V3.85, remplace ESCALADE ; nouveaux sprites et fond marin en V3.86, décor enrichi en V3.87).
+- **Décor :** la mer défile avec sa houle, ses crêtes, ses moutons d'écume et des reflets du soleil ; des îles de formes variées avec lagon en deux tons, ressac, plage, prairie, forêt, palmiers, maisons au toit rouge et rochers. Rien ne déborde sur la ligne du score.
 - **Commandes :** croix ou stick pour voler dans le bas de l'écran, **✕ (ou carré, R1, R2) pour tirer**, **○ pour un tonneau** : l'avion tourne sur lui-même, il est invincible pendant 1 s mais ne tire pas. 3 tonneaux par stage (les ronds cyan en bas à gauche).
-- **Ton avion :** un chasseur bleu à étoiles blanches, hélice qui tourne.
-- **Ennemis :** des chasseurs (verts, argent ou jaunes) en V, en vague sinueuse, par le côté ou en piqué ; des **bombardiers bimoteurs** qui tirent en éventail ; des **navires** sur la mer : vedette, destroyer à deux canons, et **porte-avions** qui fait décoller des chasseurs.
+- **Ton avion :** un chasseur bleu clair à étoiles blanches, hélice qui tourne, avec un **contour sombre** et une **ombre sur la mer** pour bien le voir. Les avions ennemis ont aussi leur ombre.
+- **Ennemis :** des chasseurs (verts, argent ou jaunes) en V, en vague sinueuse, par le côté ou en piqué ; des **bombardiers bimoteurs** qui tirent en éventail ; des **navires** qui avancent sur la mer (vague d'étrave, sillage d'écume, tourelles qui suivent ton avion) : vedette, destroyer à cheminées qui fument, et **porte-avions** (pont en bois, îlot, avions posés) qui fait décoller des chasseurs.
 - **Capsules :** **P** jaune = arme (2, 3, 4 puis 5 tirs en éventail), **T** bleue = un tonneau de plus, **+** rouge = une vie (laissée par le porte-avions). Une vie perdue fait baisser l'arme d'un niveau.
-- **Boss :** après 10 vagues, un **grand quadrimoteur vert** ; sous la moitié de sa vie, il bouge plus vite et tire en spirale.
+- **Boss :** après 10 vagues, un **grand quadrimoteur vert** ; il tire peu (éventail de 3 balles et un tir visé de temps en temps) ; sous la moitié de sa vie, il bouge plus vite, tire en éventail de 5 et en spirale lente.
 - **Points :** chasseur 100, piqueur 150, vedette 300, bombardier 500, destroyer 600, porte-avions 1500, boss 2000 × le stage.
+
+### BUNKER 3D
+
+![BUNKER 3D](docs/jeu-bunker.gif)
+
+Un jeu de tir original **en vue subjective** (V3.88) : tu avances dans une base souterraine comme si tu y étais.
+- **Moteur 3D** (lancer de rayons, calculé colonne par colonne, sans effacement donc sans scintillement) : murs texturés calculés à pleine résolution, sol en dalles et plafond avec plafonniers en perspective, brouillard avec la distance, ombre en haut et en bas des murs et le long des murs au sol, balancement de la marche.
+- **Murs :** briques en relief (certaines noircies), plaques de métal rivetées avec bandes de danger, panneaux techniques (écran qui clignote, bande lumineuse qui défile), pierre taillée moussue, appliques lumineuses avec halo ; portes coulissantes à bandes jaunes, porte rouge fermée à clé, panneau de sortie vert.
+- **Commandes :** stick gauche (ou croix) pour avancer, reculer et faire un pas de côté, **stick droit** (ou croix gauche / droite) pour pivoter, **L1 / R1** pas de côté, **✕ ou R2 tirer**, **□ ouvrir une porte / actionner la sortie**, **○ changer d'arme**, **△ mini-carte**. L2 ou OPTIONS : pause.
+- **Ennemis (robots originaux, 2 images de marche, reflets et ombres) :** drone flottant à l'œil rouge (rotors qui tournent), sentinelle à canons, colosse blindé qui frappe au contact.
+- **Ils se défendent :** ils te repèrent quand ils te voient, ouvrent les portes et te poursuivent ; **ils esquivent** par des pas de côté quand tu les vises, **ripostent** dès qu'ils sont touchés et **préviennent leurs voisins** ; blessés, **ils reculent en tirant** ; ils gardent leurs distances. La sentinelle tire en **rafales de 3**, le drone **vise là où tu vas être**, le colosse **charge en zigzag**.
+- **Lumières :** le plasma éclaire en vert les murs et le sol, les explosions en orange, ton tir réchauffe la pièce ; étincelles quand tu touches un mur ; bords de l'image légèrement assombris.
+- **Barils explosifs :** un tir les fait sauter ; l'explosion détruit les robots autour (et te blesse si tu es trop près), et fait sauter les barils voisins en chaîne.
+- **Objets :** soin (+30), munitions (+25), armure (+50, encaisse la moitié des dégâts), **carte rouge** (ouvre la porte rouge et actionne la sortie), arme lourde (3 tirs en éventail, 3 munitions).
+- **Stages :** chaque stage est un nouveau bunker (salles reliées par des couloirs et des portes), avec plus de robots. Barre du bas : vie, armure, munitions, carte, vies, score.
 
 ### CRUCH
 
@@ -229,7 +244,7 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. **La démo cha
 
 | Ligne | Action |
 |---|---|
-| **JOUER** | **gauche / droite : choix du jeu** (SPACE DEFENDER, RAID, RAQUETTES, BULLES, LABYRINTHE, ORBITUS, CASSE BRIQUES, BLOCS, CRUCH, TAUPE, BILLES, ESCADRILLE). Au démarrage : SPACE DEFENDER. ✕ ou OPTIONS lance la partie. |
+| **JOUER** | **gauche / droite : choix du jeu** (SPACE DEFENDER, RAID, RAQUETTES, BULLES, LABYRINTHE, ORBITUS, CASSE BRIQUES, BLOCS, CRUCH, TAUPE, BILLES, ESCADRILLE, BUNKER 3D). Au démarrage : SPACE DEFENDER. ✕ ou OPTIONS lance la partie. |
 | **NIVEAU** | Facile / Normal / Difficile (gauche / droite ou ✕), choix gardé en mémoire |
 | **LUMINOSITE** | 0 à 100 % par pas de 10 % (gauche / droite ou ✕), visible tout de suite et gardée en mémoire. À 0 %, les dalles restent très faiblement allumées pour qu'on voie encore le menu. |
 | **VOLUME** | volume du son, 0 à 100 % par pas de 10 % (gauche / droite ou ✕). Un bip fait entendre le niveau. 0 % = muet. C'est le rapport cyclique du PWM : le potentiomètre de l'ampli règle le maximum. |
@@ -244,7 +259,7 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. **La démo cha
 - **Navigation :** la croix haut / bas choisit la ligne, ✕ valide.
 - **OPTIONS** (le « START » de la manette PS4) lance la partie depuis n'importe quelle ligne.
 - **Mode démo :** au bout de **30 s sans toucher la manette**, le menu se cache et la démo tourne seule. Le premier appui sur un bouton, ou un mouvement du stick, fait revenir le menu, sans autre effet.
-- **En partie, OPTIONS met en pause** : OPTIONS reprend la partie, **○ (rond) revient au menu**. Si ton score entre dans les 5 meilleurs, il est enregistré.
+- **En partie, OPTIONS ou L2 met en pause** (V3.88 : L2 ajouté, une touche libre) : OPTIONS ou L2 reprend la partie, **○ (rond) revient au menu**. Si ton score entre dans les 5 meilleurs, il est enregistré.
 - **Fin de partie :** « GAME OVER » s'affiche. Le jeu revient ensuite au menu, puis passe en mode démo après 30 s.
 - **Saisie du nom :** si ton score entre dans les 5 meilleurs, un écran affiche « NOUVEAU RECORD ! » (ou « BRAVO ! RANG n ») puis **3 grandes lettres** à choisir, comme sur une borne d'arcade.
   - Croix haut / bas : change la lettre (A à Z, chiffres, espace, tiret).
@@ -269,6 +284,7 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. **La démo cha
 | croix, carré, triangle, R1, L1 ou R2 | tirer (SPACE DEFENDER, RAID, ORBITUS, BILLES, ESCADRILLE), jet de boue (TAUPE), lancer la balle (CASSE BRIQUES), tourner la pièce (BLOCS), prendre un bonbon (CRUCH) |
 | ○ (rond) | bombe dans RAID, saut dans BULLES, tourner dans l'autre sens (BLOCS), annuler (CRUCH) ; dans les menus : retour |
 | OPTIONS | jouer depuis le menu, pause en partie |
+| L2 | pause / reprise en partie |
 | ○ (rond), pendant la pause | quitter la partie et revenir au menu |
 | croix haut / bas, au menu | choisir la ligne |
 | Share + croix haut / bas | luminosité (enregistrée), aussi réglable dans le menu |
@@ -354,8 +370,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V3.86_complet.bin](firmware/GameHub_V3.86_complet.bin) | 0x0 | `dc451b01c498df647da822a1427a1a5e` |
-| [firmware/GameHub_V3.86.bin](firmware/GameHub_V3.86.bin) | 0x10000 | `ee1945d390b91eb82240245a1e52821f` |
+| [firmware/GameHub_V3.88_complet.bin](firmware/GameHub_V3.88_complet.bin) | 0x0 | `90c6530e875199b44cb57b1c7203ba22` |
+| [firmware/GameHub_V3.88.bin](firmware/GameHub_V3.88.bin) | 0x10000 | `2a1c5dc7a47901a004a72a0ba67a21c8` |
 
 Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB SPIFFS)** dans Outils → Partition Scheme.
 

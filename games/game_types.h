@@ -15,3 +15,6 @@ struct KCap { float x, y; uint8_t type; bool on; };  // BRIQUES : capsule (0 lar
 struct DEn { float x, y; int8_t c, r, dx, dy; uint8_t type, stun, ghost; int16_t t; bool on; };  // TAUPE : ver (0) ou chauve-souris (1)
 struct DRock { float y, vy; int8_t c; uint8_t wob, state; bool on; };                         // TAUPE : rocher (0 pose, 1 tremble, 2 tombe)
 struct AEn { float x, y, vx, vy; int16_t t; uint8_t type, pat, var; int8_t hp, flash; bool on, carrier; };  // ESCADRILLE : chasseur (0), bombardier (1), vedette (2), destroyer (3), porte-avions (4) ; var : couleur
+struct ZMob { float x, y; int16_t hp; uint16_t t, walk; uint8_t type, state, flash, cool, dodgeT, burst, atk; int8_t dx; bool on; };  // BUNKER 3D : drone (0), sentinelle (1), colosse (2), colonne (3), baril (4)
+struct ZShot { float x, y, vx, vy; uint16_t t; bool on; };  // BUNKER 3D : plasma ennemi
+struct ZItem { uint8_t x, y, type; bool on; };  // BUNKER 3D : soin, munitions, armure, carte rouge, arme lourde
