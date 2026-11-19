@@ -28,7 +28,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "3.95"
+#define GAMES_VERSION "3.99"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -4177,6 +4177,7 @@ uint16_t aIsS[2];  // forme de chaque ile (graine)
 int aTier = 0, aCool = 0, aGroups = 0, aSpawnT = 0, aInv = 0, aRoll = 0, aRolls = 3;
 bool aBoss = false, aPrevRoll = false, aPaint = true;
 float aBX, aBY;
+int8_t aBKind = 0;  // boss : 0 bombardier lourd, 1 bimoteur a double queue (en alternance selon le stage)
 int aBHp, aBMax, aBT = 0, aBFlash = 0;
 // sprites : B/b bleu, W blanc, y/o helice et feu, c vitrage, k sombre, G/g couleur de l'ennemi (vert, argent, jaune),
 // S/s gris des navires, n/N pont du porte-avions, w sillage
@@ -4190,11 +4191,11 @@ const char *const SPR_A_FIGHT[2][7] = {  // chasseur ennemi, nez vers le bas
 const char *const SPR_A_BOMBER[11] = {  // bombardier bimoteur
   "......GGGGG......", "........G........", "........G........", "...g....G....g...", "GGGGGGGGGGGGGGGGG",
   "gGGGGgGGGGGgGGGGg", "....ggg.G.ggg....", "....ggg.G.ggg....", "....ooo.G.ooo....", "........G........", ".......GcG......." };
-const char *const SPR_A_BOSS[15] = {  // grand quadrimoteur
-  "...........GGGGGGG...........", "..............G..............", "..............G..............", "..............G..............",
-  ".............GGG.............", "GGGGGGGGGGGGGGGGGGGGGGGGGGGGG", "GGgGGGGGGGGGGGGGGGGGGGGGGGgGG", "gGGGGgGGGGGGGGGGGGGGGGgGGGGGg",
-  "..ggg..ggg...GGG...ggg..ggg..", "..ggg..ggg...GGG...ggg..ggg..", "..ooo..ooo...GGG...ooo..ooo..", ".............GGG.............",
-  ".............GcG.............", ".............GcG.............", "..............G.............." };
+const char *const SPR_A_BOSS[2][2][17] = {  // boss : bombardier lourd (4 moteurs), puis bimoteur a double queue ; 2 images (helices)
+  { { "..........kkkkkkkkk..........", ".........kSSSSSSSSSk.........", "..........kGGkSkGGk..........", "............kSSSk............", "............kSWSk............", "......kkkkkkkSSSkkkkkkk......", "...kkkSSSSSSSSSSSSSSSSSkkk...", "kkkSSSWSSSSSSSSSSSSSSSWSSSkkk", "kGGSSSSSSSSGSSSSSGSSSSSSSSGGk", ".kksssskssssksSskssssksssskk.", "....kSSkkSSk.kSk.kSSkkSSk....", "....koSkkSok.kck.koSkkSok....", "...yyyy.yyyy.kck.yyyy.yyyy...", ".............kck.............", ".............kWk.............", ".............kSk.............", "..............k.............." },
+    { "..........kkkkkkkkk..........", ".........kSSSSSSSSSk.........", "..........kGGkSkGGk..........", "............kSSSk............", "............kSWSk............", "......kkkkkkkSSSkkkkkkk......", "...kkkSSSSSSSSSSSSSSSSSkkk...", "kkkSSSWSSSSSSSSSSSSSSSWSSSkkk", "kGGSSSSSSSSGSSSSSGSSSSSSSSGGk", ".kksssskssssksSskssssksssskk.", "....kSSkkSSk.kSk.kSSkkSSk....", "....koSkkSok.kck.koSkkSok....", "....yy...yy..kck..yy...yy....", ".............kck.............", ".............kWk.............", ".............kSk.............", "..............k.............." } },
+  { { "...kkkkkkkkkkkkkkkkkkkkkkk...", "...kSGGGGGGGGGGGGGGGGGGGSk...", "...kSkkkkkkkkkkkkkkkkkkkSk...", "...kSk.................kSk...", "...kWk.................kWk...", "...kSk......kkkkk......kSk...", "kkkkSkkkkkkkSSSSSkkkkkkkSkkkk", "kSWSSSSSSSSSSSWSSSSSSSSSSSWSk", "kGGSSSSSSSSSSSSSSSSSSSSSSSGGk", ".kkkSSkkkkkkSsSsSkkkkkkSSkkk.", "...kSSk....kScccSk....kSSk...", "..kSSSSk...kccccck...kSSSSk..", "..kSoSSk...kSSSSSk...kSSoSk..", "..kkkkkk....kSSSk....kkkkkk..", "..yyyyyy....kkSkk....yyyyyy..", ".............kSk.............", "..............k.............." },
+    { "...kkkkkkkkkkkkkkkkkkkkkkk...", "...kSGGGGGGGGGGGGGGGGGGGSk...", "...kSkkkkkkkkkkkkkkkkkkkSk...", "...kSk.................kSk...", "...kWk.................kWk...", "...kSk......kkkkk......kSk...", "kkkkSkkkkkkkSSSSSkkkkkkkSkkkk", "kSWSSSSSSSSSSSWSSSSSSSSSSSWSk", "kGGSSSSSSSSSSSSSSSSSSSSSSSGGk", ".kkkSSkkkkkkSsSsSkkkkkkSSkkk.", "...kSSk....kScccSk....kSSk...", "..kSSSSk...kccccck...kSSSSk..", "..kSoSSk...kSSSSSk...kSSoSk..", "..kkkkkk....kSSSk....kkkkkk..", "...y..y.....kkSkk.....y..y...", ".............kSk.............", "..............k.............." } } };
 // taille de chaque type : chasseur, bombardier, vedette, destroyer, porte-avions
 const uint8_t A_W[5] = { 9, 17, 7, 9, 15 }, A_H[5] = { 7, 11, 18, 28, 40 };
 
@@ -4211,8 +4212,8 @@ uint16_t aCol(char ch, uint8_t var) {
     case 'k': return rgb(40, 40, 50);
     case 'G': return rgb(G[var % 3][0][0], G[var % 3][0][1], G[var % 3][0][2]);
     case 'g': return rgb(G[var % 3][1][0], G[var % 3][1][1], G[var % 3][1][2]);
-    case 'S': return rgb(150, 155, 165);
-    case 's': return rgb(90, 95, 105);
+    case 'S': return rgb(188, 192, 202);  // assez clair pour une dalle a 3 bits
+    case 's': return rgb(135, 140, 150);
     case 'n': return rgb(160, 105, 55);
     case 'N': return rgb(230, 210, 170);
     default: return rgb(200, 230, 255);  // w : sillage
@@ -4392,7 +4393,7 @@ void aStep() {
     if (aGroups < A_GROUPS) {
       if (--aSpawnT <= 0) { aSpawnGroup(); aSpawnT = 120; }
     } else if (!any) {
-      aBoss = true; aBX = W / 2 - 14; aBY = -16; aBT = 0;
+      aBoss = true; aBX = W / 2 - 14; aBY = -18; aBT = 0; aBKind = (gWave - 1) % 2;
       aBMax = aBHp = (50 + 25 * gWave) * (gEffDiff() + 1) / 2;
       sfxDive();
     }
@@ -4470,15 +4471,15 @@ void aStep() {
     if (aBY < 14) aBY += 0.4f;
     else aBX = W / 2 - 14 + sinf(aBT * (phase2 ? 0.03f : 0.018f)) * (W / 2 - 18);
     if (aBY >= 14) {
-      if (aBT % max(55, int((phase2 ? 70 : 95) / diff)) == 0) aSpread(aBX + 14, aBY + 15, phase2 ? 5 : 3, 1.1f * diff);
-      if (aBT % 90 == 45) aAimed((aBT / 90) & 1 ? aBX + 24 : aBX + 4, aBY + 10, 1.4f * diff);
+      if (aBT % max(55, int((phase2 ? 70 : 95) / diff)) == 0) aSpread(aBX + 14, aBY + 17, phase2 ? 5 : 3, 1.1f * diff);
+      if (aBT % 90 == 45) aAimed((aBT / 90) & 1 ? aBX + 24 : aBX + 4, aBY + 12, 1.4f * diff);
       if (phase2 && aBT % 18 == 0) {
         float a = aBT * 0.29f;
-        aBombAt(aBX + 14, aBY + 8, cosf(a) * 1.1f * diff, fabsf(sinf(a)) * 1.1f * diff + 0.3f);
+        aBombAt(aBX + 14, aBY + 9, cosf(a) * 1.1f * diff, fabsf(sinf(a)) * 1.1f * diff + 0.3f);
       }
     }
     for (auto &s : aShot)
-      if (s.on && s.x >= aBX && s.x <= aBX + 28 && s.y >= aBY && s.y <= aBY + 14) {
+      if (s.on && s.x >= aBX && s.x <= aBX + 28 && s.y >= aBY && s.y <= aBY + 16) {
         s.on = false;
         aBHp--;
         aBFlash = 2;
@@ -4487,14 +4488,14 @@ void aStep() {
       }
     if (aBHp <= 0) {
       aBoss = false;
-      for (int i = 0; i < 10; i++) gBoomAt(aBX + random(29), aBY + random(15));
+      for (int i = 0; i < 10; i++) gBoomAt(aBX + random(29), aBY + random(17));
       sfxHit();
       gScore += 2000UL * gWave;
       altStageClear(1000UL * gWave);
       for (auto &b : aBomb) b.on = false;
       aNewStage();
     }
-    if (aBoss && !safe && aBX + 28 >= aX + 2 && aBX <= aX + 8 && aBY + 13 >= aY + 1 && aBY <= aY + 8) { aHit(); safe = true; }
+    if (aBoss && !safe && aBX + 28 >= aX + 2 && aBX <= aX + 8 && aBY + 15 >= aY + 1 && aBY <= aY + 8) { aHit(); safe = true; }
   }
   for (auto &b : aBomb) {
     if (!b.on) continue;
@@ -4526,6 +4527,15 @@ void aErase(uint16_t sea) {
   gNOld = 0;
 }
 // dessin limite a la mer (jamais dans la bande du score, meme un instant)
+uint16_t aSea() { return rgb(6, 40, 108); }  // mer (V3.96 : plus sombre, les sprites ressortent)
+// un point (x, y) est-il sur une ile ? (les vagues n'y sont pas dessinees : elles y feraient des trous qui clignotent)
+bool aOnIsle(int x, int y) {
+  for (int i = 0; i < 2; i++) {
+    int dx = x - aIsX[i], dy = y - (int)aIsY[i], rr = aIsR[i] * 2 + 7;
+    if (dx * dx + dy * dy < rr * rr) return true;
+  }
+  return false;
+}
 void aP(int x, int y, uint16_t c) { if (x >= 0 && x < W && y >= A_TOP && y < H) gfx->drawPixel(x, y, c); }
 void aH(int x, int y, int w, uint16_t c) {
   if (y < A_TOP || y >= H) return;
@@ -4556,13 +4566,15 @@ void aTurret(int x, int y, uint16_t c) {  // tourelle ronde, canon tourne vers t
 void aShip(const AEn &e) {
   int x = e.x, y = e.y, w = A_W[e.type], h = A_H[e.type], cx = x + w / 2, hw0 = w / 2;
   bool fl = e.flash;
-  uint16_t wh = rgb(255, 255, 255), edge = fl ? wh : rgb(55, 60, 72), hull = fl ? wh : rgb(150, 156, 170), lite = fl ? wh : rgb(200, 205, 215);
-  uint16_t foam = rgb(225, 240, 255), foam2 = rgb(110, 175, 235), dark = rgb(40, 42, 52);
+  uint16_t wh = rgb(255, 255, 255), edge = fl ? wh : rgb(45, 50, 62), hull = fl ? wh : rgb(178, 182, 194), lite = fl ? wh : rgb(225, 228, 236);
+  uint16_t shade = fl ? wh : rgb(140, 145, 158), rail = fl ? wh : rgb(225, 228, 235), dark = fl ? wh : rgb(38, 40, 50);
+  uint16_t glass = fl ? wh : rgb(110, 210, 250), boat = fl ? wh : rgb(255, 130, 20), red = fl ? wh : rgb(200, 40, 30);
+  uint16_t foam = rgb(170, 195, 225), foam2 = rgb(55, 100, 160), seaSh = rgb(3, 22, 64);
   for (int k = 0; k < 14; k++) {  // sillage : deux traines d'ecume qui s'ecartent, remous au milieu
     int yy = y + h + k, sp = hw0 - 1 + k / 2;
-    uint16_t c = k < 6 ? foam : foam2;
+    uint16_t c = k < 5 ? foam : foam2;
     if (((k + (gFrame >> 2)) % 5) != 0) { aP(cx - sp, yy, c); aP(cx + sp, yy, c); }
-    if (k < 10 && ((k + (gFrame >> 1)) % 3) == 0) aP(cx + (int)(sinf(k * 1.7f + gFrame * 0.25f) * 1.5f), yy, c);
+    if (k < 10 && ((k + (gFrame >> 1)) % 3) == 0) aP(cx + (int)(sinf(k * 1.7f + gFrame * 0.25f) * 1.5f), yy, foam2);
   }
   aP(cx, y - 1, foam);  // vague d'etrave
   for (int k = 1; k <= 3; k++) {
@@ -4570,43 +4582,71 @@ void aShip(const AEn &e) {
     aP(cx - k - 1, y + k * 2 - 1, c);
     aP(cx + k + 1, y + k * 2 - 1, c);
   }
-  for (int j = 0; j < h; j++) {  // coque
+  // coque : etrave pointue, poupe arrondie, bord gauche eclaire, bord droit dans l'ombre, bastingage, ombre sur la mer
+  for (int j = 0; j < h; j++) {
     int hw = min(hw0, j / 2 + (j > 0));
-    if (j == h - 1) hw = max(0, hw - 1);
+    if (j >= h - 2) hw = max(1, hw - (j - (h - 3)));
     aH(cx - hw, y + j, 2 * hw + 1, hull);
     aP(cx - hw, y + j, edge);
     aP(cx + hw, y + j, edge);
+    aP(cx + hw + 1, y + j + 1, seaSh);  // ombre portee sur l'eau
+    if (hw >= 2) {
+      aP(cx - hw + 1, y + j, (j % 3 == 1 && j > 2) ? rail : lite);
+      aP(cx + hw - 1, y + j, (j % 3 == 1 && j > 2) ? rail : shade);
+    }
   }
-  if (e.type == 2) {  // vedette : canon avant, passerelle, canon arriere
+  auto radar = [&](int px, int py) {  // mat et radar qui tourne
+    aP(px, py, dark);
+    int f = (gFrame >> 2) & 3;
+    static const int8_t RX[4] = { -1, 0, 1, 0 }, RY[4] = { 0, -1, 0, 1 };
+    aP(px + RX[f], py + RY[f], lite);
+    aP(px - RX[f], py - RY[f], lite);
+  };
+  if (e.type == 2) {  // vedette : canon avant, passerelle vitree, radar, canon arriere
     aTurret(cx, y + 5, lite);
     aR(cx - 1, y + 8, 3, 4, lite);
-    aH(cx - 1, y + 8, 3, dark);
-    aTurret(cx, y + 14, lite);
-  } else if (e.type == 3) {  // destroyer : deux canons, passerelle, deux cheminees qui fument, canon arriere
+    aH(cx - 1, y + 8, 3, glass);
+    aP(cx, y + 11, dark);
+    radar(cx, y + 12);
+    aTurret(cx, y + 15, lite);
+  } else if (e.type == 3) {  // destroyer : 2 canons, passerelle, radar, 2 cheminees, canots, canon arriere
     aTurret(cx, y + 5, lite);
     aTurret(cx, y + 9, lite);
     aR(cx - 2, y + 12, 5, 4, lite);
-    aH(cx - 2, y + 12, 5, dark);
-    aR(cx - 1, y + 17, 3, 2, dark);
-    aR(cx - 1, y + 20, 3, 2, dark);
+    aH(cx - 2, y + 12, 5, glass);  // vitres de la passerelle
+    aV(cx + 2, y + 13, 3, shade);
+    radar(cx, y + 15);
+    for (int f = 0; f < 2; f++) {  // cheminees : grises, bande rouge, sommet noir
+      int fy = y + 17 + f * 3;
+      aR(cx - 1, fy, 3, 2, shade);
+      aH(cx - 1, fy, 3, red);
+      aP(cx, fy + 1, dark);
+    }
+    aV(cx - 3, y + 18, 2, boat);  // canots de sauvetage
+    aV(cx + 3, y + 18, 2, boat);
     for (int p = 0; p < 3; p++)  // fumee qui part vers l'arriere
-      aP(cx + ((p + (gFrame >> 3)) & 1) - (p == 2), y + 19 + p * 2 + ((gFrame >> 2) & 1), rgb(150 - p * 25, 150 - p * 25, 160 - p * 25));
-    aTurret(cx, y + 24, lite);
-  } else {  // porte-avions : pont de bois, marquages, ilot, avions
-    uint16_t deck = fl ? wh : rgb(165, 110, 60), mark = fl ? wh : rgb(235, 220, 180);
-    aR(x + 2, y + 7, 11, 31, deck);
-    aV(x + 2, y + 7, 31, mark);
-    for (int j = y + 9; j < y + 36; j += 4) aV(cx, j, 2, mark);  // ligne d'envol
-    aH(x + 4, y + 33, 7, mark);
-    aR(x + 11, y + 17, 3, 9, lite);  // ilot et mat
-    aH(x + 11, y + 18, 3, dark);
-    aP(x + 12, y + 15 + ((gFrame >> 4) & 1), dark);
+      aP(cx + ((p + (gFrame >> 3)) & 1) - (p == 2), y + 22 + p * 2 + ((gFrame >> 2) & 1), rgb(140 - p * 25, 140 - p * 25, 150 - p * 25));
+    aTurret(cx, y + 25, lite);
+  } else {  // porte-avions : pont gris, bords blancs, axe jaune, piste en biais, ascenseur, ilot, avions
+    uint16_t deck = fl ? wh : rgb(128, 132, 142), mark = fl ? wh : rgb(230, 230, 230), yel = fl ? wh : rgb(240, 200, 30);
+    aR(x + 2, y + 6, 11, 32, deck);
+    aV(x + 2, y + 6, 32, mark);
+    aV(x + 12, y + 6, 32, mark);
+    for (int j = y + 8; j < y + 36; j += 4) aV(cx, j, 2, yel);  // axe d'envol
+    for (int k = 0; k < 8; k++) aP(x + 4 + k, y + 21 + k * 2, (k & 1) ? deck : mark);  // piste d'atterrissage en biais
+    aH(x + 4, y + 35, 7, mark);
+    aR(x + 4, y + 10, 3, 3, dark);  // ascenseur
+    aR(x + 11, y + 15, 3, 10, lite);  // ilot : vitres et radar
+    aV(x + 11, y + 16, 8, shade);
+    aH(x + 11, y + 17, 3, glass);
+    radar(x + 12, y + 21);
     for (int p = 0; p < 3; p++) {  // avions sur le pont
-      int px = x + 4 + (p & 1) * 3, py = y + 26 + p * 4;
-      uint16_t pc = fl ? wh : aCol('G', 1);
+      int px = x + 4 + (p & 1) * 3, py = y + 26 + p * 3;
+      uint16_t pc = fl ? wh : rgb(150, 160, 150);
       aH(px, py, 3, pc);
       aP(px + 1, py - 1, pc);
       aP(px + 1, py + 1, pc);
+      aP(px + 1, py, glass);
     }
   }
   gMark(cx - hw0 - 7, y - 2, w + 14, h + 16);
@@ -4625,7 +4665,35 @@ void aIsland(int i) {
     br[k] = k ? r / 2 + rn(r / 2 + 1) : r;
   }
   static const int8_t OFF[6] = { 4, 2, 0, -2, -4, -6 };
-  uint16_t COL[6] = { rgb(25, 105, 185), rgb(60, 170, 215), rgb(230, 205, 125), rgb(70, 170, 60), rgb(30, 120, 45), rgb(20, 85, 35) };
+  uint16_t COL[6] = { rgb(18, 78, 140), rgb(45, 135, 175), rgb(230, 205, 125), rgb(70, 170, 60), rgb(30, 120, 45), rgb(20, 85, 35) };
+  // l'ile n'est jamais effacee en entier (elle clignotait) : on redessine par-dessus, et on ne rend a la mer que les
+  // points qu'elle vient de quitter en descendant (le haut de chaque colonne)
+  static int16_t prevY[2] = { -32000, -32000 };
+  static uint16_t prevS[2] = { 0, 0 };
+  if (prevS[i] == aIsS[i] && prevY[i] > -32000 && y0 > prevY[i]) {
+    const int span = 48;  // demi-largeur maximale d'une ile (rayon 16 : r * 2 + 4 + 1 < 48)
+    int16_t top[2 * span + 1];
+    for (auto &t : top) t = 32767;
+    for (int k = 0; k < nb; k++) {
+      int R = br[k] + OFF[0];
+      if (R <= 0) continue;
+      for (int dy = -R; dy <= 0; dy++) {
+        int dx = (int)sqrtf((float)(R * R - dy * dy) + 0.5f);
+        for (int c = bx[k] - dx; c <= bx[k] + dx; c++) {
+          int ci = c + span;
+          if (ci >= 0 && ci <= 2 * span && by[k] + dy < top[ci]) top[ci] = by[k] + dy;
+        }
+      }
+    }
+    uint16_t sea = aSea();
+    for (int c = 0; c <= 2 * span; c++) {
+      if (top[c] == 32767) continue;
+      int x = x0 - span + c, a = max(prevY[i] + top[c], (int)A_TOP), b = min(y0 + top[c], (int)H);
+      if (x >= 0 && x < W && b > a) gfx->drawFastVLine(x, a, b - a, sea);
+    }
+  }
+  prevY[i] = y0;
+  prevS[i] = aIsS[i];
   for (int l = 0; l < 6; l++)
     for (int k = 0; k < nb; k++)
       if (br[k] + OFF[l] > 0) aDisc(x0 + bx[k], y0 + by[k], br[k] + OFF[l], COL[l]);
@@ -4646,7 +4714,6 @@ void aIsland(int i) {
   int rx = x0 + r + 3, ry = y0 - r / 2;  // rochers dans le lagon
   aH(rx, ry, 2, rgb(125, 120, 110));
   aP(rx, ry + 1, rgb(90, 88, 80));
-  gMark(x0 - r * 2 - 6, y0 - r * 2 - 6, r * 4 + 13, r * 4 + 13);
 }
 void aFire() {  // explosions en boules de feu (blanc, jaune, orange, rouge, fumee)
   for (auto &b : gBoom) {
@@ -4662,25 +4729,25 @@ void aFire() {  // explosions en boules de feu (blanc, jaune, orange, rouge, fum
   }
 }
 void aDraw() {
-  uint16_t sea = rgb(10, 60, 150), shadow = rgb(4, 34, 95), palFull[9];
+  uint16_t sea = aSea(), shadow = rgb(3, 22, 64), palFull[9];
   for (int i = 0; i < 9; i++) palFull[i] = rgb(G_PAL_RGB[i][0], G_PAL_RGB[i][1], G_PAL_RGB[i][2]);
   aErase(sea);
   // mer : houle sombre (longs traits), cretes claires, moutons d'ecume, reflets du soleil qui scintillent
   for (int i = 0; i < A_WAVE; i++) {
     int x = aWave[i][0], y = aWave[i][1], kind = i % 7;
-    if (y < A_TOP + 3) continue;
+    if (y < A_TOP + 3 || aOnIsle(x, y)) continue;
     if (kind < 2) {
       int len = 6 + (i % 5);
-      gfx->drawFastHLine(x, y, len, rgb(5, 44, 122));
+      gfx->drawFastHLine(x, y, len, rgb(4, 28, 80));
       gMark(x, y, len, 1);
     } else if (kind < 6) {
-      uint16_t c = kind == 5 ? rgb(215, 235, 255) : rgb(70, 140, 225);
+      uint16_t c = kind == 5 ? rgb(150, 175, 205) : rgb(38, 86, 150);
       gfx->drawPixel(x, y, c); gfx->drawPixel(x + 3, y, c);
       gfx->drawFastHLine(x + 1, y - 1, 2, c);
-      if (kind == 5) gfx->drawPixel(x + 1 + ((gFrame >> 3) & 1), y - 2, rgb(255, 255, 255));
+      if (kind == 5) gfx->drawPixel(x + 1 + ((gFrame >> 3) & 1), y - 2, rgb(190, 205, 225));
       gMark(x, y - 2, 4, 3);
     } else {
-      gPix(x, y, ((gFrame >> 2) + i) % 6 < 2 ? rgb(255, 250, 220) : rgb(60, 120, 210));
+      gPix(x, y, ((gFrame >> 2) + i) % 6 < 2 ? rgb(170, 170, 150) : rgb(30, 70, 130));
     }
   }
   for (int i = 0; i < 2; i++) aIsland(i);
@@ -4690,7 +4757,7 @@ void aDraw() {
   for (auto &e : aEn)
     if (e.on && e.type == 0) aSil(SPR_A_FIGHT[0], 9, 7, (int)e.x + 3, (int)e.y + 5, shadow);
     else if (e.on && e.type == 1) aSil(SPR_A_BOMBER, 17, 11, (int)e.x + 4, (int)e.y + 6, shadow);
-  if (aBoss) aSil(SPR_A_BOSS, 29, 15, (int)aBX + 5, (int)aBY + 8, shadow);
+  if (aBoss) aSil(SPR_A_BOSS[aBKind][0], 29, 17, (int)aBX + 5, (int)aBY + 8, shadow);
   bool me = gDead == 0 && !(aInv > 0 && (gFrame & 4));
   if (me) aSil(aRoll ? SPR_A_ROLL : SPR_A_ME[0], 11, 9, (int)aX + 4, (int)aY + 6, shadow);
   if (aCap.on && aCap.y >= A_TOP) {  // capsule : case de couleur et lettre (P arme, T tonneau, + vie), bord qui clignote
@@ -4708,7 +4775,7 @@ void aDraw() {
     if (e.on && e.type == 0) aSpr(SPR_A_FIGHT[(gFrame / 3) & 1], 9, 7, (int)e.x, (int)e.y, e.var, e.flash);
     else if (e.on && e.type == 1) aSpr(SPR_A_BOMBER, 17, 11, (int)e.x, (int)e.y, e.var % 2, e.flash);
   if (aBoss) {
-    aSpr(SPR_A_BOSS, 29, 15, (int)aBX, (int)aBY, 0, aBFlash);
+    aSpr(SPR_A_BOSS[aBKind][(gFrame >> 1) & 1], 29, 17, (int)aBX, (int)aBY, aBKind ? 2 : 0, aBFlash);  // helices qui tournent ; liseres rouges ou jaunes
     int bw = W - 20, fill = bw * max(0, aBHp) / aBMax;  // barre de vie
     gfx->drawRect(10, A_TOP + 1, bw, 3, rgb(90, 90, 110));
     gfx->fillRect(10, A_TOP + 2, fill, 1, aBHp < aBMax / 2 ? palFull[7] : palFull[1]);
@@ -6618,11 +6685,22 @@ void ps4Poll() {
                (PS4.Options() && !PS4.Share()) << 6 | (PS4.L2Value() > 120) << 7;  // L2 : pause (touche libre)
   uint8_t edge = bt & ~prevB;
   prevB = bt;
+  {  // la 2e manette navigue aussi dans le menu (memes boutons, appuis fusionnes avec ceux de la 1re)
+    static uint8_t prevB2 = 0;
+    uint8_t bt2 = 0;
+    if (PAD2.isConnected())
+      bt2 = PAD2.Up() | PAD2.Down() << 1 | PAD2.Left() << 2 | PAD2.Right() << 3 | PAD2.Cross() << 4 | PAD2.Circle() << 5 |
+            (PAD2.Options() && !PAD2.Share()) << 6 | (PAD2.L2Value() > 120) << 7;
+    edge |= bt2 & ~prevB2;
+    prevB2 = bt2;
+    bt |= bt2;
+    if (keysP2) lastInput = millis();
+  }
   if (edge) lastInput = millis();
   if (gNameEntry) nameInput(edge);  // saisie du nom
   else if (gDemo && gAttract) {  // mode demo : n'importe quel bouton ou le stick fait revenir le menu (sans autre effet)
-    if (gAttractHold) { if (!k && !bt) gAttractHold = false; }  // la croix qui a lance la demo est encore enfoncee
-    else if (edge || k) { gAttract = false; lastInput = millis(); sfxMenu(); prevB = 0xFF; }
+    if (gAttractHold) { if (!k && !bt && !keysP2) gAttractHold = false; }  // la croix qui a lance la demo est encore enfoncee
+    else if (edge || k || keysP2) { gAttract = false; lastInput = millis(); sfxMenu(); prevB = 0xFF; }
   } else if (gDemo) menuInput(edge);
   else if (edge & (64 | 128) && gLives > 0) { gPaused = !gPaused; sfxMenu(); }  // OPTIONS ou L2 : pause / reprise
   else if (gPaused && (edge & 32)) {  // pause + rond : on quitte la partie (score enregistre s'il entre au tableau)
