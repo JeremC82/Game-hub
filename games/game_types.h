@@ -18,3 +18,5 @@ struct AEn { float x, y, vx, vy; int16_t t; uint8_t type, pat, var; int8_t hp, f
 struct ZMob { float x, y, hd; int16_t hp; uint16_t t, walk; uint8_t type, state, flash, cool, dodgeT, burst, atk, strafeT, guard; int8_t dx; bool on; };  // BUNKER 3D : drone (0), sentinelle (1), colosse (2), colonne (3), baril (4)
 struct ZShot { float x, y, vx, vy; uint16_t t; bool on; };  // BUNKER 3D : plasma ennemi
 struct ZItem { uint8_t x, y, type; bool on; };  // BUNKER 3D : soin, munitions, armure, carte rouge, arme lourde
+struct VCar { float x, y, vy, tx; uint8_t type, col; int8_t lane; bool on, passed; };  // TURBO ROUTE : 0 voiture, 1 camion, 2 cone, 3 huile, 4 piece, 5 turbo
+struct VDeco { float y; int16_t x; uint8_t type; bool on; };  // TURBO ROUTE : decor du bord de la route

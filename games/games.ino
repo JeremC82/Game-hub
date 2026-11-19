@@ -28,7 +28,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "3.93"
+#define GAMES_VERSION "3.95"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -125,8 +125,8 @@ bool gAttract = false;              // mode demo : menu cache (ligne DEMO, ou 30
 #define MENU_IDLE_MS 30000UL        // menu sans activite : passage en mode demo
 bool menuScores = false;            // page des meilleurs scores affichee
 // numeros des jeux (ordre du menu)
-enum GameId : uint8_t { G_SPACE, G_RAID, G_RAQ, G_BUL, G_LAB, G_ORB, G_BRI, G_BLO, G_CRU, G_TAU, G_BIL, G_ESQ, G_BUN };
-#define N_GAMES 13
+enum GameId : uint8_t { G_SPACE, G_RAID, G_RAQ, G_BUL, G_LAB, G_ORB, G_BRI, G_BLO, G_CRU, G_TAU, G_BIL, G_ESQ, G_BUN, G_CAR };
+#define N_GAMES 14
 // ===== NOMS DES JEUX : a modifier ici, ils s'affichent dans le menu, les scores et la demo =====
 // Majuscules, sans accents (la police n'en a pas), 14 caracteres au plus. Garder l'ordre : il suit la liste GameId ci-dessus.
 // Au-dela de 10 caracteres, le menu affiche le nom seul (sans le mot JOUER devant).
@@ -144,9 +144,10 @@ const char *const GAME_NAME[N_GAMES] = {
   "BILLES",          // G_BIL
   "1945",      // G_ESQ
   "BUNKER 3D",       // G_BUN
+  "TURBO ROUTE",     // G_CAR
 };
 uint8_t gGame = 0;                  // jeu choisi dans le menu (gauche / droite sur la ligne JOUER)
-const char *topKey() { static const char *const K[N_GAMES] = { "top", "top1", "top3", "top4", "top5", "top7", "top8", "top9", "top10", "top11", "top12", "top14", "top15" }; return K[gGame % N_GAMES]; }  // top2 (COURSE), top6 (SAUTERELLE), top13 (ESCALADE) : jeux retires
+const char *topKey() { static const char *const K[N_GAMES] = { "top", "top1", "top3", "top4", "top5", "top7", "top8", "top9", "top10", "top11", "top12", "top14", "top15", "top16" }; return K[gGame % N_GAMES]; }  // top2 (COURSE), top6 (SAUTERELLE), top13 (ESCALADE) : jeux retires
 #define TOP_N 5
 HiScore gBest[TOP_N];                // meilleurs scores (gardes en memoire)
 uint8_t gLastRank = 0;              // place obtenue a la derniere partie (0 : hors tableau)
@@ -4780,6 +4781,7 @@ bool zKey = false, zHeavy = false, zMapOn = false, zPrevUse = false, zPrevSw = f
 int8_t zExitX = 0, zExitY = 0;
 char zMsg[24] = "";
 GFXcanvas16 *zHudCv = nullptr;
+bool zLow = false;  // dalle a 3 ou 4 bits de couleur : textures sans grain, couleurs franches, peu de brouillard
 int zHudKey = -1;
 int zVH() { return H - (H >= 128 ? 12 : 8); }  // hauteur de la vue 3D (barre d'etat en bas)
 
@@ -4829,8 +4831,16 @@ uint32_t zHash(uint32_t x) { x ^= x >> 16; x *= 0x7feb352d; x ^= x >> 15; x *= 0
 // textures des murs calculees a pleine resolution (32 points par case) : u, v de 0 a 1 ; id : variation de chaque mur
 void zTexel(int t, float u, float v, uint32_t id, float &r, float &g, float &b) {
   int px = (int)(u * 32), py = (int)(v * 32);
-  float n = (zHash(id * 1031 + py * 37 + px) & 31) - 16;  // grain fin
-  if (t == 1) {  // briques bleues en relief
+  float n = zLow ? 0 : (zHash(id * 1031 + py * 37 + px) & 31) - 16;  // grain fin (aucun sur une dalle a 3 ou 4 bits : il ferait du bruit)
+  if (t == 1 && zLow) {  // briques bleues pour une dalle a peu de couleurs : teintes franches, joints noirs, arete claire
+    int row = py / 5, iy = py % 5, bx = px + (row & 1) * 5, col = bx / 10, ix = bx % 10;
+    bool alt = zHash(id * 97 + row * 13 + col) & 1;
+    // (la dalle passe chaque couleur par une courbe de luminosite avant de garder 3 bits : en dessous de ~100, c'est noir)
+    if (ix == 9 || iy == 4) { r = 0; g = 0; b = 40; }
+    else if (iy == 0) { r = 150; g = 200; b = 255; }
+    else if (iy == 3) { r = 0; g = 60; b = 190; }
+    else { r = alt ? 90 : 40; g = alt ? 150 : 110; b = alt ? 235 : 255; }
+  } else if (t == 1) {  // briques bleues en relief
     int row = py / 5, iy = py % 5, bx = px + (row & 1) * 5, col = bx / 10, ix = bx % 10;
     uint32_t bh = zHash(id * 97 + row * 13 + col);
     if (ix == 9 || iy == 4) { r = 30; g = 36 + n * 0.2f; b = 62 + n * 0.3f; }  // joint sombre
@@ -5034,6 +5044,7 @@ void zRelease() {
   if (zD) { free(zD); zD = nullptr; }
 }
 void zReset() {
+  zLow = colorBits > 0 && colorBits <= 4;  // dalle a peu de couleurs : rendu simplifie, plus lisible
   if (!zAlloc()) { gGame = 0; topLoad(); gReset(); return; }  // pas assez de memoire : on joue au premier jeu
   gLives = (!gDemo && gDiff == 0) ? 5 : 3;
   gPaused = false;
@@ -5543,7 +5554,7 @@ void zDraw() {
     for (int i = 0; i < ns; i++)
       if (spr[i].art) lightAt(spr[i].wx, spr[i].wy, spr[i].lr, spr[i].lg, spr[i].lb);
   float *vigY = zD->vigY;  // vignettage : les bords de l'image un peu plus sombres
-  for (int y = 0; y < VH; y++) { float v = (y - VH / 2.0f) / (VH / 2.0f); vigY[y] = v * v * 0.28f; }
+  for (int y = 0; y < VH; y++) { float v = (y - VH / 2.0f) / (VH / 2.0f); vigY[y] = zLow ? 0 : v * v * 0.28f; }  // pas de vignettage a 3 ou 4 bits
   float *rowD = zD->rowD;
   for (int y = 0; y < VH; y++) rowD[y] = y == horizon ? 99 : (K * 0.5f) / fabsf(y - horizon + 0.5f);
   float light = 1 + (zFlash > 2 ? 0.25f : 0);
@@ -5580,14 +5591,15 @@ void zDraw() {
     int tex = min(hit, Z_TEXS - 1);
     float hX = zPX + rdx * dist, hY = zPY + rdy * dist, lr = 0, lg = 0, lb = 0;
     if (nl) lightAt(hX, hY, lr, lg, lb);  // lumiere recue par ce mur
-    float vx = (x - W / 2.0f) / (W / 2.0f), vigX = vx * vx * 0.28f;
+    float vx = (x - W / 2.0f) / (W / 2.0f), vigX = zLow ? 0 : vx * vx * 0.28f;
     float hurtK = 0;  // voile rouge : sur tout l'ecran, ou du cote d'ou vient le tir
     if (zHurt) {
       float side = zHurtDir < 0 ? -vx : zHurtDir > 0 ? vx : 0;
       hurtK = constrain(zHurt * (zHurtDir ? 0.02f + max(0.0f, side - 0.2f) * 0.09f : 0.05f), 0.0f, 0.85f);
     }
     uint32_t wid = mx * 131 + my * 71 + side * 7;
-    float fog = light / (1 + dist * dist * 0.035f), shade = (side ? 0.72f : 1.0f) * fog;
+    float fog = zLow ? max(0.65f, light / (1 + dist * dist * 0.012f)) : light / (1 + dist * dist * 0.035f);  // brouillard leger a 3 ou 4 bits
+    float shade = (side ? (zLow ? 0.8f : 0.72f) : 1.0f) * fog;
     for (int y = 0; y < VH; y++) {
       float r, g, b;
       if (y >= top && y < bot) {  // mur texture
@@ -5597,7 +5609,7 @@ void zDraw() {
         if (r > 200 && g > 200) s = max(s, 0.85f);  // lumieres : visibles meme de loin
         r = (r + lr) * s; g = (g + lg) * s; b = (b + lb) * s;
       } else {  // sol (dalles) et plafond (dalles avec plafonniers)
-        float rd = rowD[y], fx = zPX + rdx * rd, fy = zPY + rdy * rd, fg = light / (1 + rd * rd * 0.035f);
+        float rd = rowD[y], fx = zPX + rdx * rd, fy = zPY + rdy * rd, fg = zLow ? max(0.8f, light / (1 + rd * rd * 0.008f)) : light / (1 + rd * rd * 0.035f);
         int cx = (int)floorf(fx), cy = (int)floorf(fy);
         float ux = fx - cx, uy = fy - cy;
         bool edge = ux < 0.06f || uy < 0.06f;
@@ -5606,6 +5618,7 @@ void zDraw() {
           float sx = fx * 2 - floorf(fx * 2), sy = fy * 2 - floorf(fy * 2);
           int tn = zHash((int)floorf(fx * 2) * 57 + (int)floorf(fy * 2) * 113) & 15;
           float v = (sx < 0.05f || sy < 0.05f) ? 40 : (sx < 0.12f || sy < 0.12f) ? 105 + tn : 78 + tn + n / 2;
+          if (zLow) v = (sx < 0.06f || sy < 0.06f) ? 60 : 175;  // dalles du sol bien visibles a 3 ou 4 bits
           float wall = 1;
           if (cx >= 0 && cy >= 0 && cx < Z_N && cy < Z_N) {  // ombre au pied des murs (jamais hors de la carte)
             if (ux < 0.25f && zMap[cy][max(0, cx - 1)]) wall = min(wall, 0.55f + ux * 1.8f);
@@ -5619,7 +5632,7 @@ void zDraw() {
           float lx = ux - 0.5f, ly = uy - 0.5f, ld = lx * lx + ly * ly;
           if (lamp) { r = 255; g = 245; b = 210; fg = max(fg, 0.75f); }
           else {
-            float v = edge ? 25 : 48 + n / 2;
+            float v = zLow ? (edge ? 70 : 170) : edge ? 25 : 48 + n / 2;
             r = v; g = v; b = v + 4;
             if ((cx % 3 == 1) && (cy % 3 == 1) && ld < 0.25f) { float k = (0.25f - ld) * 4; r += 70 * k; g += 65 * k; b += 45 * k; }  // halo du plafonnier
           }
@@ -5637,7 +5650,7 @@ void zDraw() {
       if (s.ty >= dist) continue;
       int x0 = s.sx - s.w / 2;
       if (x < x0 || x >= x0 + s.w) continue;
-      float fog2 = light / (1 + s.ty * s.ty * 0.035f);
+      float fog2 = zLow ? 1.3f : light / (1 + s.ty * s.ty * 0.035f);  // a 3 ou 4 bits : objets eclaires, sinon ils tombent au noir
       if (s.art) {  // ombre au sol, sous l'objet
         float hw = s.w * 0.42f + 0.5f, du = (x - s.sx) / hw;
         if (du > -1 && du < 1) {
@@ -5739,6 +5752,416 @@ void zDraw() {
   gNOld = 0;  // tout l'ecran est redessine a chaque image
 }
 
+// ---------------------------------------------------------------- TURBO ROUTE
+// Jeu de voiture original vu de dessus : tu doubles voitures et camions sur une route a 3 ou 4 voies et tu evites
+// cones et taches d'huile. Gauche / droite pour braquer (au stick : proportionnel), X ou R2 (ou haut) accelerer,
+// bas freiner, rond : turbo (bidons bleus ramasses). Pieces : points. Huile : tete-a-queue. Bas-cote : ca secoue et
+// ca freine. Choc : une vie. Chaque stage : une distance a parcourir (barre en haut), decor qui change (campagne,
+// desert, neige, nuit), plus de circulation, des voitures qui changent de voie. Bruit du moteur selon la vitesse.
+// Poursuite : une fois par stage, la police surgit par l'arriere (sirene) ; tiens 15 s (+2000) ou fais-la percuter
+// une voiture, un camion ou un cone (+3000) ; si elle te touche, une vie.
+#define V_TOP 10   // bande du score
+#define V_CARS 14
+#define V_DECO 12
+struct VMem { VCar car[V_CARS]; VDeco deco[V_DECO]; };
+#define vCar (GMEM(VMem)->car)
+#define vDeco (GMEM(VMem)->deco)
+float vX = 0, vSpd = 1, vScroll = 0, vDist = 0, vGoal = 1, vGap = 0, vAcc = 0;
+int vLanes = 3, vLW = 13, vRoadL = 12, vInv = 0, vSpin = 0, vNitro = 0, vNitroT = 0;
+// poursuite : la police surgit par l'arriere une fois par stage (vCop 1 : elle te chasse, 2 : elle decroche)
+float vCopX = 0, vCopY = 0, vCopAt = 0;
+int vCop = 0, vCopT = 0, vMsgT = 0;
+const char *vMsg = "";
+int vS = 1;  // echelle : 2 sur un grand ecran (128x128 et plus), tout est dessine en double taille
+bool vPaint = true;
+struct VTheme { uint8_t grass[3], tuft[3], road[3]; };
+const VTheme V_TH[4] = { { { 40, 140, 50 }, { 25, 100, 35 }, { 70, 72, 80 } },      // campagne
+                         { { 205, 170, 95 }, { 170, 130, 70 }, { 84, 78, 74 } },     // desert
+                         { { 215, 225, 240 }, { 160, 175, 205 }, { 78, 80, 92 } },   // neige
+                         { { 12, 38, 22 }, { 8, 26, 14 }, { 30, 32, 42 } } };        // nuit
+int vTheme() { return (max(1, gWave) - 1) % 4; }
+int vPY() { return H - 14 * vS; }  // ta voiture : en bas de l'ecran
+float vLaneX(int l) { return vRoadL + l * vLW + vLW / 2.0f; }
+// voitures vues de dessus, nez vers le haut (7 de large) : B carrosserie, b sombre, k pneus, W vitres, L phares, R feux
+const char *const V_SPR_CAR[11] = { "..BBB..", ".BLBLB.", "kBBBBBk", "kBWWWBk", ".BWWWB.", ".BBBBB.", ".BBBBB.", ".BbWbB.", "kBBBBBk", "kRBBBRk", ".bbbbb." };
+const char *const V_SPR_TRUCK[17] = { ".SSSSS.", "kSLSLSk", "kSWWWSk", ".SSSSS.", "..kkk..", "BBBBBBB", "BhBBBhB", "BhBBBhB", "BBBBBBB", "BhBBBhB",
+                                      "BhBBBhB", "BBBBBBB", "BhBBBhB", "BhBBBhB", "kBBBBBk", "kRBBBRk", ".bbbbb." };
+const char *const V_SPR_CONE[5] = { "..o..", "..o..", ".oWo.", ".ooo.", "ooooo" };
+const char *const V_SPR_OIL[5] = { "..kk...", ".kkkkk.", "kkhkkkk", ".kkkkk.", "...kk.." };
+const char *const V_SPR_COIN[5] = { ".yyy.", "yWyyy", "yyyyy", "yyyyo", ".yoo." };
+const char *const V_SPR_CAN[6] = { ".kkk.", "bbbbb", "bWbbb", "bbbbb", "bbbbb", ".bbb." };
+const uint8_t V_W[6] = { 7, 7, 5, 7, 5, 5 }, V_H[6] = { 11, 17, 5, 5, 5, 6 };
+const uint8_t V_COL[8][3] = { { 40, 110, 255 }, { 255, 210, 0 }, { 40, 200, 80 }, { 230, 230, 235 }, { 170, 70, 230 }, { 255, 130, 0 }, { 0, 200, 220 }, { 150, 150, 160 } };
+
+void vSpr(const char *const *rows, int w, int h, int x, int y, uint16_t body, uint16_t dark, bool flash) {
+  for (int r = 0; r < h; r++)
+    for (int c = 0; c < w; c++) {
+      char ch = rows[r][c];
+      int px = x + c * vS, py = y + r * vS;
+      if (ch == '.' || px < 0 || px >= W || py < V_TOP || py >= H) continue;  // jamais sur la bande du score
+      uint16_t col;
+      switch (ch) {
+        case 'B': col = body; break;
+        case 'b': col = dark; break;
+        case 'h': col = (body >> 1 & 0x7BEF) + (rgb(255, 255, 255) >> 1 & 0x7BEF); break;  // reflet : moitie blanc
+        case 'k': col = rgb(18, 18, 22); break;
+        case 'W': col = rgb(150, 200, 240); break;
+        case 'L': col = rgb(255, 240, 170); break;
+        case 'R': col = rgb(255, 30, 20); break;
+        case 'S': col = rgb(190, 195, 205); break;
+        case 'o': col = rgb(255, 120, 0); break;
+        case 'y': col = rgb(255, 215, 0); break;
+        default: col = rgb(255, 255, 255); break;  // W blanc (cone, piece)
+      }
+      gfx->fillRect(px, py, vS, vS, flash ? rgb(255, 255, 255) : col);
+    }
+  gMark(x, y, w * vS, h * vS);
+}
+// fond (herbe, route) sur un rectangle : sert a effacer les objets d'une image a l'autre
+void vBg(int x0, int y0, int x1, int y1) {
+  if (y0 < V_TOP) {
+    gfx->fillRect(x0, y0, x1 - x0, min(y1, V_TOP) - y0, 0);
+    y0 = V_TOP;
+    if (y1 <= y0) return;
+  }
+  const VTheme &t = V_TH[vTheme()];
+  uint16_t grass = rgb(t.grass[0], t.grass[1], t.grass[2]), road = rgb(t.road[0], t.road[1], t.road[2]);
+  int rl = vRoadL - 3, rr = vRoadL + vLanes * vLW + 3;
+  auto seg = [&](int a, int b, uint16_t c) { a = max(a, x0); b = min(b, x1); if (b > a) gfx->fillRect(a, y0, b - a, y1 - y0, c); };
+  seg(0, rl, grass);
+  seg(rl, rr, road);
+  seg(rr, W, grass);
+}
+void vErase() {
+  if (gOverflow || vPaint) { gOverflow = false; vPaint = false; gNOld = 0; vBg(0, 0, W, H); return; }
+  for (int i = 0; i < gNOld; i++) {
+    GRect &rc = gOld[i];
+    int x0 = max(0, (int)rc.x), y0 = max(0, (int)rc.y), x1 = min(W, rc.x + rc.w), y1 = min(H, rc.y + rc.h);
+    if (x1 > x0 && y1 > y0) vBg(x0, y0, x1, y1);
+  }
+  gNOld = 0;
+}
+void vDecoNew(VDeco &d, float y) {  // arbre, touffe ou poteau sur le bord de la route (a gauche ou a droite)
+  int side = random(2), room = vRoadL - 3;
+  d.on = room >= 4;
+  d.y = y;
+  d.type = random(3);
+  d.x = side ? vRoadL + vLanes * vLW + 3 + random(max(1, room - 5 * vS)) : random(max(1, room - 5 * vS));
+}
+void vNewStage() {
+  gWave++;
+  gStageT = 100;
+  sndMelody(JINGLE_STAGE, 4);
+  vDist = 0;
+  vGoal = 3500 + 900 * min(gWave, 6);
+  vCop = 0;
+  vCopAt = vGoal * (gWave == 1 ? 0.55f : 0.25f + random(35) / 100.0f);  // la police arrive a un moment au hasard
+  vPaint = true;  // nouveau decor : tout l'ecran est repeint
+  for (auto &d : vDeco) vDecoNew(d, V_TOP + random(H - V_TOP));
+}
+void vReset() {
+  gLives = (!gDemo && gDiff == 0) ? 5 : 3;
+  gPaused = false;
+  gScore = 0; gWave = 0; gDead = 0; gBonus = 0; gLifeUp = false;
+  vS = (W >= 96 && H >= 128) ? 2 : 1;
+  vLanes = (W >= 96 && vS == 1) ? 4 : 3;
+  vLW = vS == 2 ? 24 : W >= 96 ? 18 : 13;
+  vRoadL = (W - vLanes * vLW) / 2;
+  vX = vLaneX(vLanes / 2); vSpd = 1.5f; vScroll = 0; vGap = 30; vAcc = 0;
+  vInv = 0; vSpin = 0; vNitro = 1; vNitroT = 0;
+  for (auto &c : vCar) c.on = false;
+  for (auto &b : gBoom) b.t = 0;
+  vNewStage();
+}
+// nouvel objet en haut de la route ; il reste toujours au moins une voie libre
+void vSpawn() {
+  bool busy[6] = {};
+  for (auto &c : vCar)
+    if (c.on && c.y < V_TOP + 26 * vS) busy[c.lane] = true;
+  int freeN = 0;
+  for (int l = 0; l < vLanes; l++) freeN += !busy[l];
+  if (freeN <= 1) return;
+  int l = random(vLanes);
+  for (int k = 0; k < vLanes && busy[l]; k++) l = (l + 1) % vLanes;
+  for (auto &c : vCar)
+    if (!c.on) {
+      int lvl = min(gWave, 8), r = random(100);
+      c = {};
+      c.on = true; c.lane = l;
+      c.type = r < 8 + lvl ? 1 : r < 14 + 2 * lvl ? 2 : r < 18 + 3 * lvl ? 3 : r < 26 + 3 * lvl ? 4 : r < 29 + 3 * lvl ? 5 : 0;
+      c.x = c.tx = vLaneX(l);
+      c.y = V_TOP - V_H[c.type] * vS - 2;
+      c.col = random(7);
+      if (c.type <= 1) c.vy = (0.7f + random(60) / 100.0f + 0.05f * lvl) * (c.type == 1 ? 0.8f : 1);
+      return;
+    }
+}
+// pilote automatique (demo) : choisit la voie la plus sure, double, ramasse pieces et turbos
+uint8_t vAuto() {
+  int py = vPY(), cur = constrain((int)((vX - vRoadL) / vLW), 0, vLanes - 1), best = cur;
+  float bestS = -1e9, curDanger = 0;
+  for (int l = 0; l < vLanes; l++) {
+    float s = -abs(l - cur) * 4.0f;
+    for (auto &c : vCar) {
+      if (!c.on || (c.lane != l && fabsf(c.x - vLaneX(l)) > vLW * 0.7f)) continue;
+      float d = (py - (c.y + V_H[c.type] * vS)) / vS;  // en points du dessin
+      if (d < -12 || d > 90) continue;
+      if (c.type >= 4) { s += 25; continue; }
+      float danger = d < 0 ? 900 : 1800 / (d + 8);
+      s -= danger;
+      if (l == cur) curDanger += danger;
+    }
+    if (s > bestS) { bestS = s; best = l; }
+  }
+  uint8_t k = 0;
+  float tx = vLaneX(best);
+  if (tx < vX - 1.2f) k |= 1;
+  if (tx > vX + 1.2f) k |= 2;
+  if (curDanger > 60 && best == cur) k |= 16;  // bouche : il freine
+  else k |= 4;
+  if (vNitro > 0 && !vNitroT && (vCop == 1 ? vCopY < vPY() + 30 * vS : bestS > -3 && random(400) == 0)) k |= 32;
+  return k;
+}
+void vStep() {
+  gFrame++;
+  if (vInv > 0) vInv--;
+  int py = vPY();
+  if (gDead > 0) {
+    vSpd *= 0.92f;
+    if (--gDead == 0) {
+      if (gLives <= 0) {
+        if (gDemo) vReset();
+        else if (gLastRank) startNameEntry();
+        else toDemo();
+        return;
+      }
+      vX = vLaneX(vLanes / 2); vSpd = 1.2f; vInv = 90; vSpin = 0; vNitroT = 0; vCop = 0;
+      for (auto &c : vCar)
+        if (c.on && c.y > V_TOP + 10) c.on = false;  // la route est degagee devant toi
+    }
+    return;
+  }
+  uint8_t k = gDemo ? vAuto() : keysPs4;
+  float steer = 0;
+  int sx = gDemo ? 0 : PS4.LStickX();
+  if (abs(sx) > 20) steer = sx / 127.0f;  // stick : braquage proportionnel
+  else steer = (k & 1) ? -1 : (k & 2) ? 1 : 0;
+  bool gas = (k & 4) || (k & 8), brake = (k & 16) != 0;
+  if ((k & 32) && vNitro > 0 && !vNitroT) { vNitro--; vNitroT = 120; sndPlay(200, 900, 400, 0.4f, true, 1); }
+  if (vSpin > 0) { vSpin--; steer = sinf(vSpin * 0.55f) * 0.9f; gas = false; }  // tete-a-queue sur l'huile
+  if (vNitroT > 0) { vNitroT--; vSpd = min(vSpd + 0.08f, 4.2f); }
+  else if (gas) vSpd = min(vSpd + 0.035f, 3.0f);
+  else if (brake) vSpd = max(vSpd - 0.09f, 0.5f);
+  else vSpd = max(vSpd - 0.012f, 1.0f);
+  if (!vNitroT && vSpd > 3.0f) vSpd -= 0.04f;
+  vX += steer * (0.8f + vSpd * 0.25f) * vS;
+  int rl = vRoadL, rr = vRoadL + vLanes * vLW;
+  vX = constrain(vX, (float)(rl + 1), (float)(rr - 2));
+  if (vX - 3 * vS < rl || vX + 3 * vS >= rr) {  // sur le bas-cote : ca secoue et ca freine
+    vSpd = max(0.8f, vSpd - 0.06f);
+    if (gFrame % 4 == 0) sndPlay(260, 180, 60, 0.2f, true, 0);
+  }
+  vScroll += vSpd * vS;
+  vDist += vSpd;
+  vAcc += vSpd;
+  while (vAcc >= 8) { vAcc -= 8; gScore++; }
+  vGap -= vSpd;
+  if (vGap <= 0) { vSpawn(); vGap = max(16, 44 - 3 * min(gWave, 8)) + random(18); }
+  int lvl = min(gWave, 8);
+  if (vMsgT > 0) vMsgT--;
+  if (!vCop && vCopAt > 0 && vDist >= vCopAt && gStageT == 0) {  // la police te prend en chasse
+    vCop = 1; vCopAt = 0; vCopT = 600; vCopX = vX; vCopY = H + 4 * vS;
+    vMsg = "POLICE !"; vMsgT = 80;
+  }
+  if (vCop) {
+    int cw = 7 * vS, ch = 11 * vS;
+    if (vCop == 1) {
+      float cs = 3.15f + 0.04f * lvl;  // un peu plus rapide que toi (sauf au turbo)
+      if (vCopY <= py + 2 * vS && cs > vSpd) cs = vSpd;  // elle reste derriere toi pour te percuter
+      vCopY -= (cs - vSpd) * vS;
+      vCopX += constrain((vX - vCopX) * 0.06f, -0.55f * vS, 0.55f * vS);  // elle se cale sur ta voie
+      if (gFrame % 10 == 0) sndPlay((gFrame / 10) & 1 ? 660 : 880, (gFrame / 10) & 1 ? 660 : 880, 110, 0.22f, false, 2);  // sirene
+      if (--vCopT <= 0) { vCop = 2; gScore += 2000; vMsg = "SEMEE ! +2000"; vMsgT = 80; sndMelody(JINGLE_ARME, 4); }
+      for (auto &c : vCar)  // elle percute une voiture, un camion ou un cone : police KO
+        if (vCop == 1 && c.on && c.type <= 2) {
+          int w = V_W[c.type] * vS, h = V_H[c.type] * vS;
+          if (vCopX + cw / 2 >= c.x - w / 2 && vCopX - cw / 2 <= c.x + w / 2 && vCopY + ch >= c.y && vCopY <= c.y + h) {
+            vCop = 0; c.on = false;
+            gBoomAt((int)vCopX, (int)vCopY + ch / 2); gBoomAt((int)c.x, (int)c.y + h / 2);
+            gScore += 3000; vMsg = "POLICE KO +3000"; vMsgT = 90;
+            sfxBoom();
+          }
+        }
+      if (vCop == 1 && !vInv && vX + 3 * vS >= vCopX - cw / 2 && vX - 3 * vS <= vCopX + cw / 2 && py + ch >= vCopY && py <= vCopY + ch) {
+        altLoseLife((int)vX, py + 5 * vS);  // attrape !
+        vCop = 2; vSpd = 0.6f; vNitroT = 0;
+      }
+    } else vCopY += (vSpd - 1.0f + 0.5f) * vS;  // elle abandonne et recule
+    if (vCop && (vCopY > H + 30 * vS || vCopY < V_TOP - 40 * vS)) vCop = 0;
+  }
+  for (auto &c : vCar) {
+    if (!c.on) continue;
+    c.y += (vSpd - c.vy) * vS;
+    if (c.type <= 1) {
+      if (fabsf(c.tx - c.x) > 0.3f * vS) c.x += c.tx > c.x ? 0.35f * vS : -0.35f * vS;  // changement de voie en cours
+      else if (gWave >= 2 && c.y > V_TOP && c.y < py - 30 * vS && random(1000) < 2 + lvl) {  // il change de voie (clignotant)
+        int nl = c.lane + (random(2) ? 1 : -1);
+        bool ok = nl >= 0 && nl < vLanes;
+        for (auto &o : vCar)
+          if (ok && o.on && &o != &c && o.lane == nl && fabsf(o.y - c.y) < 22 * vS) ok = false;
+        if (ok) { c.lane = nl; c.tx = vLaneX(nl); }
+      }
+    }
+    if (c.y > H + 2 || c.y < V_TOP - 60 * vS) { c.on = false; continue; }
+    if (!c.passed && c.type <= 1 && c.y > py + 11 * vS) { c.passed = true; gScore += 50; }  // doublee
+    int w = V_W[c.type] * vS, h = V_H[c.type] * vS;
+    if (vX + 3 * vS >= c.x - w / 2 && vX - 3 * vS <= c.x - w / 2 + w - 1 && py + 11 * vS - 1 >= c.y && py <= c.y + h - 1) {
+      if (c.type == 4) { c.on = false; gScore += 250; sndPlay(1800, 2600, 90, 0.3f, false, 1); }
+      else if (c.type == 5) { c.on = false; vNitro = min(3, vNitro + 1); sndMelody(JINGLE_ARME, 4); }
+      else if (c.type == 3) { if (!vSpin && !vInv) { vSpin = 32; vSpd *= 0.8f; sndPlay(2600, 1500, 350, 0.3f, true, 1); } }
+      else if (!vInv) { altLoseLife((int)vX, py + 5); c.on = false; vSpd = 0.6f; vNitroT = 0; }
+    }
+  }
+  if (!gDemo && gScore > gHi) gHi = gScore;
+  for (auto &d : vDeco)
+    if (d.on && (d.y += vSpd * vS) > H + 2) vDecoNew(d, V_TOP - 10 * vS - random(20 * vS));
+  if (vDist >= vGoal && gStageT == 0) { altStageClear(1000UL * gWave); vNewStage(); }
+  // bruit du moteur : un grondement grave relance en continu, plus aigu quand tu vas vite (turbo : encore plus)
+  if (gFrame % 3 == 0) {
+    float f = 42 + vSpd * 36 + (vNitroT ? 30 : 0);
+    sndPlay(f, f * 1.06f, 85, 0.13f + vSpd * 0.025f, false, 0);
+  }
+  if (gStageT > 0) gStageT--;
+}
+void vDraw() {
+  uint16_t palFull[9];
+  for (int i = 0; i < 9; i++) palFull[i] = rgb(G_PAL_RGB[i][0], G_PAL_RGB[i][1], G_PAL_RGB[i][2]);
+  vErase();
+  int th = vTheme(), py = vPY(), off = (int)vScroll;
+  const VTheme &t = V_TH[th];
+  uint16_t road = rgb(t.road[0], t.road[1], t.road[2]), line = th == 3 ? rgb(200, 200, 120) : rgb(235, 235, 235);
+  int rl = vRoadL, rr = vRoadL + vLanes * vLW;
+  // bas-cotes rouges et blancs, et lignes de voies en pointilles : redessines a chaque image (ils defilent)
+  int cp = 8 * vS, cw = 3;  // bandes des bas-cotes
+  for (int y = V_TOP - cp + off % cp; y < H; y += cp) {
+    int a = max(y, V_TOP), b = min(y + cp / 2, H);
+    if (b > a) { gfx->fillRect(rl - cw, a, cw, b - a, rgb(220, 30, 30)); gfx->fillRect(rr, a, cw, b - a, rgb(220, 30, 30)); }
+    a = max(y + cp / 2, V_TOP); b = min(y + cp, H);
+    if (b > a) { gfx->fillRect(rl - cw, a, cw, b - a, rgb(240, 240, 240)); gfx->fillRect(rr, a, cw, b - a, rgb(240, 240, 240)); }
+  }
+  for (int l = 1; l < vLanes; l++) {
+    int x = rl + l * vLW;
+    int dp = 12 * vS;  // pointilles
+    for (int y = V_TOP - dp + off % dp; y < H; y += dp) {
+      int a = max(y, V_TOP), b = min(y + dp / 2, H);
+      if (b > a) gfx->fillRect(x, a, vS, b - a, line);
+      a = max(y + dp / 2, V_TOP); b = min(y + dp, H);
+      if (b > a) gfx->fillRect(x, a, vS, b - a, road);
+    }
+  }
+  // decor sur l'herbe : arbres (pins en hiver, cactus au desert, reverberes la nuit), touffes, poteaux
+  uint16_t tuft = rgb(t.tuft[0], t.tuft[1], t.tuft[2]);
+  for (auto &d : vDeco) {
+    if (!d.on) continue;
+    int x = d.x, y = (int)d.y;
+    if (y + 8 * vS < V_TOP || y > H) continue;
+    auto px = [&](int a, int b, uint16_t c) {  // un point du dessin (vS x vS points sur la dalle)
+      int X = x + (a - x) * vS, Y = y + (b - y) * vS;
+      if (Y >= V_TOP && Y + vS <= H && X >= 0 && X + vS <= W) gfx->fillRect(X, Y, vS, vS, c);
+    };
+    if (d.type == 0) {
+      if (th == 1) {  // cactus
+        uint16_t g = rgb(40, 150, 60);
+        for (int k = 0; k < 6; k++) px(x + 2, y + k, g);
+        px(x, y + 2, g); px(x, y + 3, g); px(x + 1, y + 3, g); px(x + 4, y + 1, g); px(x + 4, y + 2, g); px(x + 3, y + 2, g);
+      } else if (th == 3) {  // reverbere et sa lumiere
+        for (int k = 1; k < 7; k++) px(x + 2, y + k, rgb(110, 110, 120));
+        px(x + 1, y, rgb(255, 240, 160)); px(x + 2, y, rgb(255, 255, 220)); px(x + 3, y, rgb(255, 240, 160));
+        px(x + 2, y - 1, rgb(160, 140, 60));
+      } else {  // arbre (pin enneige l'hiver)
+        uint16_t f = th == 2 ? rgb(30, 90, 60) : rgb(30, 120, 40), f2 = th == 2 ? rgb(240, 245, 255) : rgb(60, 170, 60);
+        for (int r = 0; r < 5; r++)
+          for (int c = 2 - r / 2; c <= 2 + r / 2; c++) px(x + c, y + r, (r == 0 || c == 2 - r / 2) ? f2 : f);
+        px(x + 2, y + 5, rgb(110, 70, 30)); px(x + 2, y + 6, rgb(110, 70, 30));
+      }
+      gMark(x, y - vS, 5 * vS, 8 * vS);
+    } else if (d.type == 1) {  // touffe d'herbe (ou caillou) : on voit le sol defiler
+      px(x, y, tuft); px(x + 2, y, tuft); px(x + 1, y + 1, tuft);
+      gMark(x, y, 3 * vS, 2 * vS);
+    } else {  // poteau blanc a bande rouge
+      px(x, y, rgb(240, 240, 240)); px(x, y + 1, rgb(220, 30, 30)); px(x, y + 2, rgb(240, 240, 240)); px(x, y + 3, rgb(150, 150, 150));
+      gMark(x, y, vS, 4 * vS);
+    }
+  }
+  // circulation et obstacles
+  for (auto &c : vCar) {
+    if (!c.on) continue;
+    int x = (int)c.x - V_W[c.type] * vS / 2, y = (int)c.y;
+    const uint8_t *cc = V_COL[c.col];
+    uint16_t body = rgb(cc[0], cc[1], cc[2]), dark = rgb(cc[0] / 2, cc[1] / 2, cc[2] / 2);
+    if (c.type == 0) vSpr(V_SPR_CAR, 7, 11, x, y, body, dark, false);
+    else if (c.type == 1) vSpr(V_SPR_TRUCK, 7, 17, x, y, body, dark, false);
+    else if (c.type == 2) vSpr(V_SPR_CONE, 5, 5, x, y, body, dark, false);
+    else if (c.type == 3) vSpr(V_SPR_OIL, 7, 5, x, y, rgb(70, 40, 110), dark, false);
+    else if (c.type == 4) vSpr(V_SPR_COIN, 5, 5, x, y, body, dark, (gFrame >> 2) % 6 == 0);
+    else vSpr(V_SPR_CAN, 5, 6, x, y, rgb(40, 110, 255), rgb(20, 55, 150), false);
+    if (c.type <= 1 && fabsf(c.tx - c.x) > 0.3f * vS && (gFrame & 4)) {  // clignotant du cote ou il va
+      int bx = c.tx > c.x ? x + 6 * vS : x, y1 = y + vS, y2 = y + (V_H[c.type] - 2) * vS;
+      if (y1 >= V_TOP && y1 + vS <= H) gfx->fillRect(bx, y1, vS, vS, rgb(255, 160, 0));
+      if (y2 >= V_TOP && y2 + vS <= H) gfx->fillRect(bx, y2, vS, vS, rgb(255, 160, 0));
+    }
+  }
+  if (vCop) {  // voiture de police : blanche et noire, gyrophare rouge et bleu
+    int x = (int)vCopX - 3 * vS, y = (int)vCopY;
+    vSpr(V_SPR_CAR, 7, 11, x, y, rgb(235, 235, 240), rgb(25, 25, 30), false);
+    bool ph = (gFrame >> 2) & 1;
+    for (int k = 0; k < 2; k++) {
+      int ly = y + 5 * vS;
+      if (ly >= V_TOP && ly + vS <= H) {
+        gfx->fillRect(x + (1 + k) * vS, ly, vS, vS, ph ? rgb(255, 30, 30) : rgb(90, 0, 0));
+        gfx->fillRect(x + (4 + k) * vS, ly, vS, vS, ph ? rgb(0, 0, 90) : rgb(40, 90, 255));
+      }
+    }
+  }
+  // ta voiture (rouge), clignote apres un choc ; flammes du turbo ; phares la nuit
+  if (gDead == 0 && !(vInv > 0 && (gFrame & 4))) {
+    int x = (int)vX - 3 * vS;
+    if (th == 3) {  // faisceau des phares
+      for (int r = 1; r <= 10 * vS; r++)
+        for (int c = -r / 3; c <= 7 * vS - 1 + r / 3; c++)
+          if (((c + r) & 1) && py - r >= V_TOP && x + c >= 0 && x + c < W) gfx->drawPixel(x + c, py - r, rgb(90, 85, 40));
+      gMark(x - 4 * vS, py - 10 * vS, 15 * vS, 10 * vS);
+    }
+    vSpr(V_SPR_CAR, 7, 11, x, py, rgb(230, 30, 30), rgb(120, 10, 10), false);
+    if (vNitroT > 0) {  // flammes du turbo
+      int fl = (2 + (gFrame & 3)) * vS;
+      for (int k = 0; k < fl; k++) {
+        if (py + 11 * vS + k >= H) break;
+        uint16_t fc = k < 2 * vS ? rgb(255, 255, 160) : rgb(255, 120, 0);
+        gfx->fillRect(x + 2 * vS, py + 11 * vS + k, vS, 1, fc);
+        gfx->fillRect(x + 4 * vS, py + 11 * vS + k, vS, 1, fc);
+      }
+      gMark(x + 2 * vS, py + 11 * vS, 3 * vS, 5 * vS);
+    }
+  }
+  if (vMsgT > 0 && ((vMsgT & 8) || vCop != 1)) {  // message : POLICE !, SEMEE !, POLICE KO
+    int tw = tinyWidth(vMsg), mx = (W - tw) / 2, my = V_TOP + 3;
+    gfx->fillRect(mx - 2, my - 2, tw + 4, 9, 0);
+    tinyText(*gfx, mx, my, vMsg, vCop == 1 ? rgb(255, 60, 60) : rgb(255, 220, 0));
+    gMark(mx - 2, my - 2, tw + 4, 9);
+  }
+  // barre de progression du stage (sous le score) et turbos en reserve (en bas a gauche)
+  int fw = (int)(W * min(1.0f, vDist / vGoal));
+  gfx->drawFastHLine(0, V_TOP - 2, W, rgb(40, 40, 50));
+  if (fw > 0) gfx->drawFastHLine(0, V_TOP - 2, fw, rgb(0, 200, 255));
+  for (int i = 0; i < vNitro; i++) {
+    gfx->fillRect(1 + i * 4, H - 4, 3, 3, rgb(40, 110, 255));
+    gMark(1 + i * 4, H - 4, 3, 3);
+  }
+  altBooms(palFull);
+  altHud(palFull);
+}
+
 // taille du bloc memoire de chaque jeu (0 : rien a reserver)
 size_t gMemSize(uint8_t g) {
   switch (g) {
@@ -5752,6 +6175,7 @@ size_t gMemSize(uint8_t g) {
     case G_TAU: return sizeof(DMem);
     case G_BIL: return sizeof(PMem);
     case G_ESQ: return sizeof(AMem);
+    case G_CAR: return sizeof(VMem);
     default: return 0;
   }
 }
@@ -5782,6 +6206,7 @@ void altReset() {
     case G_TAU: dReset(); break;
     case G_BIL: pReset(); break;
     case G_ESQ: aReset(); break;
+    case G_CAR: vReset(); break;
     default: zReset(); break;
   }
 }
@@ -5800,6 +6225,7 @@ void altStep() {
     case G_TAU: dStep(); break;
     case G_BIL: pStep(); break;
     case G_ESQ: aStep(); break;
+    case G_CAR: vStep(); break;
     default: zStep(); break;
   }
 }
@@ -5817,6 +6243,7 @@ void altDraw() {
     case G_TAU: dDraw(); break;
     case G_BIL: pDraw(); break;
     case G_ESQ: aDraw(); break;
+    case G_CAR: vDraw(); break;
     default: zDraw(); break;
   }
 }

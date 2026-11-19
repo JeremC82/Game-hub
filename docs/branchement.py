@@ -89,9 +89,9 @@ class Sheet:
 
 
 # ================================================================ jeu : ESP32 -> dalles
-s = Sheet(2000, 1560, 'Game hub - branchement des dalles et du son',
+s = Sheet(2000, 2010, 'Game hub - branchement des dalles, du son, du bouton et des manettes USB',
           'ESP32 DevKit (38 broches) - meme brochage dalle que l\'horloge ClockV1 et le VU-metre - manette PS4 en Bluetooth (sans fil)')
-LEFT = [('5V / VIN', '5v'), ('GND', 'gnd'), ('GPIO22', 'snd')]
+LEFT = [('5V / VIN', '5v'), ('GND', 'gnd'), ('GPIO22', 'snd'), ('GPIO34', 'btn'), ('GPIO36 (VP)', 'usb')]
 RIGHT = [('GPIO25', 'R1'), ('GPIO26', 'G1'), ('GPIO27', 'B1'), ('GPIO14', 'R2'), ('GPIO12', 'G2'), ('GPIO13', 'B2'),
          ('GPIO23', 'A'), ('GPIO19', 'B'), ('GPIO5', 'C'), ('GPIO17', 'D'), ('GPIO32', 'E'), ('GPIO16', 'CLK'),
          ('GPIO4', 'LAT'), ('GPIO15', 'OE'), ('GND', 'GND')]
@@ -186,5 +186,64 @@ oy = y + 40 + 4 * (VH + 14) + 20
 s.text(40, oy, 'Commande c NDFS du moniteur serie : 1 a 4 dalles, l\'une sous l\'autre, cote a cote ou carre 2x2 (4 dalles).', FB)
 s.text(40, oy + 32, '- Ecran retourne (180) : la 1re dalle est en bas (ou a droite), ou tout l\'ensemble est monte a l\'envers.', FS)
 s.text(40, oy + 58, '- Une dalle sur deux retournee (serpentin) : les dalles 2 et 4 sont tournees de 180 pour garder des nappes courtes.', FS)
+# broches 34 et 36 : reperes A et B, detail en bas de la page
+for key, tag, col in (('btn', 'A', GREEN), ('usb', 'B', BLUE)):
+    x, y = lp[key]
+    s.wire([(x, y), (706, y)], col, 4)
+    s.d.ellipse((682, y - 12, 706, y + 12), fill=col)
+    s.text(694, y, tag, FB, (255, 255, 255), 'mm')
+
+by = 1580
+# (A) bouton d'association
+s.box(40, by, 960, by + 400, '(A) Bouton d\'association (bouton "config wifi" du shield, comme l\'horloge)', (238, 250, 240))
+s.text(80, by + 70, '3,3 V', FB, RED, 'lm')
+s.wire([(150, by + 70), (300, by + 70)], RED, 4)
+s.d.rectangle((300, by + 52, 380, by + 88), outline=INK, width=3, fill=(255, 255, 255))
+s.text(340, by + 70, 'bouton', FS, INK, 'mm')
+s.wire([(380, by + 70), (560, by + 70)], GREEN, 4)
+s.dot(560, by + 70, GREEN)
+s.text(580, by + 70, 'GPIO34 de l\'ESP32 (A)', FB, GREEN, 'lm')
+s.wire([(470, by + 70), (470, by + 120)], INK, 3)
+s.d.rectangle((455, by + 120, 485, by + 180), outline=INK, width=3, fill=(255, 255, 255))
+s.text(500, by + 150, '10 kOhm vers la masse (deja sur le shield)', FS, INK, 'lm')
+s.wire([(470, by + 180), (470, by + 205)], INK, 3)
+s.gnd(470, by + 207)
+for i, t in enumerate(('Un appui : mode association 60 s (la dalle affiche ASSOCIATION, son coupe,',
+                       'luminosite a 10 %). Seul moment ou une nouvelle manette peut s\'associer.',
+                       'Les manettes deja associees se reconnectent toujours avec PS.',
+                       'GPIO 34 : entree seule, sans tirage interne : la resistance est obligatoire.',
+                       'Aussi : commande m du moniteur serie.')):
+    s.text(80, by + 250 + i * 28, t, FS, GREY if i >= 3 else INK)
+
+# (B) manettes en USB par un RP2040-Zero
+bx = 1000
+s.box(bx, by, 1960, by + 400, '(B) Manettes USB (option) : RP2040-Zero', (238, 244, 255))
+s.d.rounded_rectangle((bx + 40, by + 70, bx + 200, by + 150), 10, outline=INK, width=3, fill=(255, 255, 255))
+s.text(bx + 120, by + 100, 'Manette', FB, INK, 'mm')
+s.text(bx + 120, by + 126, 'PS4, PS5, Xbox', FS, GREY, 'mm')
+s.arrow([(bx + 200, by + 110), (bx + 300, by + 110)], GREY, 4)
+s.text(bx + 250, by + 92, 'cable USB', FS, GREY, 'mb')
+s.d.rounded_rectangle((bx + 300, by + 80, bx + 420, by + 140), 8, outline=INK, width=3, fill=(250, 250, 250))
+s.text(bx + 360, by + 110, 'OTG', FB, INK, 'mm')
+s.text(bx + 360, by + 160, 'adaptateur USB-C', FS, GREY, 'mt')
+s.text(bx + 360, by + 182, 'femelle A', FS, GREY, 'mt')
+s.wire([(bx + 420, by + 110), (bx + 470, by + 110)], INK, 4)
+s.d.rounded_rectangle((bx + 470, by + 60, bx + 680, by + 220), 12, outline=INK, width=3, fill=(220, 236, 255))
+s.text(bx + 575, by + 84, 'RP2040-Zero', FB, BLUE, 'mm')
+for i, (pin, col) in enumerate((('5V', RED), ('GND', INK), ('GP0 (TX)', BLUE))):
+    y = by + 125 + i * 32
+    s.d.rectangle((bx + 680, y - 6, bx + 692, y + 6), fill=INK)
+    s.text(bx + 668, y, pin, FS, col, 'rm')
+for i, (t, col) in enumerate((('+5 V commun', RED), ('GND commun', INK), ('GPIO36 / VP de l\'ESP32 (B)', BLUE))):
+    y = by + 125 + i * 32
+    s.wire([(bx + 692, y), (bx + 740, y)], col, 4)
+    s.dot(bx + 740, y, col)
+    s.text(bx + 752, y, t, FS, col, 'lm')
+for i, t in enumerate(('Le RP2040 lit la manette en USB et envoie ses touches a l\'ESP32 par un seul fil',
+                       '(liaison serie 3,3 V : TX du RP2040 -> GPIO 36, une entree libre de l\'ESP32).',
+                       'Avantages : plus de decrochage Bluetooth, la manette se recharge en jouant.',
+                       'A faire : programme du RP2040 et prise en charge dans le Game hub',
+                       '(les manettes Bluetooth continueront de marcher a cote).')):
+    s.text(bx + 40, by + 250 + i * 28, t, FS, RED if i >= 3 else INK)
 s.save('branchement-dalles.png')
 

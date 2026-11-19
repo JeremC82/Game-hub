@@ -12,6 +12,7 @@ from PIL import Image, ImageDraw, ImageFont
 DOC = os.path.dirname(os.path.abspath(__file__))
 SRC = open(os.path.join(DOC, '..', 'games', 'games.ino'), encoding='utf-8').read()
 W, H = 128, 64
+LOW = False  # dalle a 3 ou 4 bits de couleur : rendu simplifie du firmware (zLow)
 HUDH = 8
 VH = H - HUDH
 
@@ -48,7 +49,19 @@ def zhash(x):
 
 def texel(t, u, v, wid, frame):  # zTexel du firmware
     px, py = int(u * 32), int(v * 32)
-    n = (zhash(wid * 1031 + py * 37 + px) & 31) - 16
+    n = 0 if LOW else (zhash(wid * 1031 + py * 37 + px) & 31) - 16
+    if t == 1 and LOW:
+        row, iy = py // 5, py % 5
+        bx = px + (row & 1) * 5
+        col, ix = bx // 10, bx % 10
+        alt = zhash(wid * 97 + row * 13 + col) & 1
+        if ix == 9 or iy == 4:
+            return 0, 0, 40
+        if iy == 0:
+            return 150, 200, 255
+        if iy == 3:
+            return 0, 60, 190
+        return (90, 150, 235) if alt else (40, 110, 255)
     if t == 1:
         row, iy = py // 5, py % 5
         bx = px + (row & 1) * 5
@@ -300,12 +313,12 @@ def render(px_, py_, a, frame, sprites, weapon=0, flash=0, bob=0.0, hurt=0, hurt
         wx = hx - math.floor(hx)
         lh = int(K / dist)
         top = horizon - lh // 2
-        fog = light / (1 + dist * dist * .035)
-        shade = (0.72 if side else 1.0) * fog
+        fog = max(.65, light / (1 + dist * dist * .012)) if LOW else light / (1 + dist * dist * .035)
+        shade = ((0.8 if LOW else 0.72) if side else 1.0) * fog
         wid = mx * 131 + my * 71 + side * 7
         lr, lg, lb = light_at(px_ + rdx * dist, py_ + rdy * dist)
         vx_ = (x - W / 2) / (W / 2)
-        vgx = vx_ ** 2 * .28
+        vgx = 0 if LOW else vx_ ** 2 * .28
         hk = 0
         if hurt:
             sd = -vx_ if hurt_dir < 0 else vx_ if hurt_dir > 0 else 0
@@ -323,7 +336,7 @@ def render(px_, py_, a, frame, sprites, weapon=0, flash=0, bob=0.0, hurt=0, hurt
             else:
                 rd = (K * .5) / abs(y - horizon + .5)
                 fx, fy = px_ + rdx * rd, py_ + rdy * rd
-                fg = light / (1 + rd * rd * .035)
+                fg = max(.8, light / (1 + rd * rd * .008)) if LOW else light / (1 + rd * rd * .035)
                 cx, cy = math.floor(fx), math.floor(fy)
                 ux, uy = fx - cx, fy - cy
                 n = zhash(cx * 73 + cy * 151 + (y > horizon) * 7) & 15
@@ -331,6 +344,8 @@ def render(px_, py_, a, frame, sprites, weapon=0, flash=0, bob=0.0, hurt=0, hurt
                     sx2, sy2 = fx * 2 - math.floor(fx * 2), fy * 2 - math.floor(fy * 2)
                     tn = zhash(math.floor(fx * 2) * 57 + math.floor(fy * 2) * 113) & 15
                     v = 40 if (sx2 < .05 or sy2 < .05) else (105 + tn if (sx2 < .12 or sy2 < .12) else 78 + tn + n / 2)
+                    if LOW:
+                        v = 60 if (sx2 < .06 or sy2 < .06) else 175
                     wl = 1
                     if ux < .25 and wall(cx - 1, cy):
                         wl = min(wl, .55 + ux * 1.8)
@@ -348,7 +363,7 @@ def render(px_, py_, a, frame, sprites, weapon=0, flash=0, bob=0.0, hurt=0, hurt
                         r, g, b = 255, 245, 210
                         fg = max(fg, .75)
                     else:
-                        v = 25 if (ux < .06 or uy < .06) else 48 + n / 2
+                        v = (70 if (ux < .06 or uy < .06) else 170) if LOW else (25 if (ux < .06 or uy < .06) else 48 + n / 2)
                         r, g, b = v, v, v + 4
                         if cx % 3 == 1 and cy % 3 == 1 and ld < .25:
                             k = (.25 - ld) * 4
@@ -357,7 +372,7 @@ def render(px_, py_, a, frame, sprites, weapon=0, flash=0, bob=0.0, hurt=0, hurt
                     a_, c_, e_ = light_at(fx, fy)
                     r, g, b = r + a_ * .6, g + c_ * .6, b + e_ * .6
                 r, g, b = r * fg, g * fg, b * fg
-            vg = 1 - vgx - ((y - VH / 2) / (VH / 2)) ** 2 * .28
+            vg = 1 - vgx - (0 if LOW else ((y - VH / 2) / (VH / 2)) ** 2 * .28)
             r, g, b = r * vg, g * vg, b * vg
             if hk:
                 r, g, b = r + (255 - r) * hk, g * (1 - hk), b * (1 - hk)
@@ -368,7 +383,7 @@ def render(px_, py_, a, frame, sprites, weapon=0, flash=0, bob=0.0, hurt=0, hurt
             x0 = ssx - sw // 2
             if not x0 <= x < x0 + sw:
                 continue
-            f2 = light / (1 + ty * ty * .035)
+            f2 = 1.3 if LOW else light / (1 + ty * ty * .035)
             if art:  # ombre au sol
                 hw = sw * .42 + .5
                 du = (x - ssx) / hw
@@ -417,7 +432,7 @@ def render(px_, py_, a, frame, sprites, weapon=0, flash=0, bob=0.0, hurt=0, hurt
                     continue
                 shd = .68 if (ax + 1 >= aw or row[ax + 1] == '.') else 1.3 if (ax == 0 or row[ax - 1] == '.') else 1.25 if (ay == 0 or art[ay - 1][ax] == '.') else 1.0
                 f = f2 * shd * (1.12 - .3 * ay / ah)
-                col[y] = (c[0] * f + slr * f2 * .45, c[1] * f + slg * f2 * .45, c[2] * f + slb * f2 * .45)
+                col[y] = tuple(min(255, v) for v in (c[0] * f + slr * f2 * .45, c[1] * f + slg * f2 * .45, c[2] * f + slb * f2 * .45))
         if gx <= x < gx + gw:
             ax = (x - gx) // gs
             for y in range(max(0, gy), VH):

@@ -6,9 +6,9 @@ Jeux d'arcade sur 1 à 4 dalles LED 128x64, avec un ESP32 classique et une **man
 - **Partition unique de 3 Mo :** il reste de la place pour d'autres jeux.
 - **Son en option :** une broche PWM vers un petit ampli et un haut-parleur.
 
-**13 jeux originaux**, à choisir dans le menu (gauche / droite sur la ligne JOUER). Au démarrage, c'est toujours **SPACE DEFENDER** qui est proposé.
+**14 jeux originaux**, à choisir dans le menu (gauche / droite sur la ligne JOUER). Au démarrage, c'est toujours **SPACE DEFENDER** qui est proposé.
 
-Les 13 jeux ont en commun les niveaux de difficulté, les stages, les vies, les meilleurs scores avec les noms et la démo automatique.
+Les 14 jeux ont en commun les niveaux de difficulté, les stages, les vies, les meilleurs scores avec les noms et la démo automatique.
 
 
 ## Deux manettes (Bluepad32)
@@ -18,7 +18,7 @@ Depuis la V3.84, le Game-hub utilise **Bluepad32** : jusqu'à **4 manettes Bluet
 - **Menu « JOUEURS 1 / 2 »** (2e ligne, une étoile par manette connectée) : seuls les jeux à deux joueurs utilisent la 2e manette.
   - **RAQUETTES** : match à deux (raquette de droite pour le joueur 2), **le premier à 7 points gagne**.
   - **SPACE DEFENDER** : coopération, un 2e vaisseau **vert** pour le joueur 2, vies et score communs ; les ennemis piquent sur l'un ou l'autre ; la manette du joueur touché vibre.
-- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V3.93_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
+- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V3.95_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
 - **Mémoire** : environ 81 Ko libres avec 2 dalles en 3 bits et deux manettes connectées.
 
 # SPACE DEFENDER
@@ -214,6 +214,7 @@ Un shoot vertical original au-dessus de la mer (V3.85, remplace ESCALADE ; nouve
 
 Un jeu de tir original **en vue subjective** (V3.88) : tu avances dans une base souterraine comme si tu y étais.
 - **Moteur 3D** (lancer de rayons, calculé colonne par colonne, sans effacement donc sans scintillement) : murs texturés calculés à pleine résolution, sol en dalles et plafond avec plafonniers en perspective, brouillard avec la distance, ombre en haut et en bas des murs et le long des murs au sol, balancement de la marche.
+- **Dalle à 3 ou 4 bits de couleur (V3.95) :** rendu adapté automatiquement : briques à teintes franches sans grain, sol et plafond assez clairs pour ne pas tomber au noir, peu de brouillard, robots éclairés. (La bibliothèque des dalles applique une courbe de luminosité avant de garder 3 bits : toute teinte sous ~100 devenait noire.)
 - **Murs :** briques bleues en relief (V3.91 : dans toutes les salles), arêtes éclairées, joints sombres, certaines briques noircies, appliques lumineuses avec halo ; portes coulissantes à bandes jaunes, porte rouge fermée à clé, panneau de sortie vert.
 - **Commandes :** stick gauche (ou croix) pour avancer, reculer et faire un pas de côté, **stick droit** (ou croix gauche / droite) pour pivoter, **L1 / R1** pas de côté, **✕ ou R2 tirer**, **□ ouvrir une porte / actionner la sortie**, **○ changer d'arme**, **△ mini-carte**. L2 ou OPTIONS : pause.
 - **Ennemis (robots originaux dessinés en 24 × 24, V3.89) :** drone flottant à l'œil rouge rond (rotor qui tourne, bras-canons, flamme du réacteur), sentinelle à visière cyan et canons d'épaule, colosse blindé (casque, épaulières, poings) qui frappe au contact. **Volume** (bord éclairé, bord dans l'ombre, lumière du plafond), **ombre au sol**, éclairés par le plasma et les explosions ; leurs yeux et voyants brillent dans le noir. Les épaves **fument**.
@@ -224,6 +225,21 @@ Un jeu de tir original **en vue subjective** (V3.88) : tu avances dans une base 
 - **Barils explosifs :** un tir les fait sauter ; l'explosion détruit les robots autour (et te blesse si tu es trop près), et fait sauter les barils voisins en chaîne.
 - **Objets :** soin (+30), munitions (+25), armure (+50, encaisse la moitié des dégâts), **carte rouge** (ouvre la porte rouge et actionne la sortie), arme lourde (3 tirs en éventail, 3 munitions).
 - **Stages :** chaque stage est un nouveau bunker (salles reliées par des couloirs et des portes), avec plus de robots. Barre du bas (dégradé métal, cases séparées) : vie, armure, munitions avec **jauges** (la vie passe du vert au rouge, écran 128x128), carte, vies, score.
+
+### TURBO ROUTE
+
+![TURBO ROUTE](docs/jeu-turbo.gif)
+
+Un jeu de voiture original vu de dessus (V3.94) : tu doubles voitures et camions sur une route à 3 ou 4 voies.
+- **Commandes :** gauche / droite pour braquer (au **stick**, braquage proportionnel), **✕, R2 ou haut accélérer**, **bas freiner**, **○ turbo** (flammes, vitesse maximale plus haute).
+- **À éviter :** voitures et camions (qui changent de voie avec leur clignotant à partir du stage 2), **cônes**, **taches d'huile** (tête-à-queue). Le bas-côté secoue et freine.
+- **À ramasser :** **pièces** (+250) et **bidons bleus** de turbo (3 au plus, en bas à gauche). Chaque voiture doublée : +50.
+- **Poursuite :** une fois par stage, **la police surgit par l'arrière**, gyrophare rouge et bleu et sirène. Elle est un peu plus rapide que toi et se cale sur ta voie pour te percuter : tiens **15 s** (« SEMEE ! +2000 »), ou fais-la percuter une voiture, un camion ou un cône que tu viens de doubler (« POLICE KO +3000 »). Le turbo te permet de la distancer.
+- **Stages :** une distance à parcourir (barre bleue sous le score) ; le décor change : **campagne, désert** (cactus), **neige** (sapins), **nuit** (réverbères, faisceau des phares). Plus de circulation à chaque stage.
+- **Son :** **bruit de moteur** qui monte avec la vitesse (et le turbo), crissement sur l'huile, grondement sur le bas-côté, sirène de la police.
+- **Grand écran (128x128 et plus) :** tout est dessiné en double taille.
+
+![Les 4 décors de TURBO ROUTE](docs/turbo-decors.png)
 
 ### CRUCH
 
@@ -248,7 +264,7 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. **La démo cha
 
 | Ligne | Action |
 |---|---|
-| **JOUER** | **gauche / droite : choix du jeu** (13 jeux ; leurs noms se changent dans le tableau `GAME_NAME` en haut de `games/games.ino`). Au démarrage : le premier jeu de la liste. ✕ ou OPTIONS lance la partie. |
+| **JOUER** | **gauche / droite : choix du jeu** (14 jeux ; leurs noms se changent dans le tableau `GAME_NAME` en haut de `games/games.ino`). Au démarrage : le premier jeu de la liste. ✕ ou OPTIONS lance la partie. |
 | **NIVEAU** | Facile / Normal / Difficile (gauche / droite ou ✕), choix gardé en mémoire |
 | **LUMINOSITE** | 0 à 100 % par pas de 10 % (gauche / droite ou ✕), visible tout de suite et gardée en mémoire. À 0 %, les dalles restent très faiblement allumées pour qu'on voie encore le menu. |
 | **VOLUME** | volume du son, 0 à 100 % par pas de 10 % (gauche / droite ou ✕). Un bip fait entendre le niveau. 0 % = muet. C'est le rapport cyclique du PWM : le potentiomètre de l'ampli règle le maximum. |
@@ -334,7 +350,10 @@ De la V2.01 à la V2.22, le son passait par un ampli I2S MAX98357A (GPIO 22, 21,
 
 ## Branchement
 
-![Branchement des dalles et du son](docs/branchement-dalles.png)
+![Branchement des dalles, du son, du bouton et des manettes USB](docs/branchement-dalles.png)
+
+- **(A) Bouton d'association** : le bouton « config wifi » du shield de l'horloge, sur la **GPIO 34** (3,3 V par le bouton, 10 kΩ vers la masse sur le shield).
+- **(B) Manettes USB (option, à venir)** : un **RP2040-Zero** lit la manette en USB (adaptateur OTG) et envoie ses touches à l'ESP32 par un seul fil, sur la **GPIO 36 (VP)**, plus le 5 V et la masse. Le programme du RP2040 et sa prise en charge dans le Game hub restent à écrire.
 
 | Écran | Dalles | Montage (ordre de la chaîne) | Commande |
 |---|---|---|---|
@@ -378,8 +397,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V3.93_complet.bin](firmware/GameHub_V3.93_complet.bin) | 0x0 | `3c167f6391edc483098d31541bd36d35` |
-| [firmware/GameHub_V3.93.bin](firmware/GameHub_V3.93.bin) | 0x10000 | `5665e868b952c32adcb0ac1280461ddb` |
+| [firmware/GameHub_V3.95_complet.bin](firmware/GameHub_V3.95_complet.bin) | 0x0 | `e47f88ca24b614fc492c3b84b95f63c9` |
+| [firmware/GameHub_V3.95.bin](firmware/GameHub_V3.95.bin) | 0x10000 | `b9ff28f0064b6a38bbe1f9f3075446c6` |
 | [firmware/GameHub_V3.86_complet.bin](firmware/GameHub_V3.86_complet.bin) | 0x0 | `dc451b01c498df647da822a1427a1a5e` |
 | [firmware/GameHub_V3.86.bin](firmware/GameHub_V3.86.bin) | 0x10000 | `ee1945d390b91eb82240245a1e52821f` |
 
@@ -397,6 +416,6 @@ Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB S
 - **Carte :** installée avec la configuration `build/bp32/arduino-cli.yaml` (adresse du paquet Bluepad32 ajoutée). Le programme d'essai `bp32test/` affiche l'état des manettes et la mémoire libre.
 - **Bibliothèques :** ESP32-HUB75-MatrixPanel-I2S-DMA et Adafruit GFX ; Bluepad32 est fourni avec la carte.
 - **Manettes :** une petite couche d'adaptation (`PadShim`) garde les noms `PS4.Cross()`, `PS4.LStickX()`... utilisés par les jeux ; `PAD2` lit la 2e manette. L'ancienne bibliothèque PS4Controller (une seule manette, adresse de la console à recopier) reste dans l'historique Git (V3.70, commit `11e9556`).
-- **Plans, aperçus et GIF :** `python docs/branchement.py`, `python docs/rendu.py`, `python docs/gif_manette_ps4.py`, `python docs/gif_arrivee.py`, `python docs/gif_menus.py`, `python docs/gif_jeux.py [raid raquettes bulles labyrinthe orbite briques blocs cruch taupe billes escadrille]`, `python docs/branchement_son.py` (Pillow).
+- **Plans, aperçus et GIF :** `python docs/branchement.py`, `python docs/rendu.py`, `python docs/gif_manette_ps4.py`, `python docs/gif_arrivee.py`, `python docs/gif_menus.py`, `python docs/gif_jeux.py [raid raquettes bulles labyrinthe orbite briques blocs cruch taupe billes escadrille]`, `python docs/gif_bunker.py`, `python docs/gif_turbo.py`, `python docs/branchement_son.py` (Pillow).
 
 L'ancienne version avec wifi, page web et manette ESP-NOW reste disponible dans l'historique Git, jusqu'au commit `fb11367`.
