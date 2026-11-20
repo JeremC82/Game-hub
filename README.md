@@ -47,7 +47,7 @@ Depuis la V3.84, le Game-hub utilise **Bluepad32** : jusqu'à **4 manettes Bluet
 - **Menu « JOUEURS 1 / 2 »** (2e ligne, une étoile par manette connectée) : seuls les jeux à deux joueurs utilisent la 2e manette.
   - **RAQUETTES** : match à deux (raquette de droite pour le joueur 2), **le premier à 7 points gagne**.
   - **SPACE DEFENDER** : coopération, un 2e vaisseau **vert** pour le joueur 2, vies et score communs ; les ennemis piquent sur l'un ou l'autre ; la manette du joueur touché vibre.
-- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V4.23_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
+- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V4.25_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
 - **Mémoire** : environ 81 Ko libres avec 2 dalles en 3 bits et deux manettes connectées.
 
 # SPACE DEFENDER
@@ -242,7 +242,7 @@ Un shoot vertical original au-dessus de la mer (V3.85, remplace ESCALADE ; nouve
 - **Ton avion :** un chasseur **vert foncé** à étoiles blanches (V3.93 ; les chasseurs ennemis sont rouge brique), hélice qui tourne, avec un **contour sombre** et une **ombre sur la mer** pour bien le voir. Les avions ennemis ont aussi leur ombre.
 - **Ennemis :** des chasseurs (rouge brique, argent ou jaunes) en V, en vague sinueuse, par le côté ou en piqué ; des **bombardiers bimoteurs** qui tirent en éventail ; des **navires** qui avancent sur la mer (vague d'étrave, sillage d'écume, tourelles qui suivent ton avion) : vedette, destroyer à cheminées qui fument, et **porte-avions** (pont gris, îlot, avions posés) qui fait décoller des chasseurs.
 - **Capsules :** **P** jaune = arme (2, 3, 4 puis 5 tirs en éventail), **T** bleue = un tonneau de plus, **+** rouge = une vie (laissée par le porte-avions). Une vie perdue fait baisser l'arme d'un niveau.
-- **Boss :** après 10 vagues, chacun son tour (V4.23, d'après des dessins fournis) : **bimoteur rouge à double poutre**, **grand quadrimoteur kaki**, **aile volante bleue** aux moteurs jaunes ; il tire peu (éventail de 3 balles et un tir visé de temps en temps) ; sous la moitié de sa vie, il bouge plus vite, tire en éventail de 5 et en spirale lente.
+- **Boss :** après 10 vagues, chacun son tour (V4.23, d'après des dessins fournis) : **bimoteur rouge à double poutre**, **grand quadrimoteur kaki** (ailes en dégradé, cocardes, capots cerclés de rouge), **aile volante bleue** aux moteurs jaunes, chacun avec ses grandes hélices qui tournent ; il glisse sans à-coups de gauche à droite ; il tire peu (éventail de 3 balles et un tir visé de temps en temps) ; sous la moitié de sa vie, il bouge plus vite, tire en éventail de 5 et en spirale lente.
 - **Points :** chasseur 100, piqueur 150, vedette 300, bombardier 500, destroyer 600, porte-avions 1500, boss 2000 × le stage.
 
 ### BUNKER 3D
@@ -323,11 +323,11 @@ Une course sur circuit originale (V4.14) **vue en relief et en biais**, comme SC
 
 ![VORTEX 3D](docs/jeu-vortex3d.gif)
 
-Un tir sur route en 3D original (V4.21 à V4.23) : la route flotte dans l'espace et file vers l'horizon, avec ses **virages en S**, ses **bosses** et sa **plongée** au loin derrière la crête ; une planète à anneau se lève sur l'horizon.
+Un tir sur route en 3D original (V4.21 à V4.25, plus rapide et nouveau vaisseau en V4.24) : la route flotte dans l'espace et file vers l'horizon, avec ses **virages en S**, ses **bosses** et sa **plongée** au loin derrière la crête ; une planète à anneau se lève sur l'horizon.
 - **Commandes :** gauche / droite (ou stick) pour se déplacer, **haut / bas pour la vitesse**, **✕ pour tirer**, **○ pour sauter**. Dans les virages, la route te pousse vers l'extérieur.
 - **Obstacles :** caisses (2 tirs, ou sauter par-dessus), mines (sauter ou tirer), **murs** avec une ouverture où passer, **piliers** violets indestructibles à éviter, **trous** dans la route (à sauter, à partir du stage 2), **soucoupes** qui reculent devant toi et tirent ; **orbe** jaune : double tir 10 s.
 - **Stages :** une distance à parcourir (barre verte en haut), puis stage suivant : plus vite, plus d'obstacles, autres couleurs (route, rails, planète).
-- **Graphisme :** route en bandes de couleur, rails néon, voies en pointillés, poteaux lumineux qui défilent, objets à l'échelle de la distance ; vaisseau en flèche avec cockpit et réacteurs, son ombre sur la route quand il saute. Image dessinée en mémoire (32 Ko pendant le jeu seulement) : pas de scintillement.
+- **Graphisme :** route en bandes de couleur et bandes noires (moitié moins de LED allumées : moins de courant pour les dalles), rails néon, voies en pointillés, poteaux lumineux qui défilent, objets à l'échelle de la distance ; vaisseau vu de derrière (dôme vitré, ailes en métal, ailerons rouges, deux réacteurs aux flammes qui vacillent) qui s'incline dans les virages, son ombre sur la route quand il saute. Image dessinée en mémoire (32 Ko pendant le jeu seulement) : pas de scintillement.
 
 ![VORTEX 3D : stages 1, 2 et 3](docs/vortex3d-rendus.png)
 
@@ -490,8 +490,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V4.23_complet.bin](firmware/GameHub_V4.23_complet.bin) | 0x0 | `3491b3ab1ff2696b249367d51378cc20` |
-| [firmware/GameHub_V4.23.bin](firmware/GameHub_V4.23.bin) | 0x10000 | `8952aad1ef3a1b9c0faa2e660275be2a` |
+| [firmware/GameHub_V4.25_complet.bin](firmware/GameHub_V4.25_complet.bin) | 0x0 | `9eedc4368d4942878b6d4f0f3d133910` |
+| [firmware/GameHub_V4.25.bin](firmware/GameHub_V4.25.bin) | 0x10000 | `6d455aa70b5948ba27d71986bbf894ad` |
 | [firmware/GameHub_V3.86_complet.bin](firmware/GameHub_V3.86_complet.bin) | 0x0 | `dc451b01c498df647da822a1427a1a5e` |
 | [firmware/GameHub_V3.86.bin](firmware/GameHub_V3.86.bin) | 0x10000 | `ee1945d390b91eb82240245a1e52821f` |
 

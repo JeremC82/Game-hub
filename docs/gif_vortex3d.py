@@ -14,9 +14,11 @@ sys.path.insert(0, DOC)
 import gif_bunker as GB  # noqa: E402
 
 W = H = 128
+import re  # noqa: E402
+SHIP_SPR = re.findall(r'"([^"]*)"', re.search(r'VX_SHIP_SPR\[14\] = \{(.*?)\};', open(os.path.join(DOC, '..', 'games', 'games.ino'), encoding='utf-8').read(), re.S).group(1))
 SHIP = 6.0
-RA = [(0, 170, 255), (230, 40, 200), (40, 220, 90), (255, 150, 0)]
-RB = [(0, 0, 160), (150, 0, 150), (0, 150, 60), (170, 40, 0)]
+RA = [(0, 150, 220), (190, 0, 170), (0, 180, 60), (220, 110, 0)]
+RB = [(0, 0, 0)] * 4
 RL = [(255, 255, 255), (255, 230, 0), (255, 255, 255), (255, 255, 120)]
 PL = [(230, 120, 40), (60, 170, 255), (220, 60, 200), (150, 220, 255)]
 
@@ -24,9 +26,9 @@ PL = [(230, 120, 40), (60, 170, 255), (220, 60, 200), (150, 220, 255)]
 class Game:
     def __init__(self, wave=1, seed=5):
         self.rnd = random.Random(seed)
-        self.wave, self.pos, self.spd, self.x, self.z, self.vz = wave, 0.0, .3, 0.0, 0.0, 0.0
+        self.wave, self.pos, self.spd, self.x, self.z, self.vz = wave, 0.0, .46 + .035 * wave, 0.0, 0.0, 0.0
         self.curve, self.target, self.ct, self.nxt, self.frame, self.score = 0.0, 0.0, 0, 20.0, 0, 1200 * wave
-        self.objs, self.shots, self.dbl, self.head = [], [], 0, 0.0
+        self.objs, self.shots, self.dbl, self.head, self.bank = [], [], 0, 0.0, 0.0
 
     def spawn(self):
         r, d = self.rnd.randrange(100), self.pos + 46
@@ -65,7 +67,9 @@ class Game:
                     tx = o[1] - .6 if o[1] > 0 else o[1] + .6
                 else:
                     tx = o[1]
-        self.x += .045 * (-1 if tx < self.x - .06 else 1 if tx > self.x + .06 else 0)
+        st_ = -1 if tx < self.x - .06 else 1 if tx > self.x + .06 else 0
+        self.x += .06 * st_
+        self.bank += (st_ - self.bank) * .2
         self.x = max(-1.05, min(1.05, self.x - curv(self, self.pos + SHIP) * self.spd * 4))
         if jump and self.z == 0:
             self.vz = .085
@@ -233,18 +237,22 @@ def render(g):
         if dz > 4:
             x, y = int(cxf(dz) + s[1] * S / dz), int(yf(dz)) - int(.2 * S / dz)
             d.rectangle((x, y, x + max(1, int(.05 * S / dz)) - 1, y + max(1, int(.15 * S / dz)) - 1), fill=(120, 255, 255))
-    sx, sy, s = W // 2, int(yf(SHIP)), 2
+    sx, sy = W // 2, int(yf(SHIP))
     jz = int(g.z * S / SHIP * .6)
-    d.rounded_rectangle((sx - 16 + jz // 4, sy - 1, sx + 15 - jz // 4, sy + 1), 1, fill=(0, 0, 0))
-    y = sy - 8 - jz
-    d.polygon([(sx - 18, y + 8), (sx + 18, y + 8), (sx, y - 6)], fill=(220, 225, 240))
-    d.polygon([(sx, y + 8), (sx + 18, y + 8), (sx, y - 6)], fill=(150, 155, 175))
-    d.rectangle((sx - 18, y + 4, sx - 13, y + 7), fill=(255, 40, 60))
-    d.rectangle((sx + 13, y + 4, sx + 18, y + 7), fill=(255, 40, 60))
-    d.polygon([(sx - 4, y + 4), (sx + 4, y + 4), (sx, y - 2)], fill=(0, 200, 255))
-    fl = (255, 230, 0) if g.frame & 2 else (255, 120, 0)
-    d.rectangle((sx - 10, y + 8, sx - 7, y + 9 + (g.frame & 1)), fill=fl)
-    d.rectangle((sx + 6, y + 8, sx + 9, y + 9 + ((g.frame >> 1) & 1)), fill=fl)
+    sw = 15 - jz // 6
+    d.rounded_rectangle((sx - sw, sy - 1, sx + sw, sy + 1), 1, fill=(0, 0, 0))
+    x0, y0, fl = sx - 15, sy - 15 - jz, g.frame & 2
+    pix = im.load()
+    for r, line in enumerate(SHIP_SPR):
+        for c, ch in enumerate(line):
+            if ch == '.' or (r == 13 and fl):
+                continue
+            col = {'k': (20, 20, 30), 'W': (255, 255, 255), 'L': (225, 230, 245), 'S': (170, 175, 195), 's': (150, 150, 170),
+                   'R': (255, 40, 60), 'c': (0, 170, 255), 'C': (160, 240, 255),
+                   'o': (255, 230, 0) if fl else (255, 120, 0)}.get(ch, (255, 120, 0) if fl else (255, 230, 0))
+            px, py = x0 + c, y0 + r + round((c - 15) * g.bank * .18)
+            if 0 <= px < W and 0 <= py < H:
+                pix[px, py] = col
     d.rectangle((0, 0, W, 7), fill=(0, 0, 0))
     GB.tiny(d, 1, 1, 'S%d' % g.wave, (255, 220, 0))
     sc_ = 'SCORE %d' % g.score

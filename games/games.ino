@@ -28,7 +28,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "4.23"
+#define GAMES_VERSION "4.25"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -4377,6 +4377,7 @@ uint16_t aIsS[2];  // forme de chaque ile (graine)
 int aTier = 0, aCool = 0, aGroups = 0, aSpawnT = 0, aInv = 0, aRoll = 0, aRolls = 3;
 bool aBoss = false, aPrevRoll = false, aPaint = true;
 float aBX, aBY;
+float aBPh = 0;  // phase du va-et-vient du boss
 int8_t aBKind = 0;  // boss : 0 bimoteur rouge, 1 quadrimoteur kaki, 2 aile volante (chacun son tour selon le stage)
 int aBHp, aBMax, aBT = 0, aBFlash = 0;
 // sprites : B/b bleu, W blanc, y/o helice et feu, c vitrage, k sombre, G/g couleur de l'ennemi (vert, argent, jaune),
@@ -4393,8 +4394,8 @@ const char *const SPR_A_BOMBER[11] = {  // bombardier bimoteur : dessus eclaire 
 // boss (dessins fournis) : bimoteur rouge a double poutre, grand quadrimoteur kaki, aile volante bleue ; 2 images (helices)
 const char *const SPR_A_BOSS0[2][20] = { { ".........................", ".....kkkkkkkkkkkkkkk.....", ".....kRRRRRRRRRRRRRk.....", ".....kRkkkkkkkkkkkRk.....", ".....kRk.........kRk.....", ".....kRk.........kRk.....", ".....kRk.........kRk.....", ".....kRk..kkkkk..kRk.....", "..kkkkRkkkkRRRkkkkRkkkk..", ".kRRRRRRRRkRRRkRRRRRRRRk.", "kRRRRRRRRRkRRRkRRRRRRRRRk", "krrrrrRrrrkRRRkrrrRrrrrrk", ".kkkkRRRkkkRcRkkkRRRkkkk.", ".....kWk..kRcRk..kWk.....", ".....kWk..kRcRk..kWk.....", "......y...kRRRk...y......", "..........kRRRk..........", "..........kRRRk..........", "...........kRk...........", "............k............" },
   { ".........................", ".....kkkkkkkkkkkkkkk.....", ".....kRRRRRRRRRRRRRk.....", ".....kRkkkkkkkkkkkRk.....", ".....kRk.........kRk.....", ".....kRk.........kRk.....", ".....kRk.........kRk.....", ".....kRk..kkkkk..kRk.....", "..kkkkRkkkkRRRkkkkRkkkk..", ".kRRRRRRRRkRRRkRRRRRRRRk.", "kRRRRRRRRRkRRRkRRRRRRRRRk", "krrrrrRrrrkRRRkrrrRrrrrrk", ".kkkkRRRkkkRcRkkkRRRkkkk.", ".....kWk..kRcRk..kWk.....", ".....kWk..kRcRk..kWk.....", "......W...kRRRk...W......", "..........kRRRk..........", "..........kRRRk..........", "...........kRk...........", "............k............" } };
-const char *const SPR_A_BOSS1[2][24] = { { "..................k..................", ".................kOk.................", "...........kkkkkkOOOkkkkkk...........", "..........kQQQQQQOOOQQQQQQk..........", "..........kOOOOOOOOOOOOOOOk..........", "...........kkkkkkOOOkkkkkk...........", "................kOOOk................", "..........kkkkkkkOOOkkkkkkk..........", "....kkkkkkQQQQQQQOOOQQQQQQQkkkkkk....", "kkkkQQQQQQOOOOOOOOOOOOOOOOOQQQQQQkkkk", "kQQQOOOOOOOOOOOOOOOOOOOOOOOOOOOOOQQQk", "kOOOOOkLkOOkLkOOOOOOOOOkLkOOkLkOOOOOk", "kOOOOOkLkOOkLkOOOOOOOOOkLkOOkLkOOOOOk", ".kkkkkkLkkkkLkkOOOOOOOkkLkkkkLkkkkkk.", "......kLk..kLk.kOOOOOk.kLk..kLk......", "......kWk..kWk.kOOOOOk.kWk..kWk......", "......kWk..kWk.kOOOOOk.kWk..kWk......", ".......y....y...kccck...y....y.......", "................kccck................", "................kccck................", ".................kck.................", ".................kWk.................", ".................kyk.................", "..................k.................." },
-  { "..................k..................", ".................kOk.................", "...........kkkkkkOOOkkkkkk...........", "..........kQQQQQQOOOQQQQQQk..........", "..........kOOOOOOOOOOOOOOOk..........", "...........kkkkkkOOOkkkkkk...........", "................kOOOk................", "..........kkkkkkkOOOkkkkkkk..........", "....kkkkkkQQQQQQQOOOQQQQQQQkkkkkk....", "kkkkQQQQQQOOOOOOOOOOOOOOOOOQQQQQQkkkk", "kQQQOOOOOOOOOOOOOOOOOOOOOOOOOOOOOQQQk", "kOOOOOkLkOOkLkOOOOOOOOOkLkOOkLkOOOOOk", "kOOOOOkLkOOkLkOOOOOOOOOkLkOOkLkOOOOOk", ".kkkkkkLkkkkLkkOOOOOOOkkLkkkkLkkkkkk.", "......kLk..kLk.kOOOOOk.kLk..kLk......", "......kWk..kWk.kOOOOOk.kWk..kWk......", "......kWk..kWk.kOOOOOk.kWk..kWk......", ".......W....W...kccck...W....W.......", "................kccck................", "................kccck................", ".................kck.................", ".................kWk.................", ".................kWk.................", "..................k.................." } };
+const char *const SPR_A_BOSS1[2][24] = { { "..................k..................", ".................kQk.................", "...........kkkkkkQOQkkkkkk...........", "..........kyQQQQQQOQQQQQQyk..........", "..........kyOOOOOOPOOOOOOyk..........", "...........kkkkkkQPQkkkkkk...........", "................kQOQk................", "..........kkkkkkkQOQkkkkkkk..........", "....kkkkkkQQQQQQQQOQQQQQQQQkkkkkk....", "kkkkQQQQQQQQQQQQQQOQQQQQQQQQQQQQQkkkk", "kyQuuuOOOOOOOOOOQOOOQOOOOOOOOOOuuuQyk", "kOOuWuRLROORLROOQOOOQOORLROORLRuWuOOk", "kPPuuuPLPPPPLPPPQOOOQPPPLPPPPLPuuuPPk", ".kkkkkkLkkkkLkkPQOPOQPkkLkkkkLkkkkkk.", "......kLk..kLk.kQOPOQk.kLk..kLk......", "......kWk..kWk.kQOPOQk.kWk..kWk......", "......kWk..kWk.kQPPPQk.kWk..kWk......", ".......y....y...kccck...y....y.......", "................kWcWk................", "................kccck................", ".................kck.................", ".................kWk.................", ".................kyk.................", "..................k.................." },
+  { "..................k..................", ".................kQk.................", "...........kkkkkkQOQkkkkkk...........", "..........kyQQQQQQOQQQQQQyk..........", "..........kyOOOOOOPOOOOOOyk..........", "...........kkkkkkQPQkkkkkk...........", "................kQOQk................", "..........kkkkkkkQOQkkkkkkk..........", "....kkkkkkQQQQQQQQOQQQQQQQQkkkkkk....", "kkkkQQQQQQQQQQQQQQOQQQQQQQQQQQQQQkkkk", "kyQuuuOOOOOOOOOOQOOOQOOOOOOOOOOuuuQyk", "kOOuWuRLROORLROOQOOOQOORLROORLRuWuOOk", "kPPuuuPLPPPPLPPPQOOOQPPPLPPPPLPuuuPPk", ".kkkkkkLkkkkLkkPQOPOQPkkLkkkkLkkkkkk.", "......kLk..kLk.kQOPOQk.kLk..kLk......", "......kWk..kWk.kQOPOQk.kWk..kWk......", "......kWk..kWk.kQPPPQk.kWk..kWk......", ".......W....W...kccck...W....W.......", "................kWcWk................", "................kccck................", ".................kck.................", ".................kWk.................", ".................kyk.................", "..................k.................." } };
 const char *const SPR_A_BOSS2[2][16] = { { "........kkk.......kkk........", ".......kyyyk.....kyyyk.......", ".......kyyyk.kkk.kyyyk.......", "kkkkkkkkyyykkUUUkkyyykkkkkkkk", "kyyUUUUkykykUUUUUkykykUUUUyyk", "kyUUUUUUkkkUUUUUUUkkkUUUUUUyk", ".kUUUUUUUUUUuUUUuUUUUUUUUUUk.", "..kUUUUUUUUUuUUUuUUUUUUUUUk..", "...kUUUkkUUUuUUUuUUUkkUUUk...", "....kUUUUUUUuUcUuUUUUUUUk....", ".....kUUUUUUuUcUuUUUUUUk.....", "......kUUUUUuUUUuUUUUUk......", ".......kkUUUuUUUuUUUkk.......", ".........kkUuUUUuUkk.........", "...........kkUUUkk...........", ".............kkk............." },
   { "........kkk.......kkk........", ".......kyyyk.....kyyyk.......", ".......kyyyk.kkk.kyyyk.......", "kkkkkkkkyyykkUUUkkyyykkkkkkkk", "kyyUUUUkWkWkUUUUUkWkWkUUUUyyk", "kWUUUUUUkkkUUUUUUUkkkUUUUUUWk", ".kUUUUUUUUUUuUUUuUUUUUUUUUUk.", "..kUUUUUUUUUuUUUuUUUUUUUUUk..", "...kUUUkkUUUuUUUuUUUkkUUUk...", "....kUUUUUUUuUcUuUUUUUUUk....", ".....kUUUUUUuUcUuUUUUUUk.....", "......kUUUUUuUUUuUUUUUk......", ".......kkUUUuUUUuUUUkk.......", ".........kkUuUUUuUkk.........", "...........kkUUUkk...........", ".............kkk............." } };
 const char *const *const SPR_A_BOSS[3][2] = { { SPR_A_BOSS0[0], SPR_A_BOSS0[1] }, { SPR_A_BOSS1[0], SPR_A_BOSS1[1] }, { SPR_A_BOSS2[0], SPR_A_BOSS2[1] } };
@@ -4419,8 +4420,9 @@ uint16_t aCol(char ch, uint8_t var) {
     case 'g': return rgb(G[var % 3][1][0], G[var % 3][1][1], G[var % 3][1][2]);
     case 'S': return rgb(188, 192, 202);  // assez clair pour une dalle a 3 bits
     case 'L': return rgb(235, 240, 250);  // metal eclaire (dessus des gros avions)
-    case 'O': return rgb(150, 170, 30);   // kaki (quadrimoteur)
-    case 'Q': return rgb(200, 220, 80);   // kaki eclaire
+    case 'O': return rgb(170, 190, 40);   // kaki (quadrimoteur)
+    case 'Q': return rgb(215, 235, 100);  // kaki eclaire (bord d'attaque, reflet du fuselage)
+    case 'P': return rgb(160, 150, 0);    // kaki sombre (bord de fuite)
     case 'R': return rgb(235, 30, 30);    // rouge (bimoteur)
     case 'r': return rgb(160, 0, 0);
     case 'U': return rgb(60, 150, 255);   // bleu (aile volante)
@@ -4609,7 +4611,7 @@ void aStep() {
     if (aGroups < A_GROUPS) {
       if (--aSpawnT <= 0) { aSpawnGroup(); aSpawnT = 120; }
     } else if (!any) {
-      aBoss = true; aBT = 0; aBKind = (gWave - 1) % 3; aBX = W / 2 - aBW() / 2; aBY = -aBH() - 1;
+      aBoss = true; aBT = 0; aBPh = 0; aBKind = (gWave - 1) % 3; aBX = W / 2 - aBW() / 2; aBY = -aBH() - 1;
       aBMax = aBHp = (50 + 25 * gWave) * (gEffDiff() + 1) / 2;
       sfxDive();
     }
@@ -4685,7 +4687,10 @@ void aStep() {
     if (aBFlash > 0) aBFlash--;
     bool phase2 = aBHp < aBMax / 2;
     if (aBY < 14) aBY += 0.4f;
-    else aBX = W / 2 - aBW() / 2 + sinf(aBT * (phase2 ? 0.03f : 0.018f)) * (W / 2 - aBW() / 2 - 3);
+    else {  // va-et-vient : la phase avance en continu (plus vite en 2e phase) -> pas de saut quand il accelere
+      aBPh += phase2 ? 0.03f : 0.018f;
+      aBX = W / 2 - aBW() / 2 + sinf(aBPh) * (W / 2 - aBW() / 2 - 3);
+    }
     if (aBY >= 14) {
       if (aBT % max(55, int((phase2 ? 70 : 95) / diff)) == 0) aSpread(aBX + aBW() / 2, aBY + aBH(), phase2 ? 5 : 3, 1.1f * diff);
       if (aBT % 90 == 45) aAimed((aBT / 90) & 1 ? aBX + aBW() - 5 : aBX + 4, aBY + aBH() - 5, 1.4f * diff);
@@ -4788,6 +4793,17 @@ void aProp(int x, int y, int phase) {
   aP(x + PX[f], y + PY[f], tip);
   aP(x, y, blade);
   gMark(x - 1, y - 1, 3, 3);
+}
+void aPropBig(int x, int y, int phase) {  // grande helice des boss : pale de 5 points qui tourne, moyeu jaune
+  static const int8_t PX[4] = { 2, 2, 0, -2 }, PY[4] = { 0, 1, 1, 1 };
+  int f = phase & 3;
+  uint16_t blade = rgb(215, 215, 225), tip = rgb(255, 255, 255);
+  aP(x - PX[f], y - PY[f], tip);
+  aP(x + PX[f], y + PY[f], tip);
+  aP(x - PX[f] / 2, y - PY[f] / 2 - (f == 2 ? 1 : 0), blade);
+  aP(x + PX[f] / 2, y + PY[f] / 2 + (f == 2 ? 1 : 0), blade);
+  aP(x, y, rgb(255, 210, 0));
+  gMark(x - 2, y - 2, 5, 5);
 }
 void aTurret(int x, int y, uint16_t c) {  // tourelle ronde, canon tourne vers ton avion
   aDisc(x, y, 1, c);
@@ -5011,7 +5027,12 @@ void aDraw() {
       aProp((int)e.x + 11, (int)e.y + 9, (gFrame >> 1) + 1);
     }
   if (aBoss) {
-    aSpr(SPR_A_BOSS[aBKind][(gFrame >> 1) & 1], aBW(), aBH(), (int)aBX, (int)aBY, 0, aBFlash);  // helices qui tournent
+    aSpr(SPR_A_BOSS[aBKind][(gFrame >> 1) & 1], aBW(), aBH(), (int)aBX, (int)aBY, 0, aBFlash);
+    static const int8_t BP[3][4][2] = { { { 6, 15 }, { 18, 15 }, { -1, 0 }, { -1, 0 } },      // helices : bimoteur rouge,
+                                        { { 7, 17 }, { 12, 17 }, { 24, 17 }, { 29, 17 } },   // quadrimoteur kaki,
+                                        { { 9, 5 }, { 19, 5 }, { -1, 0 }, { -1, 0 } } };     // aile volante (devant les moteurs)
+    for (int i = 0; i < 4; i++)
+      if (BP[aBKind][i][0] >= 0) aPropBig((int)aBX + BP[aBKind][i][0], (int)aBY + BP[aBKind][i][1], (gFrame >> 1) + i);
     int bw = W - 20, fill = bw * max(0, aBHp) / aBMax;  // barre de vie
     gfx->drawRect(10, A_TOP + 1, bw, 3, rgb(90, 90, 110));
     gfx->fillRect(10, A_TOP + 2, fill, 1, aBHp < aBMax / 2 ? palFull[7] : palFull[1]);
@@ -7442,15 +7463,17 @@ void xrDraw() {
 #define VX_N 16
 #define VX_SH 6
 #define VX_EB 6
-#define VX_LEN 650.0f   // longueur d'un stage
+#define VX_LEN 1100.0f  // longueur d'un stage
 #define VX_SHIP 6.0f    // distance du vaisseau devant la camera
 VxObj vxO[VX_N];
 struct VxShot { float d, x; bool on; } vxS[VX_SH], vxE[VX_EB];
 float vxPos = 0, vxSpd = 0.3f, vxX = 0, vxZ = 0, vxVZ = 0, vxCurve = 0, vxCurveT = 0, vxNext = 30, vxStageD = 0;
+float vxBank = 0;
 int vxCool = 0, vxDouble = 0, vxInv = 0, vxFlashT = 0;
 bool vxPrevJump = false;
 float vxS0() { return W * 2.25f; }                                  // echelle horizontale a distance 1
 float vxYH() { return H * 0.30f; }                                  // ligne d'horizon
+const char *const VX_SHIP_SPR[14] = { "...............k...............", "..............kWk..............", ".............kCcCk.............", "............kCcccCk............", "k..........kCcccccCk..........k", "kk........kLLLLLLLLLk........kk", "kRk......kLLLLLLLLLLLk......kRk", "kRRk...kkLLLLLLLLLLLLLkk...kRRk", "kRWRkkkLLLLLSSSSSSSLLLLLkkkRWRk", "kRRRRLLLLLLSSSsssSSSLLLLLLRRRRk", ".kkRRSSSSSSSkkkkkkkSSSSSSSRRkk.", "...kkkkkkkkkoyokoyokkkkkkkkk...", "............yoy.yoy............", ".............o...o............." };  // ton vaisseau, vu de derriere
 // route : virages (courbure qui s'accumule) et bosses ; projection recalculee a chaque image (echantillons de pres a loin)
 #define VX_NP 56
 float vxPZ[VX_NP], vxPXw[VX_NP], vxPYs[VX_NP], vxHead = 0;
@@ -7492,14 +7515,14 @@ void vxSpawn() {
   else if (r < 86) add(3, random(-70, 71) / 100.0f, 3, 0);                      // soucoupe
   else if (r < 92) add(4, random(-80, 81) / 100.0f, 1, 0);                      // orbe
   else { add(0, -0.55f, 2, 0); add(0, 0.55f, 2, 0); }                           // deux caisses
-  vxNext = vxPos + max(7.0f, 17.0f - 1.3f * st) + random(0, 6);
+  vxNext = vxPos + max(9.0f, 21.0f - 1.5f * st) + random(0, 7);
 }
 void vxStart() {
   for (auto &o : vxO) o.on = false;
   for (auto &s : vxS) s.on = false;
   for (auto &s : vxE) s.on = false;
   vxPos = 0; vxStageD = 0; vxX = 0; vxZ = vxVZ = 0; vxNext = 25; vxCurve = 0; vxCurveT = 0;
-  vxSpd = 0.28f + 0.02f * min(gWave, 8); vxInv = 60;
+  vxSpd = 0.46f + 0.035f * min(gWave, 8); vxInv = 60;
   vxProj();
 }
 void vxReset() {
@@ -7559,17 +7582,18 @@ void vxStep() {
   // pilotage
   float sx = gDemo ? 0 : PS4.LStickX() / 127.0f;
   float steer = fabsf(sx) > 0.15f ? sx : (k & 1) ? -1 : (k & 2) ? 1 : 0;
-  vxX += steer * 0.045f;
+  vxX += steer * 0.06f;
+  vxBank += (steer - vxBank) * 0.2f;  // le vaisseau s'incline
   vxX -= vxCurv(vxPos + VX_SHIP) * vxSpd * 4;  // le virage pousse vers l'exterieur
   vxX = constrain(vxX, -1.05f, 1.05f);
-  float base = 0.28f + 0.025f * st;
-  if (k & 8) vxSpd = min(vxSpd + 0.006f, base + 0.18f);
-  else if (k & 16) vxSpd = max(vxSpd - 0.01f, 0.15f);
+  float base = 0.46f + 0.035f * st;  // plus rapide
+  if (k & 8) vxSpd = min(vxSpd + 0.01f, base + 0.3f);
+  else if (k & 16) vxSpd = max(vxSpd - 0.014f, 0.25f);
   else vxSpd += (base - vxSpd) * 0.02f;
   bool jump = (k & 32) != 0;
-  if (jump && !vxPrevJump && vxZ == 0) { vxVZ = 0.085f; sndPlay(300, 900, 180, 0.35f, false, 1); }
+  if (jump && !vxPrevJump && vxZ == 0) { vxVZ = 0.075f; sndPlay(300, 900, 180, 0.35f, false, 1); }
   vxPrevJump = jump;
-  if (vxZ > 0 || vxVZ > 0) { vxZ += vxVZ; vxVZ -= 0.0055f; if (vxZ <= 0) { vxZ = 0; vxVZ = 0; } }
+  if (vxZ > 0 || vxVZ > 0) { vxZ += vxVZ; vxVZ -= 0.0042f; if (vxZ <= 0) { vxZ = 0; vxVZ = 0; } }
   vxPos += vxSpd; vxStageD += vxSpd;
   gScore += (gFrame & 3) == 0;
   vxHead += vxCurv(vxPos + VX_SHIP) * vxSpd;  // cap (le ciel tourne dans les virages)
@@ -7582,16 +7606,16 @@ void vxStep() {
     for (int n = 0; n < (vxDouble ? 2 : 1); n++)
       for (auto &s : vxS)
         if (!s.on) { s = { vxPos + VX_SHIP, vxX + (vxDouble ? (n ? 0.14f : -0.14f) : 0), true }; break; }
-    vxCool = 9;
+    vxCool = 7;
     sndPlay(1500, 600, 60, 0.25f, false, 1);
   }
   for (auto &s : vxS) {
     if (!s.on) continue;
-    s.d += 1.1f;
-    if (s.d - vxPos > 40) { s.on = false; continue; }
+    s.d += 1.7f;
+    if (s.d - vxPos > 44) { s.on = false; continue; }
     for (auto &o : vxO) {
       if (!o.on || o.type == 5 || o.type == 4) continue;
-      if (fabsf(o.d - s.d) < 1.2f && (o.type == 1 ? fabsf(s.x - o.x) > 0.3f : fabsf(s.x - o.x) < vxHalfW(o) + 0.05f)) {
+      if (fabsf(o.d - s.d) < 1.8f && (o.type == 1 ? fabsf(s.x - o.x) > 0.3f : fabsf(s.x - o.x) < vxHalfW(o) + 0.05f)) {
         s.on = false;
         if (o.hp == 255) { sndPlay(2000, 1800, 30, 0.2f, false, 0); break; }  // mur ou pilier : indestructible
         o.flash = 6;
@@ -7627,7 +7651,7 @@ void vxStep() {
       if (vxPos + VX_SHIP > o.d + o.len + 2) o.on = false;
       continue;
     }
-    if (dz > VX_SHIP + 0.3f || dz < VX_SHIP - 0.4f) continue;
+    if (dz > VX_SHIP + 0.5f || dz < VX_SHIP - 0.5f) continue;
     bool hit = o.type == 1 ? fabsf(vxX - o.x) > 0.3f : fabsf(vxX - o.x) < vxHalfW(o) + 0.14f;
     if (!hit) continue;
     if (o.type == 4) { o.on = false; vxDouble = 400; gScore += 200; sndMelody(JINGLE_STAGE, 3); continue; }
@@ -7637,7 +7661,7 @@ void vxStep() {
   }
   for (auto &e : vxE) {  // tirs ennemis : viennent vers toi
     if (!e.on) continue;
-    e.d -= 0.5f;
+    e.d -= 0.7f;
     e.x += (vxX - e.x) * 0.02f;
     float dz = e.d - vxPos;
     if (dz < VX_SHIP - 1) { e.on = false; continue; }
@@ -7659,8 +7683,10 @@ void vxDraw() {
   uint16_t palFull[9];
   for (int i = 0; i < 9; i++) palFull[i] = rgb(G_PAL_RGB[i][0], G_PAL_RGB[i][1], G_PAL_RGB[i][2]);
   int st = (gWave - 1) % 4;
-  static const uint8_t RA[4][3] = { { 0, 170, 255 }, { 230, 40, 200 }, { 40, 220, 90 }, { 255, 150, 0 } };   // bandes claires
-  static const uint8_t RB[4][3] = { { 0, 0, 160 }, { 150, 0, 150 }, { 0, 150, 60 }, { 170, 40, 0 } };       // bandes sombres
+  // bandes de la route : une coloree (une seule teinte franche, moderee), une noire : moitie moins de LED allumees
+  // (une route pleine et vive faisait tirer trop de courant aux dalles : l'alimentation chutait, l'ESP redemarrait)
+  static const uint8_t RA[4][3] = { { 0, 150, 220 }, { 190, 0, 170 }, { 0, 180, 60 }, { 220, 110, 0 } };
+  static const uint8_t RB[4][3] = { { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 } };
   static const uint8_t RL[4][3] = { { 255, 255, 255 }, { 255, 230, 0 }, { 255, 255, 255 }, { 255, 255, 120 } };  // rails
   static const uint8_t PL[4][3] = { { 230, 120, 40 }, { 60, 170, 255 }, { 220, 60, 200 }, { 150, 220, 255 } };   // planete
   uint16_t ca = rgb(RA[st][0], RA[st][1], RA[st][2]), cb = rgb(RB[st][0], RB[st][1], RB[st][2]), rail = rgb(RL[st][0], RL[st][1], RL[st][2]);
@@ -7780,23 +7806,36 @@ void vxDraw() {
     if (s.on) { float dz = s.d - vxPos; if (dz > 4.0f) { int x = (int)(vxCX(dz) + s.x * S / dz), y = (int)vxY(dz) - (int)(0.2f * S / dz); gfx->fillRect(x, y, max(1, (int)(0.05f * S / dz)), max(1, (int)(0.15f * S / dz)), rgb(120, 255, 255)); } }
   for (auto &e : vxE)
     if (e.on) { float dz = e.d - vxPos; if (dz > 4.0f) { int x = (int)(vxCX(dz) + e.x * S / dz), y = (int)vxY(dz) - (int)(0.25f * S / dz), r = max(1, (int)(0.06f * S / dz)); gfx->fillCircle(x, y, r, (gFrame & 2) ? rgb(255, 40, 40) : rgb(255, 200, 0)); } }
-  // ton vaisseau : ombre sur la route, coque en fleche, cockpit, reacteurs qui crachent ; il monte quand il saute
+  // ton vaisseau (vu de derriere) : ombre sur la route, dome vitre, ailes metal, ailerons rouges, reacteurs qui crachent ;
+  // il s'incline dans les virages et monte quand il saute
   if (gDead == 0 && !(vxInv > 0 && (gFrame & 4))) {
-    int sx = W / 2, sy = (int)vxY(VX_SHIP), jz = (int)(vxZ * S / VX_SHIP * 0.6f), s = H >= 128 ? 2 : 1;
-    gfx->fillRoundRect(sx - 8 * s + jz / 4, sy - 1, 16 * s - jz / 2, 3, 1, rgb(0, 0, 0));
-    int y = sy - 4 * s - jz;
-    uint16_t hull = rgb(220, 225, 240), hullD = rgb(150, 155, 175), acc = rgb(255, 40, 60);
-    gfx->fillTriangle(sx - 9 * s, y + 4 * s, sx + 9 * s, y + 4 * s, sx, y - 3 * s, hull);
-    gfx->fillTriangle(sx - 9 * s, y + 4 * s, sx, y + 4 * s, sx, y - 3 * s, hull);
-    gfx->fillTriangle(sx, y + 4 * s, sx + 9 * s, y + 4 * s, sx, y - 3 * s, hullD);
-    gfx->fillRect(sx - 9 * s, y + 2 * s, 3 * s, 2 * s, acc);
-    gfx->fillRect(sx + 6 * s + 1, y + 2 * s, 3 * s, 2 * s, acc);
-    gfx->fillTriangle(sx - 2 * s, y + 2 * s, sx + 2 * s, y + 2 * s, sx, y - 1 * s, rgb(0, 200, 255));
-    gfx->drawPixel(sx - 1, y, palFull[0]);
-    uint16_t flame = (gFrame & 2) ? rgb(255, 230, 0) : rgb(255, 120, 0);
-    gfx->fillRect(sx - 5 * s, y + 4 * s, 2 * s, s + (gFrame & 1), flame);
-    gfx->fillRect(sx + 3 * s, y + 4 * s, 2 * s, s + ((gFrame >> 1) & 1), flame);
-    if (vxDouble) { gfx->drawPixel(sx - 7 * s, y + s, rgb(255, 220, 0)); gfx->drawPixel(sx + 7 * s, y + s, rgb(255, 220, 0)); }
+    int sx = W / 2, sy = (int)vxY(VX_SHIP), jz = (int)(vxZ * S / VX_SHIP * 0.6f);
+    int sw = 15 - jz / 6;
+    gfx->fillRoundRect(sx - sw, sy - 1, 2 * sw + 1, 3, 1, rgb(0, 0, 0));
+    int x0 = sx - 15, y0 = sy - 15 - jz;
+    bool fl = gFrame & 2;
+    for (int r = 0; r < 14; r++)
+      for (int c = 0; c < 31; c++) {
+        char ch = VX_SHIP_SPR[r][c];
+        if (ch == '.') continue;
+        if (r == 13 && fl) continue;  // bout de flamme qui vacille
+        uint16_t col;
+        switch (ch) {
+          case 'k': col = rgb(20, 20, 30); break;
+          case 'W': col = rgb(255, 255, 255); break;
+          case 'L': col = rgb(225, 230, 245); break;
+          case 'S': col = rgb(170, 175, 195); break;
+          case 's': col = rgb(150, 150, 170); break;
+          case 'R': col = rgb(255, 40, 60); break;
+          case 'c': col = rgb(0, 170, 255); break;
+          case 'C': col = rgb(160, 240, 255); break;
+          case 'o': col = fl ? rgb(255, 230, 0) : rgb(255, 120, 0); break;
+          default: col = fl ? rgb(255, 120, 0) : rgb(255, 230, 0); break;  // y
+        }
+        int py = y0 + r + (int)lroundf((c - 15) * vxBank * 0.18f);  // inclinaison
+        gfx->drawPixel(x0 + c, py, col);
+      }
+    if (vxDouble) { gfx->drawPixel(x0 + 1, y0 + 4, rgb(255, 220, 0)); gfx->drawPixel(x0 + 29, y0 + 4, rgb(255, 220, 0)); }
   }
   altBooms(palFull);
   // tableau de bord : score, vies, stage, barre de distance
