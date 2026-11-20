@@ -28,7 +28,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "4.13"
+#define GAMES_VERSION "4.14"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -125,8 +125,8 @@ bool gAttract = false;              // mode demo : menu cache (ligne DEMO, ou 30
 #define MENU_IDLE_MS 30000UL        // menu sans activite : passage en mode demo
 bool menuScores = false;            // page des meilleurs scores affichee
 // numeros des jeux (ordre du menu)
-enum GameId : uint8_t { G_SPACE, G_RAID, G_RAQ, G_BUL, G_LAB, G_ORB, G_BRI, G_BLO, G_CRU, G_TAU, G_BIL, G_ESQ, G_BUN, G_CAR, G_PIN, G_RUN, G_ISO };
-#define N_GAMES 17
+enum GameId : uint8_t { G_SPACE, G_RAID, G_RAQ, G_BUL, G_LAB, G_ORB, G_BRI, G_BLO, G_CRU, G_TAU, G_BIL, G_ESQ, G_BUN, G_CAR, G_PIN, G_RUN, G_ISO, G_RAL };
+#define N_GAMES 18
 // ===== NOMS DES JEUX : a modifier ici, ils s'affichent dans le menu, les scores et la demo =====
 // Majuscules, sans accents (la police n'en a pas), 14 caracteres au plus. Garder l'ordre : il suit la liste GameId ci-dessus.
 // Au-dela de 10 caracteres, le menu affiche le nom seul (sans le mot JOUER devant).
@@ -148,9 +148,10 @@ const char *const GAME_NAME[N_GAMES] = {
   "PINCAB",          // G_PIN
   "RENARD",          // G_RUN
   "PAC MANIA",     // G_ISO
+  "RALLYE 3D",       // G_RAL
 };
 uint8_t gGame = 0;                  // jeu choisi dans le menu (gauche / droite sur la ligne JOUER)
-const char *topKey() { static const char *const K[N_GAMES] = { "top", "top1", "top3", "top4", "top5", "top7", "top8", "top9", "top10", "top11", "top12", "top14", "top15", "top16", "top17", "top18", "top19" }; return K[gGame % N_GAMES]; }  // top2 (COURSE), top6 (SAUTERELLE), top13 (ESCALADE) : jeux retires
+const char *topKey() { static const char *const K[N_GAMES] = { "top", "top1", "top3", "top4", "top5", "top7", "top8", "top9", "top10", "top11", "top12", "top14", "top15", "top16", "top17", "top18", "top19", "top20" }; return K[gGame % N_GAMES]; }  // top2 (COURSE), top6 (SAUTERELLE), top13 (ESCALADE) : jeux retires
 #define TOP_N 5
 HiScore gBest[TOP_N];                // meilleurs scores (gardes en memoire)
 uint8_t gLastRank = 0;              // place obtenue a la derniere partie (0 : hors tableau)
@@ -7276,7 +7277,7 @@ void iDraw() {
   for (int i = 0; i < 9; i++) palFull[i] = rgb(G_PAL_RGB[i][0], G_PAL_RGB[i][1], G_PAL_RGB[i][2]);
   const int VH = H - 8;
   // camera : suit le scarabee en douceur (vue en biais : la profondeur part en diagonale)
-  float MW = L_COLS * I_TW + L_ROWS * I_SK, MH = L_ROWS * I_TD + I_WH + 6;  // + socle
+  float MW = L_COLS * I_TW + L_ROWS * I_SK, MH = L_ROWS * I_TD + I_WH + 3;  // + socle
   float px = iPX(lP.x / 6.0f, lP.y / 6.0f) + iCamX, py = iPY(lP.y / 6.0f) + iCamY;
   float tx = MW <= W ? -(W - MW) / 2.0f : constrain(px - W / 2.0f, 0.0f, MW - W);
   float ty = MH <= VH ? -(VH - MH) / 2.0f : constrain(py - 8 - VH / 2.0f, 0.0f, MH - VH);
@@ -7288,7 +7289,12 @@ void iDraw() {
   int st = (gWave - 1) % 4;
   const uint8_t *wc = WC[st];  // sol bleu nuit uni (le plus sombre qui reste stable en 3 bits)
   uint16_t top = rgb(wc[0], wc[1], wc[2]), edge = rgb(min(255, wc[0] + 120), min(255, wc[1] + 120), min(255, wc[2] + 120));
-  uint16_t front = rgb(wc[0] * 2 / 3, wc[1] * 2 / 3, wc[2] * 2 / 3), side = rgb(wc[0] * 3 / 5, wc[1] * 3 / 5, wc[2] * 3 / 5);
+  uint16_t frontG[I_WH], sideG[I_WH];  // degrades des faces (du haut vers le pied)
+  for (int b = 0; b < I_WH; b++) {
+    int kf = 92 - b * 9, ks = 72 - b * 8;  // en % de la couleur du dessus
+    frontG[b] = rgb(wc[0] * kf / 100, wc[1] * kf / 100, wc[2] * kf / 100);
+    sideG[b] = rgb(wc[0] * ks / 100, wc[1] * ks / 100, wc[2] * ks / 100);
+  }
   uint16_t fl = colorBits >= 4 ? rgb(0, 0, 100) : rgb(0, 0, 150), seed = rgb(255, 230, 170);
   // 0) etoiles autour du plateau (defilent moins vite que le labyrinthe)
   for (int i = 0; i < 36; i++) {
@@ -7298,12 +7304,14 @@ void iDraw() {
     c.drawPixel(sx, sy, ((i + gFrame / 20) % 7) ? rgb(150, 150, 170) : palFull[0]);
   }
   // 1) socle du plateau (epaisseur sous le sol : face avant et cote gauche), puis sol uni
-  const float SL = 5;
-  uint16_t slabF = rgb(wc[0] * 3 / 5, wc[1] * 3 / 5, wc[2] * 3 / 5), slabS = rgb(wc[0] / 2 + 20, wc[1] / 2 + 20, wc[2] / 2 + 20);
+  const float SL = 2;
+  uint16_t slabS = rgb(wc[0] / 2 + 20, wc[1] / 2 + 20, wc[2] / 2 + 20);
   iQuad(c, iPX(0, 0), iPY(0), iPX(0, L_ROWS), iPY(L_ROWS), iPX(0, L_ROWS), iPY(L_ROWS) + SL, iPX(0, 0), iPY(0) + SL, slabS);
-  iQuad(c, iPX(0, L_ROWS), iPY(L_ROWS), iPX(L_COLS, L_ROWS), iPY(L_ROWS), iPX(L_COLS, L_ROWS), iPY(L_ROWS) + SL, iPX(0, L_ROWS), iPY(L_ROWS) + SL, slabF);
-  for (int k = 0; k < L_COLS; k += 2)  // joints du socle
-    c.drawFastVLine(lroundf(iPX(k, L_ROWS)), lroundf(iPY(L_ROWS)) + 1, SL - 1, 0);
+  for (int b = 0; b < SL; b++) {  // face avant du socle en degrade
+    int kf = 70 - b * 9;
+    iQuad(c, iPX(0, L_ROWS), iPY(L_ROWS) + b, iPX(L_COLS, L_ROWS), iPY(L_ROWS) + b, iPX(L_COLS, L_ROWS), iPY(L_ROWS) + b + 1, iPX(0, L_ROWS), iPY(L_ROWS) + b + 1,
+          rgb(wc[0] * kf / 100, wc[1] * kf / 100, wc[2] * kf / 100));
+  }
   iQuad(c, iPX(0, 0), iPY(0), iPX(L_COLS, 0), iPY(0), iPX(L_COLS, L_ROWS), iPY(L_ROWS), iPX(0, L_ROWS), iPY(L_ROWS), fl);
   c.drawLine(lroundf(iPX(0, L_ROWS)), lroundf(iPY(L_ROWS)), lroundf(iPX(L_COLS, L_ROWS)) - 1, lroundf(iPY(L_ROWS)), rgb(150, 150, 255));  // bord eclaire
   // 2) ombres portees des murs sur le sol (vers la droite et l'avant)
@@ -7354,14 +7362,18 @@ void iDraw() {
         if (iPX(col, r + 1) >= W || iPX(col + 1, r) <= 0) continue;
         bool wl = lWall(r, col - 1), wr = lWall(r, col + 1), wu = lWall(r - 1, col), wd = lWall(r + 1, col);
         float x0 = col + (wl ? 0 : M), x1 = col + 1 - (wr ? 0 : M), y0 = r + (wu ? 0 : M), y1 = r + 1 - (wd ? 0 : M);
-        float h = I_WH;
+        bool border = r == 0 || col == 0 || r == L_ROWS - 1 || col == L_COLS - 1;
+        int h = border ? 2 : I_WH;  // contour du plateau : murs bas, discrets
         // face gauche, face avant, dessus
-        if (!wl) iQuad(c, iPX(x0, y0), iPY(y0) - h, iPX(x0, y1), iPY(y1) - h, iPX(x0, y1), iPY(y1), iPX(x0, y0), iPY(y0), side);
-        if (!wd) iQuad(c, iPX(x0, y1), iPY(y1) - h, iPX(x1, y1), iPY(y1) - h, iPX(x1, y1), iPY(y1), iPX(x0, y1), iPY(y1), front);
+        for (int b = 0; b < h; b++) {  // faces gauche et avant en degrade : claires en haut, plus sombres vers le pied
+          float z0 = h - b, z1 = h - b - 1;
+          int g = b + I_WH - h;
+          if (!wl) iQuad(c, iPX(x0, y0), iPY(y0) - z0, iPX(x0, y1), iPY(y1) - z0, iPX(x0, y1), iPY(y1) - z1, iPX(x0, y0), iPY(y0) - z1, sideG[g]);
+          if (!wd) iQuad(c, iPX(x0, y1), iPY(y1) - z0, iPX(x1, y1), iPY(y1) - z0, iPX(x1, y1), iPY(y1) - z1, iPX(x0, y1), iPY(y1) - z1, frontG[g]);
+        }
         iQuad(c, iPX(x0, y0), iPY(y0) - h, iPX(x1, y0), iPY(y0) - h, iPX(x1, y1), iPY(y1) - h, iPX(x0, y1), iPY(y1) - h, top);
         if (!wu) c.drawLine(lroundf(iPX(x0, y0)), lroundf(iPY(y0) - h), lroundf(iPX(x1, y0)) - 1, lroundf(iPY(y0) - h), edge);  // aretes eclairees
         if (!wl) c.drawLine(lroundf(iPX(x0, y0)), lroundf(iPY(y0) - h), lroundf(iPX(x0, y1)), lroundf(iPY(y1) - h), edge);
-        if (!wd) c.drawLine(lroundf(iPX(x0, y1)), lroundf(iPY(y1)) - 1, lroundf(iPX(x1, y1)) - 1, lroundf(iPY(y1)) - 1, 0);  // pied du mur
       }
     // creatures de cette rangee : boules a piquants ombrees, yeux qui regardent ou elles vont
     for (int i = 0; i < 4; i++) {
@@ -7448,6 +7460,395 @@ void iDraw() {
   gfx->drawRGBBitmap(0, 0, c.getBuffer(), W, H);
   altBooms(palFull);
 }
+
+// ---------------------------------------------------------------- RALLYE 3D
+// Course sur circuit vue en relief et en biais (comme SCARABEE 3D) : ta voiture rouge contre 3 adversaires, 3 tours.
+// Gauche / droite (ou stick) : tourner ; X, R2 ou haut : accelerer ; bas : freiner (stick droit : les deux).
+// Dans l'herbe, on ralentit ; arbres et immeubles arretent la voiture. Dans les 3 premiers : stage suivant
+// (adversaires plus rapides, autre decor, circuit en miroir un stage sur deux) ; 4e : une vie perdue, on recommence.
+#define XR_C 30
+#define XR_R 20
+#define XR_TW 10  // largeur d'une case, profondeur, decalage de biais par rangee
+#define XR_TD 7
+#define XR_SK 4
+#define XR_TOP 14  // marge au-dessus du plateau (immeubles)
+#define XR_N 4
+#define XR_LAPS 3
+#define XR_NWP 11
+#define XR_RW 1.15f  // demi-largeur de la route (en cases)
+const int8_t XR_WP[XR_NWP][2] = { { 5, 3 }, { 15, 3 }, { 24, 3 }, { 27, 6 }, { 27, 11 }, { 23, 13 }, { 17, 11 }, { 12, 14 }, { 7, 17 }, { 3, 14 }, { 3, 7 } };
+struct XMem { uint8_t t[XR_R][XR_C]; };  // 0 herbe, 2 immeuble, 3 arbre (la route est un ruban, voir xrRoadD)
+#define xrT (GMEM(XMem)->t)
+XCar xrCar[XR_N];
+GFXcanvas16 *xrCv = nullptr;
+float xrCamX = -9999, xrCamY = 0;
+int xrGo = 0, xrEnd = 0, xrPlace = 0, xrFinCount = 0, xrBump = 0;
+bool xrMir = false;
+void xrRelease() { if (xrCv) { delete xrCv; xrCv = nullptr; } }
+float xrWX(int i) { return xrMir ? XR_C - XR_WP[i][0] : XR_WP[i][0]; }
+float xrWY(int i) { return XR_WP[i][1]; }
+uint8_t xrTile(float x, float y) {
+  int c = (int)floorf(x), r = (int)floorf(y);
+  if (c < 0 || r < 0 || c >= XR_C || r >= XR_R) return 3;
+  return xrT[r][c];
+}
+float xrRoadD(float px, float py) {  // distance au milieu de la route
+  float dmin = 99;
+  for (int i = 0; i < XR_NWP; i++) {
+    float ax = xrWX(i), ay = xrWY(i), bx = xrWX((i + 1) % XR_NWP), by = xrWY((i + 1) % XR_NWP);
+    float vx = bx - ax, vy = by - ay, t = constrain(((px - ax) * vx + (py - ay) * vy) / (vx * vx + vy * vy), 0.0f, 1.0f);
+    float dx = px - ax - t * vx, dy = py - ay - t * vy;
+    dmin = min(dmin, dx * dx + dy * dy);
+  }
+  return sqrtf(dmin);
+}
+void xrBuild() {
+  for (int r = 0; r < XR_R; r++)
+    for (int c = 0; c < XR_C; c++) {
+      float dmin = xrRoadD(c + 0.5f, r + 0.5f);
+      uint32_t h = (uint32_t)(r * 7919 + c * 104729 + gWave * 31337) * 2654435761u >> 24;  // 0 a 255
+      uint8_t t = 0;
+      if (dmin < XR_RW + 0.9f) t = 0;  // la route et ses abords restent degages
+      else if (r == 0 || c == 0 || r == XR_R - 1 || c == XR_C - 1) t = (h & 3) ? 3 : 0;  // haie d'arbres autour
+      else if (dmin > XR_RW + 1.5f && h < 22) t = 2;
+      else if (h < 70) t = 3;
+      xrT[r][c] = t;
+    }
+}
+void xrStart() {  // depart d'une course : grille derriere la ligne
+  xrMir = (gWave & 1) == 0;
+  xrBuild();
+  float a = atan2f(xrWY(1) - xrWY(0), xrWX(1) - xrWX(0));
+  static const uint8_t COL[XR_N] = { 0, 1, 2, 3 };
+  for (int i = 0; i < XR_N; i++) {
+    XCar &c = xrCar[i];
+    float back = 0.9f + (i / 2) * 1.1f, side = (i & 1) ? 0.55f : -0.55f;
+    c.x = xrWX(0) - cosf(a) * back - sinf(a) * side;
+    c.y = xrWY(0) - sinf(a) * back + cosf(a) * side;
+    c.a = a; c.v = 0; c.wp = 1; c.lap = 0; c.col = COL[i]; c.fin = 0;
+  }
+  xrGo = 130; xrEnd = 0; xrPlace = 0; xrFinCount = 0; xrBump = 0;
+}
+void xrReset() {
+  gLives = (!gDemo && gDiff == 0) ? 5 : 3;
+  gPaused = false;
+  gScore = 0; gWave = 1; gDead = 0; gBonus = 0; gLifeUp = false;
+  gStageT = 0;
+  if (!xrCv) {
+    xrCv = new GFXcanvas16(W, H);
+    if (!xrCv->getBuffer()) { delete xrCv; xrCv = nullptr; Serial.println("RALLYE 3D : memoire insuffisante"); }
+  }
+  gfx->fillScreen(0);
+  gNOld = 0;
+  xrCamX = -9999;
+  xrStart();
+}
+float xrProg(const XCar &c) {  // avancement dans la course (classement)
+  int done = c.lap * XR_NWP + (c.wp + XR_NWP - 1) % XR_NWP;
+  float dx = xrWX(c.wp) - c.x, dy = xrWY(c.wp) - c.y;
+  return c.fin ? 100000.0f - c.fin : done * 100.0f - sqrtf(dx * dx + dy * dy);
+}
+void xrPilot(const XCar &c, int i, float &steer, bool &gas, bool &brake) {  // pilote automatique : vise la balise suivante
+  int n = (c.wp + 1) % XR_NWP;
+  float tx = xrWX(c.wp), ty = xrWY(c.wp);
+  float dx0 = tx - c.x, dy0 = ty - c.y;
+  if (dx0 * dx0 + dy0 * dy0 < 9) { tx = (tx + xrWX(n)) * 0.5f; ty = (ty + xrWY(n)) * 0.5f; }  // anticipe le virage
+  float off = (i - 1.5f) * 0.25f, sa = atan2f(ty - c.y, tx - c.x);
+  tx -= sinf(sa) * off; ty += cosf(sa) * off;  // chacun sa trajectoire
+  float da = atan2f(ty - c.y, tx - c.x) - c.a;
+  while (da > 3.14159f) da -= 6.28318f;
+  while (da < -3.14159f) da += 6.28318f;
+  steer = constrain(da * 2.5f, -1.0f, 1.0f);
+  gas = fabsf(da) < 0.9f || c.v < 0.06f;
+  brake = fabsf(da) > 1.3f && c.v > 0.1f;
+}
+void xrPhys(XCar &c, float steer, bool gas, bool brake, float maxV, bool me) {
+  float turn = min(1.0f, fabsf(c.v) / 0.06f) * (c.v >= 0 ? 1 : -1);
+  c.a += steer * 0.075f * turn;
+  if (gas) c.v += 0.0035f;
+  else if (brake) c.v -= 0.008f;
+  else c.v *= 0.985f;
+  bool onRoad = xrRoadD(c.x, c.y) < XR_RW + 0.1f;
+  float lim = onRoad ? maxV : maxV * 0.45f;  // herbe : on ralentit
+  if (c.v > lim) c.v = max(lim, c.v - 0.006f);
+  c.v = max(c.v, -0.04f);
+  float nx = c.x + cosf(c.a) * c.v, ny = c.y + sinf(c.a) * c.v;
+  uint8_t t = xrTile(nx, ny);
+  if (t >= 2) {  // arbre ou immeuble : choc
+    if (me && fabsf(c.v) > 0.04f) { sndPlay(180, 90, 120, 0.4f, true, 1); if (!gDemo) rumbleReq = true; }
+    c.v = -c.v * 0.3f;
+    if (me) xrBump = 10;
+  } else { c.x = nx; c.y = ny; }
+  if (me && !onRoad && c.v > 0.05f && gFrame % 4 == 0) sndPlay(260, 180, 60, 0.15f, true, 0);  // ca secoue dans l'herbe
+}
+void xrStep() {
+  gFrame++;
+  if (gDead > 0) {
+    if (--gDead == 0) {
+      if (gLives <= 0) {
+        if (gDemo) xrReset();
+        else if (gLastRank) startNameEntry();
+        else toDemo();
+        return;
+      }
+      xrStart();  // on recommence la course
+    }
+    return;
+  }
+  if (gStageT > 0) { gStageT--; return; }
+  if (xrGo > 0) {  // 3, 2, 1, partez !
+    xrGo--;
+    if (xrGo == 120 || xrGo == 80 || xrGo == 40) sndPlay(660, 660, 120, 0.35f, false, 1);
+    if (xrGo == 0) sndPlay(1320, 1320, 250, 0.4f, false, 1);
+    return;
+  }
+  uint8_t k = keysPs4;
+  int lvl = min(gWave, 8);
+  for (int i = 0; i < XR_N; i++) {
+    XCar &c = xrCar[i];
+    float steer = 0; bool gas = false, brake = false;
+    float maxV;
+    if (i == 0 && !gDemo && !c.fin) {  // toi
+      maxV = 0.165f;
+      int sx = PS4.LStickX();
+      if (abs(sx) > 20) steer = sx / 127.0f;
+      else steer = (k & 1) ? -1 : (k & 2) ? 1 : 0;
+      gas = (k & 4) || (k & 8);
+      brake = (k & 16) != 0;
+      float rs = PS4.RStickY() / 127.0f;
+      if (rs > 0.2f) gas = true;
+      else if (rs < -0.2f) brake = true;
+    } else {
+      xrPilot(c, i, steer, gas, brake);
+      maxV = i == 0 ? 0.15f : 0.118f + 0.005f * lvl + 0.006f * (gEffDiff() - 1) + (i - 2) * 0.004f;
+      if (c.fin) { gas = false; brake = c.v > 0.03f; }
+    }
+    xrPhys(c, steer, gas, brake, maxV, i == 0);
+    float dx = xrWX(c.wp) - c.x, dy = xrWY(c.wp) - c.y;
+    if (dx * dx + dy * dy < (i == 0 ? 7.0f : 4.8f)) {  // balise atteinte
+      if (c.wp == 0) {
+        c.lap++;
+        if (i == 0 && !c.fin) { gScore += 500; if (c.lap < XR_LAPS) sndMelody(JINGLE_STAGE, 3); }
+        if (c.lap >= XR_LAPS && !c.fin) {
+          c.fin = ++xrFinCount;
+          if (i == 0) { xrPlace = c.fin; xrEnd = 140; sndMelody(JINGLE_STAGE, 4); }
+        }
+      } else if (i == 0) gScore += 10;
+      c.wp = (c.wp + 1) % XR_NWP;
+    }
+  }
+  for (int i = 0; i < XR_N; i++)  // les voitures se poussent
+    for (int j = i + 1; j < XR_N; j++) {
+      XCar &a = xrCar[i], &b = xrCar[j];
+      float dx = b.x - a.x, dy = b.y - a.y, d = sqrtf(dx * dx + dy * dy);
+      if (d < 0.6f && d > 1e-3f) {
+        float push = (0.6f - d) / 2 / d;
+        a.x -= dx * push; a.y -= dy * push; b.x += dx * push; b.y += dy * push;
+        a.v *= 0.92f; b.v *= 0.92f;
+        if (i == 0 && gFrame % 6 == 0) sndPlay(300, 150, 60, 0.3f, true, 1);
+      }
+    }
+  if (xrBump > 0) xrBump--;
+  if (!gDemo && gScore > gHi) gHi = gScore;
+  XCar &me = xrCar[0];
+  if (xrEnd > 0 && --xrEnd == 0) {  // arrivee : classement
+    if (xrPlace <= 3) {
+      gWave++;
+      gStageT = 100;
+      altStageClear(1000UL * (gWave - 1) * (4 - xrPlace));
+      sndMelody(JINGLE_STAGE, 4);
+      xrStart();
+    } else altLoseLife(W / 2, H / 2);
+    return;
+  }
+  if (!me.fin && xrFinCount >= XR_N - 1) {  // les 3 autres sont arrives : 4e
+    me.fin = ++xrFinCount; xrPlace = me.fin; xrEnd = 100;
+  }
+  // bruit du moteur : plus aigu quand tu vas vite
+  if (gFrame % 3 == 0 && !me.fin) {
+    float f = 42 + fabsf(me.v) * 320;
+    sndPlay(f, f * 1.06f, 85, 0.13f + fabsf(me.v) * 0.2f, false, 0);
+  }
+}
+// dessin
+float xrPX(float X, float Y) { return X * XR_TW + (XR_R - Y) * XR_SK - xrCamX; }
+float xrPY(float Y) { return XR_TOP + Y * XR_TD - xrCamY; }
+void xrQuadW(GFXcanvas16 &c, const float *wx, const float *wy, float z, int ox, int oy, uint16_t col) {  // 4 coins au sol -> ecran
+  iQuad(c, xrPX(wx[0], wy[0]) + ox, xrPY(wy[0]) - z + oy, xrPX(wx[1], wy[1]) + ox, xrPY(wy[1]) - z + oy,
+        xrPX(wx[2], wy[2]) + ox, xrPY(wy[2]) - z + oy, xrPX(wx[3], wy[3]) + ox, xrPY(wy[3]) - z + oy, col);
+}
+void xrCarDraw(GFXcanvas16 &cv, const XCar &car) {
+  static const uint8_t CC[4][3] = { { 255, 40, 40 }, { 40, 110, 255 }, { 255, 220, 0 }, { 230, 230, 230 } };
+  const uint8_t *k = CC[car.col];
+  uint16_t body = rgb(k[0], k[1], k[2]), side = rgb(k[0] * 2 / 3, k[1] * 2 / 3, k[2] * 2 / 3), roof = rgb(min(255, k[0] + 80), min(255, k[1] + 80), min(255, k[2] + 80));
+  float ca = cosf(car.a), sa = sinf(car.a);
+  auto box = [&](float l0, float l1, float w, float z, int ox, int oy, uint16_t col) {
+    float lx[4] = { l1, l1, l0, l0 }, ly[4] = { -w, w, w, -w }, wx[4], wy[4];
+    for (int i = 0; i < 4; i++) { wx[i] = car.x + ca * lx[i] - sa * ly[i]; wy[i] = car.y + sa * lx[i] + ca * ly[i]; }
+    xrQuadW(cv, wx, wy, z, ox, oy, col);
+  };
+  box(-0.38f, 0.38f, 0.22f, 0, 1, 1, 0);                 // ombre
+  box(-0.38f, 0.38f, 0.22f, 1, 0, 0, side);              // bas de caisse
+  box(-0.38f, 0.38f, 0.22f, 3, 0, 0, body);              // capot et coffre
+  box(-0.2f, 0.12f, 0.17f, 5, 0, 0, rgb(150, 200, 255)); // vitres
+  box(-0.16f, 0.06f, 0.15f, 6, 0, 0, roof);              // toit
+  for (int s = -1; s <= 1; s += 2) {  // phares devant, feux derriere
+    float fx = car.x + ca * 0.38f - sa * 0.14f * s, fy = car.y + sa * 0.38f + ca * 0.14f * s;
+    cv.drawPixel(lroundf(xrPX(fx, fy)), lroundf(xrPY(fy) - 3), rgb(255, 255, 170));
+    float bx = car.x - ca * 0.38f - sa * 0.14f * s, by = car.y - sa * 0.38f + ca * 0.14f * s;
+    cv.drawPixel(lroundf(xrPX(bx, by)), lroundf(xrPY(by) - 3), rgb(255, 0, 0));
+  }
+}
+void xrDraw() {
+  if (!xrCv) return;
+  GFXcanvas16 &c = *xrCv;
+  uint16_t palFull[9];
+  for (int i = 0; i < 9; i++) palFull[i] = rgb(G_PAL_RGB[i][0], G_PAL_RGB[i][1], G_PAL_RGB[i][2]);
+  const int VH = H - 8;
+  const XCar &me = xrCar[0];
+  float MW = XR_C * XR_TW + XR_R * XR_SK, MH = XR_TOP - 8 + XR_R * XR_TD + 6;
+  float px = xrPX(me.x, me.y) + xrCamX, py = xrPY(me.y) + xrCamY;
+  float la = me.v * 60;  // la vue regarde un peu devant la voiture
+  float tx = MW <= W ? -(W - MW) / 2.0f : constrain(px + cosf(me.a) * la * 3 - W / 2.0f, 0.0f, MW - W);
+  float ty = MH <= VH ? -(VH - MH) / 2.0f : constrain(py + sinf(me.a) * la * 2 - 8 - VH / 2.0f, 0.0f, MH - VH);
+  if (xrCamX < -9000) { xrCamX = tx; xrCamY = ty; }
+  xrCamX += (tx - xrCamX) * 0.15f;
+  xrCamY += (ty - xrCamY) * 0.15f;
+  if (xrBump > 0) xrCamX += (xrBump & 2) ? 1 : -1;  // choc : l'image tremble
+  // decors : verdure, desert, neige, terre volcanique
+  static const uint8_t TH[4][4][3] = {
+    { { 30, 160, 40 }, { 0, 200, 60 }, { 150, 150, 165 }, { 0, 190, 0 } },
+    { { 230, 190, 90 }, { 255, 220, 140 }, { 160, 150, 150 }, { 150, 190, 0 } },
+    { { 225, 230, 245 }, { 255, 255, 255 }, { 150, 150, 175 }, { 0, 150, 90 } },
+    { { 150, 30, 20 }, { 220, 80, 0 }, { 150, 150, 160 }, { 150, 160, 0 } } };
+  const uint8_t (*th)[3] = TH[(gWave - 1) % 4];
+  uint16_t grass = rgb(th[0][0], th[0][1], th[0][2]), tuft = rgb(th[1][0], th[1][1], th[1][2]), road = rgb(th[2][0], th[2][1], th[2][2]),
+           leaf = rgb(th[3][0], th[3][1], th[3][2]), leafHi = rgb(min(255, th[3][0] + 110), min(255, th[3][1] + 70), min(255, th[3][2] + 110));
+  c.fillScreen(rgb(0, 0, 150));  // ciel autour du plateau
+  // socle et sol
+  iQuad(c, xrPX(0, 0), xrPY(0), xrPX(0, XR_R), xrPY(XR_R), xrPX(0, XR_R), xrPY(XR_R) + 5, xrPX(0, 0), xrPY(0) + 5, rgb(150, 100, 60));
+  iQuad(c, xrPX(0, XR_R), xrPY(XR_R), xrPX(XR_C, XR_R), xrPY(XR_R), xrPX(XR_C, XR_R), xrPY(XR_R) + 5, xrPX(0, XR_R), xrPY(XR_R) + 5, rgb(190, 130, 70));
+  iQuad(c, xrPX(0, 0), xrPY(0), xrPX(XR_C, 0), xrPY(0), xrPX(XR_C, XR_R), xrPY(XR_R), xrPX(0, XR_R), xrPY(XR_R), grass);
+  for (int r = 1; r < XR_R - 1; r++)  // touffes d'herbe
+    for (int col = 1; col < XR_C - 1; col++)
+      if (xrT[r][col] == 0 && ((r * 5 + col * 3) % 7) == 0) {
+        int tx2 = lroundf(xrPX(col + 0.5f, r + 0.5f)), ty2 = lroundf(xrPY(r + 0.5f));
+        if (tx2 < -2 || tx2 > W + 2 || ty2 < 8 || ty2 > H) continue;
+        c.drawPixel(tx2, ty2, tuft); c.drawPixel(tx2 + 2, ty2 - 1, tuft);
+      }
+  // route : un ruban lisse (segments entre les balises, virages arrondis), bordures rouges et blanches, pointilles au centre
+  auto disc = [&](float x, float y, float rad, uint16_t col) {  // disque au sol (octogone)
+    float px0 = xrPX(x + rad, y), py0 = xrPY(y);
+    for (int k = 1; k <= 8; k++) {
+      float an = k * 0.785398f, px1 = xrPX(x + cosf(an) * rad, y + sinf(an) * rad), py1 = xrPY(y + sinf(an) * rad);
+      c.fillTriangle(lroundf(xrPX(x, y)), lroundf(xrPY(y)), lroundf(px0), lroundf(py0), lroundf(px1), lroundf(py1), col);
+      px0 = px1; py0 = py1;
+    }
+  };
+  auto band = [&](float ax, float ay, float bx, float by, float w, uint16_t col) {  // bande au sol de A a B, demi-largeur w
+    float dx = bx - ax, dy = by - ay, l = sqrtf(dx * dx + dy * dy), nx = -dy / l * w, ny = dx / l * w;
+    iQuad(c, xrPX(ax + nx, ay + ny), xrPY(ay + ny), xrPX(bx + nx, by + ny), xrPY(by + ny), xrPX(bx - nx, by - ny), xrPY(by - ny), xrPX(ax - nx, ay - ny), xrPY(ay - ny), col);
+  };
+  const uint16_t kRed = rgb(255, 30, 30), kWhite = rgb(255, 255, 255);
+  for (int i = 0; i < XR_NWP; i++) {  // bordures : la route un peu plus large, par morceaux de couleur alternee
+    float ax = xrWX(i), ay = xrWY(i), bx = xrWX((i + 1) % XR_NWP), by = xrWY((i + 1) % XR_NWP);
+    float l = sqrtf((bx - ax) * (bx - ax) + (by - ay) * (by - ay));
+    int n = max(1, (int)(l / 0.5f));
+    for (int k = 0; k < n; k++)
+      band(ax + (bx - ax) * k / n, ay + (by - ay) * k / n, ax + (bx - ax) * (k + 1) / n, ay + (by - ay) * (k + 1) / n, XR_RW + 0.2f, (k & 1) ? kRed : kWhite);
+    disc(ax, ay, XR_RW + 0.2f, kRed);
+  }
+  for (int i = 0; i < XR_NWP; i++) {  // la chaussee
+    float ax = xrWX(i), ay = xrWY(i), bx = xrWX((i + 1) % XR_NWP), by = xrWY((i + 1) % XR_NWP);
+    band(ax, ay, bx, by, XR_RW, road);
+    disc(ax, ay, XR_RW, road);
+  }
+  for (int i = 0; i < XR_NWP; i++) {  // pointilles blancs au centre
+    float ax = xrWX(i), ay = xrWY(i), bx = xrWX((i + 1) % XR_NWP), by = xrWY((i + 1) % XR_NWP);
+    float l = sqrtf((bx - ax) * (bx - ax) + (by - ay) * (by - ay));
+    for (float t = 0.6f; t + 0.5f < l - 0.6f; t += 1.2f) {
+      float x0 = ax + (bx - ax) * t / l, y0 = ay + (by - ay) * t / l, x1 = ax + (bx - ax) * (t + 0.5f) / l, y1 = ay + (by - ay) * (t + 0.5f) / l;
+      c.drawLine(lroundf(xrPX(x0, y0)), lroundf(xrPY(y0)), lroundf(xrPX(x1, y1)), lroundf(xrPY(y1)), rgb(230, 230, 230));
+    }
+  }
+  {  // ligne d'arrivee en damier, en travers de la route
+    float ax = xrWX(0), ay = xrWY(0), bx = xrWX(1), by = xrWY(1), l = sqrtf((bx - ax) * (bx - ax) + (by - ay) * (by - ay));
+    float ux = (bx - ax) / l, uy = (by - ay) / l, nx = -uy, ny = ux;
+    for (int k = -5; k < 5; k++)
+      for (int m = 0; m < 2; m++) {
+        float s = (k + 0.5f) * XR_RW / 5, f = (m - 0.5f) * 0.25f;
+        float x = ax + nx * s + ux * f, y = ay + ny * s + uy * f;
+        c.fillRect(lroundf(xrPX(x, y)) - 1, lroundf(xrPY(y)) - 1, 2, 2, ((k + m) & 1) ? kWhite : 0);
+      }
+  }
+  // rangee par rangee (du fond vers l'avant) : immeubles et arbres, puis les voitures de cette rangee
+  static const uint8_t RF[4][3] = { { 220, 60, 50 }, { 150, 160, 190 }, { 240, 200, 90 }, { 60, 170, 230 } };
+  for (int r = 0; r < XR_R; r++) {
+    if (xrPY(r) - 14 < H && xrPY(r + 1) > 8)
+      for (int col = XR_C - 1; col >= 0; col--) {
+        uint8_t t = xrT[r][col];
+        if (t < 2) continue;
+        if (xrPX(col, r + 1) >= W + 4 || xrPX(col + 1, r) <= -4) continue;
+        if (t == 2) {  // immeuble : ombre, cote, facade avec fenetres, toit
+          const uint8_t *rf = RF[(r * 3 + col) & 3];
+          float x0 = col + 0.1f, x1 = col + 0.9f, y0 = r + 0.1f, y1 = r + 0.9f, h = 12;
+          iQuad(c, xrPX(x0, y0) + 3, xrPY(y0) + 1, xrPX(x1, y0) + 3, xrPY(y0) + 1, xrPX(x1, y1) + 3, xrPY(y1) + 1, xrPX(x0, y1) + 3, xrPY(y1) + 1, 0);
+          iQuad(c, xrPX(x0, y0), xrPY(y0) - h, xrPX(x0, y1), xrPY(y1) - h, xrPX(x0, y1), xrPY(y1), xrPX(x0, y0), xrPY(y0), rgb(150, 150, 165));
+          iQuad(c, xrPX(x0, y1), xrPY(y1) - h, xrPX(x1, y1), xrPY(y1) - h, xrPX(x1, y1), xrPY(y1), xrPX(x0, y1), xrPY(y1), rgb(200, 200, 215));
+          int fx = lroundf(xrPX(x0, y1)), fy = lroundf(xrPY(y1));
+          for (int wy = 0; wy < 3; wy++)
+            for (int wx = 0; wx < 3; wx++)
+              c.drawPixel(fx + 1 + wx * 3, fy - 3 - wy * 3, ((r + col + wx + wy) % 3) ? rgb(255, 230, 100) : rgb(0, 0, 150));
+          iQuad(c, xrPX(x0, y0), xrPY(y0) - h, xrPX(x1, y0), xrPY(y0) - h, xrPX(x1, y1), xrPY(y1) - h, xrPX(x0, y1), xrPY(y1) - h, rgb(rf[0], rf[1], rf[2]));
+          c.drawLine(lroundf(xrPX(x0, y0)), lroundf(xrPY(y0) - h), lroundf(xrPX(x1, y0)) - 1, lroundf(xrPY(y0) - h), rgb(min(255, rf[0] + 60), min(255, rf[1] + 60), min(255, rf[2] + 60)));
+        } else {  // arbre : ombre, tronc, feuillage rond eclaire en haut a gauche
+          int tx2 = lroundf(xrPX(col + 0.5f, r + 0.5f)), ty2 = lroundf(xrPY(r + 0.5f));
+          c.drawFastHLine(tx2 - 1, ty2 + 1, 6, 0);
+          c.drawFastHLine(tx2, ty2 + 2, 4, 0);
+          c.drawFastVLine(tx2, ty2 - 3, 4, rgb(150, 90, 30));
+          int fy = ty2 - 7;
+          for (int dy = -4; dy <= 4; dy++)
+            for (int dx = -4; dx <= 4; dx++)
+              if (dx * dx + dy * dy <= 17) c.drawPixel(tx2 + dx, fy + dy, dx + dy <= -3 ? leafHi : leaf);
+          c.drawPixel(tx2 + 2, fy + 2, rgb(th[3][0] * 2 / 3, th[3][1] * 2 / 3, th[3][2] * 2 / 3));
+          c.drawPixel(tx2 + 3, fy, rgb(th[3][0] * 2 / 3, th[3][1] * 2 / 3, th[3][2] * 2 / 3));
+        }
+      }
+    for (int i = XR_N - 1; i >= 0; i--)
+      if (constrain((int)floorf(xrCar[i].y), 0, XR_R - 1) == r) xrCarDraw(c, xrCar[i]);
+  }
+  // tableau de bord : tour, score, place
+  c.fillRect(0, 0, W, 8, 0);
+  char buf[16];
+  int place = 1;
+  for (int i = 1; i < XR_N; i++) if (xrProg(xrCar[i]) > xrProg(me)) place++;
+  if (me.fin) place = xrPlace;
+  snprintf(buf, sizeof(buf), "TOUR%d", min(XR_LAPS, me.lap + 1));
+  tinyText(c, 1, 1, buf, rgb(255, 220, 0));
+  snprintf(buf, sizeof(buf), "%lu", (unsigned long)gScore);
+  tinyText(c, (W - tinyWidth(buf)) / 2, 1, buf, rgb(230, 230, 230));
+  snprintf(buf, sizeof(buf), place == 1 ? "1ER" : "%dE", place);
+  tinyText(c, W - 1 - tinyWidth(buf), 1, buf, place == 1 ? rgb(255, 220, 0) : rgb(255, 60, 60));
+  for (int i = 0; i < min(4, max(0, gLives)); i++) c.fillRect(W - 22 - i * 5, 2, 3, 3, rgb(255, 40, 40));  // vies
+  // depart et arrivee en grand
+  c.setTextSize(2);
+  if (xrGo > 0) {
+    const char *s = xrGo > 90 ? "3" : xrGo > 50 ? "2" : xrGo > 10 ? "1" : "GO";
+    c.setTextColor(xrGo > 10 ? rgb(255, 60, 60) : rgb(0, 255, 0));
+    c.setCursor((W - (int)strlen(s) * 12) / 2, H / 2 - 20);
+    c.print(s);
+  }
+  if (me.fin && xrEnd > 0) {
+    snprintf(buf, sizeof(buf), place == 1 ? "1ER" : "%dE", place);
+    c.setTextColor((gFrame & 8) ? rgb(255, 220, 0) : rgb(255, 255, 255));
+    c.setCursor((W - (int)strlen(buf) * 12) / 2, H / 2 - 20);
+    c.print(buf);
+  }
+  c.setTextSize(1);
+  gfx->drawRGBBitmap(0, 0, c.getBuffer(), W, H);
+  altBooms(palFull);
+}
+
 // taille du bloc memoire de chaque jeu (0 : rien a reserver)
 size_t gMemSize(uint8_t g) {
   switch (g) {
@@ -7463,6 +7864,7 @@ size_t gMemSize(uint8_t g) {
     case G_BIL: return sizeof(PMem);
     case G_ESQ: return sizeof(AMem);
     case G_CAR: return sizeof(VMem);
+    case G_RAL: return sizeof(XMem);
     default: return 0;
   }
 }
@@ -7497,6 +7899,7 @@ void altReset() {
     case G_CAR: vReset(); break;
     case G_PIN: pbReset(); break;
     case G_RUN: ruReset(); break;
+    case G_RAL: xrReset(); break;
     default: zReset(); break;
   }
 }
@@ -7519,6 +7922,7 @@ void altStep() {
     case G_CAR: vStep(); break;
     case G_PIN: pbStep(); break;
     case G_RUN: ruStep(); break;
+    case G_RAL: xrStep(); break;
     default: zStep(); break;
   }
 }
@@ -7540,6 +7944,7 @@ void altDraw() {
     case G_PIN: pbDraw(); break;
     case G_RUN: ruDraw(); break;
     case G_ISO: iDraw(); break;
+    case G_RAL: xrDraw(); break;
     default: zDraw(); break;
   }
 }
@@ -7549,6 +7954,7 @@ void resetCurrent() {
   if (gGame != G_PIN) pbRelease();  // et celle de l'image de PINCAB
   if (gGame != G_RUN) ruRelease();  // et de RENARD
   if (gGame != G_ISO) iRelease();  // et de SCARABEE 3D
+  if (gGame != G_RAL) xrRelease();  // et de RALLYE 3D
   if (!gMemFor(gGame)) { gGame = 0; topLoad(); gMemFor(0); }  // memoire insuffisante : on revient au premier jeu
   if (gGame == 0) gReset();
   else altReset();
@@ -7769,7 +8175,7 @@ void gameUpdate() {
     if (menuGame >= 0 && screen == 0) { gGame = menuGame; menuGame = -1; topLoad(); resetCurrent(); }
   }
   if (menuMode) {  // menu sur son propre ecran : aucun jeu ne tourne, sa memoire est rendue (reprise au lancement)
-    if (gMemGame != -1 || zD || pbCv || ruCv || iCv) { zRelease(); pbRelease(); ruRelease(); iRelease(); gMemFor(255); }
+    if (gMemGame != -1 || zD || pbCv || ruCv || iCv || xrCv) { zRelease(); pbRelease(); ruRelease(); iRelease(); xrRelease(); gMemFor(255); }
     menuScreen();
     return;
   }

@@ -56,7 +56,7 @@ def render(st, dots, player, ghosts, frame, score, W=128, H=128):
     dr = ImageDraw.Draw(cv.im)
     VH = H - 8
     px_, py_, pdx, pdy, jump = player
-    MW, MH = C * TW + R * SK, R * TD + WH + 6
+    MW, MH = C * TW + R * SK, R * TD + WH + 3
     rawx = (px_ / 6) * TW + (R - py_ / 6) * SK
     rawy = 8 + WH + (py_ / 6) * TD
     cx = -(W - MW) / 2 if MW <= W else max(0, min(MW - W, rawx - W / 2))
@@ -78,12 +78,11 @@ def render(st, dots, player, ghosts, frame, score, W=128, H=128):
         sx = ((i * 53 + 17) * 7 - int(cx * 0.4)) % W
         sy = 8 + ((i * 29 + 5) * 11 - int(cy * 0.4)) % (H - 8)
         cv.p(sx, sy, (150, 150, 170) if (i + frame // 20) % 7 else WHITE)
-    SL = 5
+    SL = 2
     slabF, slabS = mul(wc, 3, 5), tuple(v // 2 + 20 for v in wc)
     quad([(PX(0, 0), PY(0)), (PX(0, R), PY(R)), (PX(0, R), PY(R) + SL), (PX(0, 0), PY(0) + SL)], slabS)
-    quad([(PX(0, R), PY(R)), (PX(C, R), PY(R)), (PX(C, R), PY(R) + SL), (PX(0, R), PY(R) + SL)], slabF)
-    for k in range(0, C, 2):
-        cv.rect(round(PX(k, R)), round(PY(R)) + 1, 1, SL - 1, (0, 0, 0))
+    for bnd in range(SL):
+        quad([(PX(0, R), PY(R) + bnd), (PX(C, R), PY(R) + bnd), (PX(C, R), PY(R) + bnd + 1), (PX(0, R), PY(R) + bnd + 1)], mul(wc, 70 - bnd * 9, 100))
     quad([(PX(0, 0), PY(0)), (PX(C, 0), PY(0)), (PX(C, R), PY(R)), (PX(0, R), PY(R))], fc)
     dr.line([(round(PX(0, R)), round(PY(R))), (round(PX(C, R)) - 1, round(PY(R)))], fill=(150, 150, 255))
     M = 0.32
@@ -124,18 +123,19 @@ def render(st, dots, player, ghosts, frame, score, W=128, H=128):
             wl, wr, wu, wd = wall(r, c - 1), wall(r, c + 1), wall(r - 1, c), wall(r + 1, c)
             x0, x1 = c + (0 if wl else M), c + 1 - (0 if wr else M)
             y0, y1 = r + (0 if wu else M), r + 1 - (0 if wd else M)
-            h = WH
-            if not wl:
-                quad([(PX(x0, y0), PY(y0) - h), (PX(x0, y1), PY(y1) - h), (PX(x0, y1), PY(y1)), (PX(x0, y0), PY(y0))], side)
-            if not wd:
-                quad([(PX(x0, y1), PY(y1) - h), (PX(x1, y1), PY(y1) - h), (PX(x1, y1), PY(y1)), (PX(x0, y1), PY(y1))], front)
+            h = 2 if (r == 0 or c == 0 or r == R - 1 or c == C - 1) else WH
+            for bnd in range(h):
+                z0, z1 = h - bnd, h - bnd - 1
+                bnd += WH - h
+                if not wl:
+                    quad([(PX(x0, y0), PY(y0) - z0), (PX(x0, y1), PY(y1) - z0), (PX(x0, y1), PY(y1) - z1), (PX(x0, y0), PY(y0) - z1)], mul(wc, 72 - bnd * 8, 100))
+                if not wd:
+                    quad([(PX(x0, y1), PY(y1) - z0), (PX(x1, y1), PY(y1) - z0), (PX(x1, y1), PY(y1) - z1), (PX(x0, y1), PY(y1) - z1)], mul(wc, 92 - bnd * 9, 100))
             quad([(PX(x0, y0), PY(y0) - h), (PX(x1, y0), PY(y0) - h), (PX(x1, y1), PY(y1) - h), (PX(x0, y1), PY(y1) - h)], top)
             if not wu:
                 dr.line([(round(PX(x0, y0)), round(PY(y0) - h)), (round(PX(x1, y0)) - 1, round(PY(y0) - h))], fill=edge)
             if not wl:
                 dr.line([(round(PX(x0, y0)), round(PY(y0) - h)), (round(PX(x0, y1)), round(PY(y1) - h))], fill=edge)
-            if not wd:
-                dr.line([(round(PX(x0, y1)), round(PY(y1)) - 1), (round(PX(x1, y1)) - 1, round(PY(y1)) - 1)], fill=(0, 0, 0))
         for i, (gx, gy, gdx, gdy, fr) in enumerate(ghosts):
             if min(R - 1, int(gy / 6)) != r:
                 continue

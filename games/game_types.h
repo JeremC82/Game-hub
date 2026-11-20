@@ -21,3 +21,4 @@ struct ZItem { uint8_t x, y, type; bool on; };  // BUNKER 3D : soin, munitions, 
 struct VCar { float x, y, vy, tx; uint8_t type, col; int8_t lane; bool on, passed; };  // TURBO ROUTE : 0 voiture, 1 camion, 2 cone, 3 huile, 4 piece, 5 turbo
 struct VDeco { float y; int16_t x; uint8_t type; bool on; };  // TURBO ROUTE : decor du bord de la route
 struct RuObj { float x; int8_t type, h; bool on; };  // RENARD : 0 rocher, 1 buissons (h : nombre), 2 tronc, 3 chauve-souris (h : hauteur), 4 gemme, 5 etoile
+struct XCar { float x, y, a, v; int8_t wp, lap; uint8_t col, fin; };  // RALLYE 3D : voiture (fin : place a l arrivee, 0 en course)
