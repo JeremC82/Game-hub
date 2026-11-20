@@ -28,7 +28,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "4.11"
+#define GAMES_VERSION "4.12"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -125,8 +125,8 @@ bool gAttract = false;              // mode demo : menu cache (ligne DEMO, ou 30
 #define MENU_IDLE_MS 30000UL        // menu sans activite : passage en mode demo
 bool menuScores = false;            // page des meilleurs scores affichee
 // numeros des jeux (ordre du menu)
-enum GameId : uint8_t { G_SPACE, G_RAID, G_RAQ, G_BUL, G_LAB, G_ORB, G_BRI, G_BLO, G_CRU, G_TAU, G_BIL, G_ESQ, G_BUN, G_CAR, G_PIN, G_RUN };
-#define N_GAMES 16
+enum GameId : uint8_t { G_SPACE, G_RAID, G_RAQ, G_BUL, G_LAB, G_ORB, G_BRI, G_BLO, G_CRU, G_TAU, G_BIL, G_ESQ, G_BUN, G_CAR, G_PIN, G_RUN, G_ISO };
+#define N_GAMES 17
 // ===== NOMS DES JEUX : a modifier ici, ils s'affichent dans le menu, les scores et la demo =====
 // Majuscules, sans accents (la police n'en a pas), 14 caracteres au plus. Garder l'ordre : il suit la liste GameId ci-dessus.
 // Au-dela de 10 caracteres, le menu affiche le nom seul (sans le mot JOUER devant).
@@ -147,9 +147,10 @@ const char *const GAME_NAME[N_GAMES] = {
   "TURBO ROUTE",     // G_CAR
   "PINCAB",          // G_PIN
   "RENARD",          // G_RUN
+  "PAC MANIA",     // G_ISO
 };
 uint8_t gGame = 0;                  // jeu choisi dans le menu (gauche / droite sur la ligne JOUER)
-const char *topKey() { static const char *const K[N_GAMES] = { "top", "top1", "top3", "top4", "top5", "top7", "top8", "top9", "top10", "top11", "top12", "top14", "top15", "top16", "top17", "top18" }; return K[gGame % N_GAMES]; }  // top2 (COURSE), top6 (SAUTERELLE), top13 (ESCALADE) : jeux retires
+const char *topKey() { static const char *const K[N_GAMES] = { "top", "top1", "top3", "top4", "top5", "top7", "top8", "top9", "top10", "top11", "top12", "top14", "top15", "top16", "top17", "top18", "top19" }; return K[gGame % N_GAMES]; }  // top2 (COURSE), top6 (SAUTERELLE), top13 (ESCALADE) : jeux retires
 #define TOP_N 5
 HiScore gBest[TOP_N];                // meilleurs scores (gardes en memoire)
 uint8_t gLastRank = 0;              // place obtenue a la derniere partie (0 : hors tableau)
@@ -987,7 +988,7 @@ void hudTop(uint16_t *palFull) {
   gMark(x, 1, tw, 5);
   if (gGame == G_RAQ || gGame == G_BLO || gGame == G_BIL) return;  // RAQUETTES, BLOCS, BILLES : pas de vies affichees
   const char *const *life = gGame == G_BUL ? SPR_LIFE_BLOB : gGame == G_BRI ? SPR_LIFE_BALL : gGame == G_CRU ? SPR_LIFE_FRUIT
-                          : gGame == G_LAB ? SPR_LIFE_CREATURE : gGame == G_ESQ ? SPR_LIFE_PLANE : SPR_LIFE;
+                          : (gGame == G_LAB || gGame == G_ISO) ? SPR_LIFE_CREATURE : gGame == G_ESQ ? SPR_LIFE_PLANE : SPR_LIFE;
   static const char LABC[6] = { 'p', 'o', 'g', 'c', 'y', 'r' };  // LABYRINTHE : une couleur par icone
   int lives = max(0, gLives);
   if (lives <= 5) {
@@ -2114,6 +2115,18 @@ struct LMem { uint8_t dot[L_ROWS][L_COLS], from[L_ROWS][L_COLS]; int16_t q[L_ROW
 LMob lP, lE[4];
 int lTile = 6, lOX = 0, lOY = 12, lDots = 0, lFright = 0, lChain = 0, lCamY = 0;  // lCamY : defilement vertical (une seule dalle)
 int8_t lWantDx = 0, lWantDy = 0;
+int lJump = 0, lJumpCd = 0;  // saut au-dessus des creatures (X ou rond)
+#define L_JUMP 26
+#define I_TW 10  // SCARABEE 3D : largeur d'une case, profondeur, decalage de biais par rangee, hauteur des murs
+#define I_TD 7
+#define I_SK 4
+#define I_WH 5
+float iCamX = 0, iCamY = 0;
+float iPX(float X, float Y) { return X * I_TW + (L_ROWS - Y) * I_SK - iCamX; }  // SCARABEE 3D : case (colonne, rangee) -> ecran
+float iPY(float Y) { return 8 + I_WH + Y * I_TD - iCamY; }
+int lSX(float x, float y) { return gGame == G_ISO ? (int)iPX(x / 6, y / 6) : (int)x; }  // position a l'ecran (explosions)
+int lSY(float y) { return gGame == G_ISO ? (int)iPY(y / 6) : (int)y - lCamY; }
+void iAlloc();
 float lcx(int c) { return lOX + c * lTile + lTile / 2.0f; }
 float lcy(int r) { return lOY + r * lTile + lTile / 2.0f; }
 bool lOpen(int c, int r, bool player) {
@@ -2136,6 +2149,7 @@ void lPositions() {  // scarabee au depart, creatures a la maison (sorties echel
     lE[i].fr = false;
   }
   lFright = 0;
+  lJump = lJumpCd = 0;
 }
 void lNewMaze() {
   lDots = 0;
@@ -2160,6 +2174,7 @@ void lReset() {
   lOX = (W - L_COLS * lTile) / 2;
   lOY = 8 + max(0, ((H - 8) - L_ROWS * lTile) / 2);
   lCamY = 0;
+  if (gGame == G_ISO) { lTile = 6; lOX = lOY = 0; iAlloc(); }  // SCARABEE 3D : cases logiques de 6
   lNewMaze();
 }
 // choix de la direction en arrivant au centre d'une case
@@ -2286,6 +2301,11 @@ void lStep() {
     return;
   }
   if (gStageT > 0) { gStageT--; return; }  // annonce : tout le monde attend
+  if (gDemo && !lJump)  // demo : saute quand une creature arrive dessus
+    for (auto &e : lE) if (!e.fr && e.state != 2 && fabsf(e.x - lP.x) + fabsf(e.y - lP.y) < lTile * 1.6f) k |= 4;
+  if (lJumpCd > 0) lJumpCd--;
+  if (lJump > 0 && --lJump == 0) lJumpCd = 20;
+  if ((k & (4 | 32)) && !lJump && !lJumpCd) { lJump = L_JUMP; sndPlay(500, 1400, 90, 0.3f, false, 1); }
   if (k & 1) { lWantDx = -1; lWantDy = 0; }
   if (k & 2) { lWantDx = 1; lWantDy = 0; }
   if (k & 8) { lWantDx = 0; lWantDy = -1; }
@@ -2304,18 +2324,21 @@ void lStep() {
   for (int i = 0; i < 4; i++) {
     LMob &e = lE[i];
     if (e.state == 2) { if (--e.t <= 0) e.state = 3; continue; }  // attend a la maison
+    if (!lJump) e.t &= ~0x4000;
     lMove(e, e.fr ? 0.5f * unit : es, i);
     if (fabsf(e.x - lP.x) + fabsf(e.y - lP.y) < lTile * 0.8f) {
       if (e.fr) {  // attrapee : points (200, 400, 800, 1600), retour a la maison
         lChain = min(lChain + 1, 4);
         gScore += 100UL << lChain;
-        gBoomAt(e.x, e.y - lCamY);
+        gBoomAt(lSX(e.x, e.y), lSY(e.y));
         sfxBoom();
         e.fr = false;
         lPlace(e, 10, 9);
         e.state = 2; e.t = 120;
+      } else if (lJump > 0) {  // saute par-dessus : bonus une fois par saut
+        if (lJump > 0 && !(e.t & 0x4000)) { gScore += 100; e.t |= 0x4000; sfxMenu(); }
       } else {
-        altLoseLife(lP.x, lP.y - lCamY);
+        altLoseLife(lSX(lP.x, lP.y), lSY(lP.y));
         return;
       }
     }
@@ -2395,6 +2418,11 @@ void lDraw() {
   }
   if (gDead == 0) {  // scarabee : carapace verte avec reflet, tete sombre du cote ou il va, pattes qui bougent
     int x = (int)lP.x - 2, y = (int)lP.y - 2 - lCamY;
+    if (lJump > 0) {  // en l'air : ombre au sol, scarabee plus haut
+      jRect(x + 1, y + 4, 3, 1, rgb(0, 150, 0));
+      y -= (int)(sinf(3.14159f * (L_JUMP - lJump) / L_JUMP) * max(4, lTile * 2 / 3) + 0.5f);
+      if (y < 8) y = 8;
+    }
     uint16_t g = rgb(40, 210, 70), hi = rgb(170, 255, 170), dk = rgb(10, 90, 30), head = rgb(20, 60, 25);
     jRect(x + 1, y, 3, 5, g);
     jRect(x, y + 1, 5, 3, g);
@@ -2736,7 +2764,7 @@ struct KMem { uint8_t brick[K_MAXR][K_MAXC], hp[K_MAXR][K_MAXC]; };
 #define kHp (GMEM(KMem)->hp)
 KBall kBall[K_BALLS];
 KCap kCap[K_CAPS];
-int kCols = 12, kRows = 6, kOX = 4, kOY = 11, kLeft = 0, kWide = 0, kSlow = 0, kStuck = 0, kLaser = 0, kLzCool = 0;
+int kCols = 12, kRows = 6, kOX = 4, kOY = 11, kLeft = 0, kWide = 0, kSlow = 0, kStuck = 0, kLaser = 0, kLzCool = 0, kNarrow = 0, kDoor = 0, kExit = 0;
 struct KLz { float x, y; bool on; } kLz[6];  // tirs de la raquette (capsule jaune)
 float kPX = 0, kPW = 18;
 const uint8_t K_COL[9][3] = { { 0, 0, 0 }, { 255, 50, 50 }, { 255, 150, 0 }, { 255, 220, 0 }, { 40, 220, 80 }, { 0, 200, 255 },
@@ -2771,7 +2799,7 @@ void kNewBall() {  // une balle posee sur la raquette, lancee avec X
   for (auto &b : kBall) b.on = false;
   kBall[0].on = true;
   kStuck = 1;
-  kWide = kSlow = kLaser = 0;
+  kWide = kSlow = kLaser = kNarrow = kDoor = kExit = 0;
   for (auto &z : kLz) z.on = false;
   kPW = W >= 256 ? 26 : 18;
   for (auto &cp : kCap) cp.on = false;
@@ -2804,6 +2832,7 @@ uint8_t kAuto() {  // demo : la raquette suit la balle la plus basse qui descend
   for (auto &b : kBall)
     if (b.on && b.vy > 0 && b.y > best) { best = b.y; tx = b.x + 1; }
   if (best < 0) for (auto &b : kBall) if (b.on) tx = b.x + 1;
+  if (kDoor && !kStuck) tx = W + 20;  // porte ouverte : la demo file vers la sortie
   float c = kPX + kPW / 2 + 3 * sinf(gFrame * 0.05f);  // touche un peu de cote : angles varies
   uint8_t k = tx < c - 2 ? 1 : tx > c + 2 ? 2 : 0;
   if (kStuck && kStuck > 40) k |= 4;
@@ -2819,7 +2848,7 @@ void kHitBrick(int r, int c) {
   gMark(x, y, 10, 4);  // la brique et son ombre disparaissent (effacees a la prochaine image)
   if (random(100) < 12)
     for (auto &cp : kCap)
-      if (!cp.on) { int r = random(100); cp.on = true; cp.x = x + 2; cp.y = y; cp.type = r < 8 ? 3 : r < 30 ? 4 : random(3); break; }  // 4 : tir
+      if (!cp.on) { int r = random(100); cp.on = true; cp.x = x + 2; cp.y = y; cp.type = r < 8 ? 3 : r < 26 ? 4 : r < 40 ? 5 : r < 47 ? 6 : random(3); break; }  // 4 tir, 5 raquette reduite, 6 porte
   b = 0;
   kLeft--;
   sfxBoom();
@@ -2840,15 +2869,33 @@ void kStep() {
     return;
   }
   if (gStageT > 0) { gStageT--; return; }
+  if (kExit) {  // la raquette s'en va par la porte : stage suivant
+    kPX += 1.5f;
+    kDoor = max(kDoor, 2);  // la porte reste ouverte pendant la sortie
+    if (++kExit > 24) {
+      gScore += 2000;
+      gWave++;
+      gStageT = 100;
+      altStageClear(500UL * gWave);
+      sndMelody(JINGLE_STAGE, 4);
+      kBuild();
+      kNewBall();
+      kPX = W / 2 - 9;
+    }
+    return;
+  }
   float sp = W > 128 ? 3.4f : 2.6f;
   if (!gDemo && padStickX) kPX += sp * 1.3f * padStickX / 127.0f;  // stick : vitesse selon l'inclinaison
   else {
     if (k & 1) kPX -= sp;
     if (k & 2) kPX += sp;
   }
-  kPW = (W >= 256 ? 26 : 18) + (kWide ? 10 : 0);
-  kPX = constrain(kPX, 0.0f, W - kPW);
+  kPW = (W >= 256 ? 26 : 18) + (kWide ? 10 : 0) - (kNarrow ? 7 : 0);
+  kPX = constrain(kPX, 0.0f, W - kPW + (kDoor ? 4.0f : 0.0f));
+  if (kDoor && kPX > W - kPW + 2) { kExit = 1; for (auto &b : kBall) b.on = false; sndMelody(JINGLE_STAGE, 4); return; }  // porte ouverte : on sort
   if (kWide > 0) kWide--;
+  if (kNarrow > 0) kNarrow--;
+  if (kDoor > 0) kDoor--;
   if (kLaser > 0) kLaser--;
   if (kLzCool > 0) kLzCool--;
   if (kLaser && !kStuck && (k & 4) && kLzCool == 0) {  // X : les deux canons tirent
@@ -2908,7 +2955,9 @@ void kStep() {
       gScore += 100;
       sndMelody(JINGLE_STAGE, 3);
       if (cp.type == 4) kLaser = 600;  // tir pendant 15 s
-      else if (cp.type == 0) kWide = 900;
+      else if (cp.type == 5) { kNarrow = 600; kWide = 0; gScore -= 100; sfxDive(); }  // piege : raquette reduite 10 s
+      else if (cp.type == 6) kDoor = 200;  // 5 s  // porte en bas a droite : passer au stage suivant
+      else if (cp.type == 0) { kWide = 900; kNarrow = 0; }
       else if (cp.type == 1) kSlow = 600;
       else if (cp.type == 2) {  // 3 balles
         KBall src = kBall[0];
@@ -2982,7 +3031,7 @@ void kDraw() {
   gfx->drawFastHLine(px + pw - 4, py, 3, rgb(255, 130, 130));
   gfx->drawFastHLine(px + pw - 4, py + 1, 4, rgb(230, 40, 40));
   gfx->drawFastHLine(px + pw - 4, py + 2, 3, rgb(120, 20, 20));
-  gfx->drawFastHLine(px + pw / 2 - 3, py + 1, 6, (gFrame & 8) ? palFull[4] : rgb(120, 255, 255));  // centre qui pulse
+  gfx->drawFastHLine(px + pw / 2 - (pw >= 14 ? 3 : 1), py + 1, pw >= 14 ? 6 : 2, (gFrame & 8) ? palFull[4] : rgb(120, 255, 255));  // centre qui pulse
   if (kLaser) {
     gfx->drawFastVLine(px + 1, py - 2, 2, palFull[2]);
     gfx->drawFastVLine(px + pw - 2, py - 2, 2, palFull[2]);
@@ -2995,7 +3044,15 @@ void kDraw() {
       gfx->fillRect((int)b.x, (int)b.y, 2, 2, palFull[0]);
       gMark((int)b.x, (int)b.y, 2, 2);
     }
-  static const uint8_t CC[5][3] = { { 0, 220, 255 }, { 255, 140, 0 }, { 220, 60, 220 }, { 255, 40, 40 }, { 255, 220, 0 } };
+  if (kDoor) {  // porte ouverte en bas a droite : cadre et fleches qui defilent vers la sortie
+    int dy = py - 5;
+    gfx->fillRect(W - 2, dy, 2, H - dy, (gFrame & (kDoor < 60 ? 2 : 8)) ? rgb(255, 220, 0) : rgb(255, 255, 255));
+    gfx->drawFastHLine(W - 8, dy - 1, 8, rgb(255, 220, 0));
+    int ax = W - 14 + (gFrame / 3) % 6;
+    gfx->drawPixel(ax, dy + 1, rgb(0, 255, 120)); gfx->drawPixel(ax + 1, dy + 2, rgb(0, 255, 120)); gfx->drawPixel(ax, dy + 3, rgb(0, 255, 120));
+    gMark(W - 14, dy - 1, 14, H - dy + 1);
+  }
+  static const uint8_t CC[7][3] = { { 0, 220, 255 }, { 255, 140, 0 }, { 220, 60, 220 }, { 255, 40, 40 }, { 255, 220, 0 }, { 0, 0, 255 }, { 0, 230, 60 } };
   for (auto &cp : kCap) {  // capsules qui clignotent
     if (!cp.on) continue;
     int x = (int)cp.x, y = (int)cp.y;
@@ -7191,12 +7248,181 @@ void ruDraw() {
   altBooms(palFull);
 }
 
+
+// ---------------------------------------------------------------- SCARABEE 3D
+// Le labyrinthe du scarabee (meme regles, memes creatures, saut avec X ou rond) vu en relief et en plongee :
+// murs en blocs (dessus clair, face avant), sol en damier, ombres ; la vue defile et suit le scarabee.
+// L'image est dessinee en memoire (32 Ko, pendant le jeu seulement) puis envoyee d'un bloc : pas de scintillement.
+GFXcanvas16 *iCv = nullptr;
+void iRelease() { if (iCv) { delete iCv; iCv = nullptr; } }
+void iAlloc() {
+  if (!iCv) {
+    iCv = new GFXcanvas16(W, H);
+    if (!iCv->getBuffer()) { delete iCv; iCv = nullptr; Serial.println("SCARABEE 3D : memoire insuffisante"); }
+  }
+  gfx->fillScreen(0);
+  gNOld = 0;
+  iCamX = iCamY = -9999;
+}
+void iQuad(GFXcanvas16 &c, float ax, float ay, float bx, float by, float cx, float cy, float dx, float dy, uint16_t col) {
+  int x0 = lroundf(ax), y0 = lroundf(ay), x1 = lroundf(bx), y1 = lroundf(by), x2 = lroundf(cx), y2 = lroundf(cy), x3 = lroundf(dx), y3 = lroundf(dy);
+  c.fillTriangle(x0, y0, x1, y1, x2, y2, col);
+  c.fillTriangle(x0, y0, x2, y2, x3, y3, col);
+}
+void iDraw() {
+  if (!iCv) return;
+  GFXcanvas16 &c = *iCv;
+  uint16_t palFull[9];
+  for (int i = 0; i < 9; i++) palFull[i] = rgb(G_PAL_RGB[i][0], G_PAL_RGB[i][1], G_PAL_RGB[i][2]);
+  const int VH = H - 8;
+  // camera : suit le scarabee en douceur (vue en biais : la profondeur part en diagonale)
+  float MW = L_COLS * I_TW + L_ROWS * I_SK, MH = L_ROWS * I_TD + I_WH;
+  float px = iPX(lP.x / 6.0f, lP.y / 6.0f) + iCamX, py = iPY(lP.y / 6.0f) + iCamY;
+  float tx = MW <= W ? -(W - MW) / 2.0f : constrain(px - W / 2.0f, 0.0f, MW - W);
+  float ty = MH <= VH ? -(VH - MH) / 2.0f : constrain(py - 8 - VH / 2.0f, 0.0f, MH - VH);
+  if (iCamX < -9000) { iCamX = tx; iCamY = ty; }
+  iCamX += (tx - iCamX) * 0.2f;
+  iCamY += (ty - iCamY) * 0.2f;
+  c.fillScreen(0);
+  static const uint8_t WC[4][3] = { { 255, 150, 0 }, { 0, 200, 255 }, { 230, 60, 230 }, { 60, 230, 90 } };
+  static const uint8_t FC[4][3] = { { 0, 0, 170 }, { 160, 0, 160 }, { 0, 0, 170 }, { 0, 0, 170 } };
+  int st = (gWave - 1) % 4;
+  const uint8_t *wc = WC[st], *fc = FC[st];
+  uint16_t top = rgb(wc[0], wc[1], wc[2]), edge = rgb(min(255, wc[0] + 120), min(255, wc[1] + 120), min(255, wc[2] + 120));
+  uint16_t front = rgb(wc[0] * 2 / 3, wc[1] * 2 / 3, wc[2] * 2 / 3), side = rgb(wc[0] * 3 / 5, wc[1] * 3 / 5, wc[2] * 3 / 5);
+  uint16_t fl = rgb(fc[0], fc[1], fc[2]), seed = rgb(255, 230, 170);
+  // 1) sol en damier (parallelogrammes) et graines
+  for (int r = 0; r < L_ROWS; r++) {
+    float ya = iPY(r), yb = iPY(r + 1);
+    if (ya >= H || yb <= 8) continue;
+    for (int col = 0; col < L_COLS; col++) {
+      float xa = iPX(col, r), xb = iPX(col, r + 1);
+      if (min(xa, xb) >= W || max(xa, xb) + I_TW <= 0) continue;
+      if ((r + col) & 1) iQuad(c, xa, ya, xa + I_TW, ya, xb + I_TW, yb, xb, yb, fl);
+      uint8_t d = L_MAZE[r][col] == '#' ? 0 : lDot[r][col];
+      int bx = lroundf(iPX(col + 0.5f, r + 0.5f)), by = lroundf(iPY(r + 0.5f));
+      if (d == 1) c.fillRect(bx - 1, by - 1, 2, 2, seed);
+      else if (d == 2) {  // grosse graine : boule qui pulse, avec son ombre
+        uint16_t gc = (gFrame & 8) ? palFull[0] : palFull[2];
+        int bb = by - 2 - ((gFrame >> 3) & 1);
+        c.drawFastHLine(bx - 1, by + 1, 3, 0);
+        c.fillRect(bx - 1, bb - 1, 3, 3, gc);
+        c.drawPixel(bx, bb - 2, gc); c.drawPixel(bx, bb + 2, gc); c.drawPixel(bx - 2, bb, gc); c.drawPixel(bx + 2, bb, gc);
+        c.drawPixel(bx - 1, bb - 1, palFull[0]);
+      }
+    }
+  }
+  // porte de la maison des creatures
+  c.drawLine(lroundf(iPX(10, 8.5f)), lroundf(iPY(8.5f)), lroundf(iPX(11, 8.5f)) - 1, lroundf(iPY(8.5f)), palFull[7]);
+  // 2) rangee par rangee (du fond vers l'avant, de droite a gauche) : les murs fins, puis ce qui se tient sur la rangee
+  static const uint8_t EC[4][3] = { { 200, 60, 255 }, { 255, 140, 0 }, { 170, 230, 40 }, { 230, 230, 230 } };
+  const float M = 0.32f;  // retrait du mur de chaque cote : murs fins, sol visible autour
+  for (int r = 0; r < L_ROWS; r++) {
+    if (iPY(r) - I_WH < H && iPY(r + 1) > 8)
+      for (int col = L_COLS - 1; col >= 0; col--) {
+        if (L_MAZE[r][col] != '#') continue;
+        if (iPX(col, r + 1) >= W || iPX(col + 1, r) <= 0) continue;
+        bool wl = lWall(r, col - 1), wr = lWall(r, col + 1), wu = lWall(r - 1, col), wd = lWall(r + 1, col);
+        float x0 = col + (wl ? 0 : M), x1 = col + 1 - (wr ? 0 : M), y0 = r + (wu ? 0 : M), y1 = r + 1 - (wd ? 0 : M);
+        float h = I_WH;
+        // face gauche, face avant, dessus
+        if (!wl) iQuad(c, iPX(x0, y0), iPY(y0) - h, iPX(x0, y1), iPY(y1) - h, iPX(x0, y1), iPY(y1), iPX(x0, y0), iPY(y0), side);
+        if (!wd) iQuad(c, iPX(x0, y1), iPY(y1) - h, iPX(x1, y1), iPY(y1) - h, iPX(x1, y1), iPY(y1), iPX(x0, y1), iPY(y1), front);
+        iQuad(c, iPX(x0, y0), iPY(y0) - h, iPX(x1, y0), iPY(y0) - h, iPX(x1, y1), iPY(y1) - h, iPX(x0, y1), iPY(y1) - h, top);
+        if (!wu) c.drawLine(lroundf(iPX(x0, y0)), lroundf(iPY(y0) - h), lroundf(iPX(x1, y0)) - 1, lroundf(iPY(y0) - h), edge);  // arete eclairee
+      }
+    // creatures de cette rangee : boules a piquants ombrees, yeux qui regardent ou elles vont
+    for (int i = 0; i < 4; i++) {
+      LMob &e = lE[i];
+      if (constrain((int)(e.y / 6), 0, L_ROWS - 1) != r) continue;
+      int sx = lroundf(iPX(e.x / 6.0f, e.y / 6.0f)), sy = lroundf(iPY(e.y / 6.0f));
+      if (e.state == 2) sy -= (gFrame / 6 + i) & 1;  // attend a la maison : sautille
+      uint16_t col = rgb(EC[i][0], EC[i][1], EC[i][2]), hi = rgb(min(255, EC[i][0] + 90), min(255, EC[i][1] + 90), min(255, EC[i][2] + 90)),
+               dk = rgb(EC[i][0] * 2 / 3, EC[i][1] * 2 / 3, EC[i][2] * 2 / 3);
+      if (e.fr) {
+        bool f2 = lFright < 60 && (gFrame & 4);
+        col = f2 ? palFull[0] : rgb(40, 90, 255); hi = f2 ? palFull[0] : rgb(150, 190, 255); dk = rgb(0, 0, 170);
+      }
+      c.drawFastHLine(sx - 3, sy + 1, 7, 0);  // ombre
+      c.drawFastHLine(sx - 2, sy + 2, 5, 0);
+      int by = sy - 4;
+      for (int dy = -4; dy <= 4; dy++)
+        for (int dx = -4; dx <= 4; dx++)
+          if (dx * dx + dy * dy <= 18) c.drawPixel(sx + dx, by + dy, dx + dy <= -4 ? hi : dx + dy >= 4 ? dk : col);
+      if ((gFrame / 6 + i) & 1) { c.drawPixel(sx - 5, by, col); c.drawPixel(sx + 5, by, col); c.drawPixel(sx, by - 5, col); c.drawPixel(sx - 5, by - 1, col); c.drawPixel(sx + 5, by - 1, col); c.drawPixel(sx - 1, by - 5, col); }
+      else { c.drawPixel(sx - 4, by - 4, col); c.drawPixel(sx + 4, by - 4, col); c.drawPixel(sx - 4, by + 4, dk); c.drawPixel(sx + 4, by + 4, dk); }
+      int ex = constrain((int)e.dx, -1, 1), ey = constrain((int)e.dy, -1, 1);
+      if (e.fr) { c.fillRect(sx - 2, by - 2, 2, 2, palFull[0]); c.fillRect(sx + 1, by - 2, 2, 2, palFull[0]); c.drawFastHLine(sx - 2, by + 2, 5, palFull[0]); }
+      else {
+        c.fillRect(sx - 3 + ex, by - 2 + ey, 3, 3, palFull[0]);
+        c.fillRect(sx + 1 + ex, by - 2 + ey, 3, 3, palFull[0]);
+        int ox = ex > 0 ? 1 : 0, oy = ey > 0 ? 1 : 0;  // pupilles du cote ou elle va
+        c.fillRect(sx - 3 + ex + ox, by - 2 + ey + oy, 2, 2, rgb(0, 0, 170));
+        c.fillRect(sx + 1 + ex + ox, by - 2 + ey + oy, 2, 2, rgb(0, 0, 170));
+      }
+    }
+    // le scarabee : carapace verte ombree, tete du cote ou il va, pattes qui bougent ; en l'air quand il saute
+    if (gDead == 0 && constrain((int)(lP.y / 6), 0, L_ROWS - 1) == r) {
+      int sx = lroundf(iPX(lP.x / 6.0f, lP.y / 6.0f)), sy = lroundf(iPY(lP.y / 6.0f));
+      int jh = lJump > 0 ? (int)(sinf(3.14159f * (L_JUMP - lJump) / L_JUMP) * 11 + 0.5f) : 0;
+      int sw = jh > 6 ? 2 : 3;
+      c.drawFastHLine(sx - sw, sy + 1, sw * 2 + 1, 0);  // ombre, plus petite en l'air
+      c.drawFastHLine(sx - sw + 1, sy + 2, sw * 2 - 1, 0);
+      int by = sy - 4 - jh;
+      uint16_t g = rgb(40, 220, 70), hi = rgb(190, 255, 190), dk = rgb(0, 150, 30), head = rgb(20, 60, 25);
+      int dx = lP.dx, dy = lP.dy;
+      if (!dx && !dy) dy = 1;
+      bool leg = (gFrame / 4) & 1;
+      for (int k = -1; k <= 1; k += 2) {  // pattes
+        c.drawPixel(sx - 5, by + k * 2 + (leg ? 1 : 0), dk);
+        c.drawPixel(sx + 5, by + k * 2 + (leg ? 0 : 1), dk);
+      }
+      c.drawPixel(sx - 5, by + (leg ? 0 : 1), dk);
+      c.drawPixel(sx + 5, by + (leg ? 1 : 0), dk);
+      for (int yy = -3; yy <= 3; yy++)
+        for (int xx = -4; xx <= 4; xx++)
+          if (xx * xx * 9 + yy * yy * 16 <= 150) c.drawPixel(sx + xx, by + yy, (xx + yy <= -4) ? hi : (xx + yy >= 4) ? dk : g);
+      if (dx) c.drawFastHLine(sx - 3, by, 7, dk);  // separation des elytres
+      else c.drawFastVLine(sx, by - 2, 5, dk);
+      c.drawFastHLine(sx - 2, by - 2, 2, hi);
+      c.drawPixel(sx - 2, by + 1, palFull[0]);  // taches
+      c.drawPixel(sx + 2, by - 1, head);
+      if (dx) {  // tete, yeux et antennes
+        c.fillRect(sx + dx * 5 - (dx < 0 ? 1 : 0), by - 2, 2, 5, head);
+        c.drawPixel(sx + dx * 6, by - 1, palFull[0]);
+        c.drawPixel(sx + dx * 6, by + 1, palFull[0]);
+        c.drawPixel(sx + dx * 7, by - 3, dk);
+        c.drawPixel(sx + dx * 7, by + 3, dk);
+      } else {
+        int hy = dy < 0 ? by - 4 : by + 4;
+        c.fillRect(sx - 2, hy - (dy < 0 ? 1 : 0), 5, 2, head);
+        if (dy > 0) { c.drawPixel(sx - 1, hy + 1, palFull[0]); c.drawPixel(sx + 1, hy + 1, palFull[0]); }
+      }
+    }
+  }
+  // tableau de bord : score et vies (dans l'image)
+  c.fillRect(0, 0, W, 8, 0);
+  char num[12];
+  snprintf(num, sizeof(num), "%lu", (unsigned long)gScore);
+  int lw = tinyWidth("SCORE"), nw = tinyWidth(num), x = (W - lw - 4 - nw) / 2;
+  tinyText(c, x, 1, "SCORE", rgb(255, 40, 40));
+  tinyText(c, x + lw + 4, 1, num, rgb(230, 230, 230));
+  for (int i = 0; i < min(5, max(0, gLives)); i++) {  // vies : petits scarabees
+    int lx = W - 5 - i * 6;
+    c.fillRect(lx - 1, 2, 4, 3, rgb(40, 220, 70));
+    c.drawFastHLine(lx, 1, 2, rgb(40, 220, 70));
+    c.drawPixel(lx, 2, rgb(190, 255, 190));
+  }
+  gfx->drawRGBBitmap(0, 0, c.getBuffer(), W, H);
+  altBooms(palFull);
+}
 // taille du bloc memoire de chaque jeu (0 : rien a reserver)
 size_t gMemSize(uint8_t g) {
   switch (g) {
     case G_RAID: return sizeof(RMem);
     case G_BUL: return sizeof(BMem);
-    case G_LAB: return sizeof(LMem);
+    case G_LAB:
+    case G_ISO: return sizeof(LMem);
     case G_ORB: return sizeof(OMem);
     case G_BRI: return sizeof(KMem);
     case G_BLO: return sizeof(TMem);
@@ -7227,7 +7453,8 @@ void altReset() {
     case G_RAID: rReset(); break;
     case G_RAQ: qReset(); break;
     case G_BUL: bReset(); break;
-    case G_LAB: lReset(); break;
+    case G_LAB:
+    case G_ISO: lReset(); break;
     case G_ORB: oReset(); break;
     case G_BRI: kReset(); break;
     case G_BLO: tReset(); break;
@@ -7248,7 +7475,8 @@ void altStep() {
     case G_RAID: rStep(); break;
     case G_RAQ: qStep(); break;
     case G_BUL: bStep(); break;
-    case G_LAB: lStep(); break;
+    case G_LAB:
+    case G_ISO: lStep(); break;
     case G_ORB: oStep(); break;
     case G_BRI: kStep(); break;
     case G_BLO: tStep(); break;
@@ -7279,6 +7507,7 @@ void altDraw() {
     case G_CAR: vDraw(); break;
     case G_PIN: pbDraw(); break;
     case G_RUN: ruDraw(); break;
+    case G_ISO: iDraw(); break;
     default: zDraw(); break;
   }
 }
@@ -7287,6 +7516,7 @@ void resetCurrent() {
   if (gGame != G_BUN) zRelease();  // la memoire de BUNKER 3D est rendue aux autres jeux et au Bluetooth
   if (gGame != G_PIN) pbRelease();  // et celle de l'image de PINCAB
   if (gGame != G_RUN) ruRelease();  // et de RENARD
+  if (gGame != G_ISO) iRelease();  // et de SCARABEE 3D
   if (!gMemFor(gGame)) { gGame = 0; topLoad(); gMemFor(0); }  // memoire insuffisante : on revient au premier jeu
   if (gGame == 0) gReset();
   else altReset();
@@ -7507,7 +7737,7 @@ void gameUpdate() {
     if (menuGame >= 0 && screen == 0) { gGame = menuGame; menuGame = -1; topLoad(); resetCurrent(); }
   }
   if (menuMode) {  // menu sur son propre ecran : aucun jeu ne tourne, sa memoire est rendue (reprise au lancement)
-    if (gMemGame != -1 || zD || pbCv || ruCv) { zRelease(); pbRelease(); ruRelease(); gMemFor(255); }
+    if (gMemGame != -1 || zD || pbCv || ruCv || iCv) { zRelease(); pbRelease(); ruRelease(); iRelease(); gMemFor(255); }
     menuScreen();
     return;
   }

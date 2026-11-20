@@ -6,11 +6,11 @@ Jeux d'arcade sur 1 à 4 dalles LED 128x64, avec un ESP32 classique et une **man
 - **Partition unique de 3 Mo :** il reste de la place pour d'autres jeux.
 - **Son en option :** une broche PWM vers un petit ampli et un haut-parleur.
 
-**16 jeux originaux**, à choisir dans le menu (gauche / droite sur la ligne JOUER). Au démarrage, c'est toujours le **1er jeu de la liste** qui est proposé. Les noms affichés au menu se changent dans le tableau `GAME_NAME` en haut de `games/games.ino`.
+**17 jeux originaux**, à choisir dans le menu (gauche / droite sur la ligne JOUER). Au démarrage, c'est toujours le **1er jeu de la liste** qui est proposé. Les noms affichés au menu se changent dans le tableau `GAME_NAME` en haut de `games/games.ino`.
 
-Les 16 jeux ont en commun les niveaux de difficulté, les stages, les vies, les meilleurs scores avec les noms et la démo automatique.
+Les 17 jeux ont en commun les niveaux de difficulté, les stages, les vies, les meilleurs scores avec les noms et la démo automatique.
 
-## Les 16 jeux en un coup d'œil
+## Les 17 jeux en un coup d'œil
 
 Dans tous les jeux : **OPTIONS ou L2 = pause** ; en pause, **○ revient au menu** (le score est enregistré). Les deux manettes pilotent le menu. « Sans fin » : les stages continuent tant qu'il reste des vies ; la difficulté monte puis **plafonne** au stage indiqué.
 
@@ -20,9 +20,9 @@ Dans tous les jeux : **OPTIONS ou L2 = pause** ; en pause, **○ revient au menu
 | 1 | SHOOTME | [RAID](#raid) | croix / stick : bouger, **✕ tirer**, **○ bombe** | capsules **P** (arme, jusqu'à 5 tirs), **S** bouclier, **B** bombe ; boss : 2000 × stage + une vie | sans fin ; boss après 8 vagues à chaque stage |
 | 2 | PONG | [RAQUETTES](#raquettes) | haut / bas (stick : vitesse proportionnelle) | point gagné 100 × stage ; effet donné par la raquette | sans fin ; stage suivant tous les 5 points ; 3 points encaissés = fin (à deux : premier à 7) |
 | 3 | BULLES | [BULLES](#bulles) | gauche / droite, **haut ou ○ sauter**, **✕ bulle** | cristal 500 ; bonus de chaîne ; une vie par niveau | sans fin ; un nouveau plan de plateformes à chaque niveau |
-| 4 | PAC MAN | [LABYRINTHE](#labyrinthe) | croix / stick | grosse graine : créatures bleues 200, 400, 800, 1600 ; une vie par stage | sans fin ; vitesse plafonnée au stage 8 |
+| 4 | PAC MAN | [LABYRINTHE](#labyrinthe) | croix / stick, **✕ ou ○ sauter** par-dessus une créature | grosse graine : créatures bleues 200, 400, 800, 1600 ; créature sautée +100 ; une vie par stage | sans fin ; vitesse plafonnée au stage 8 |
 | 5 | ORBITUS | [ORBITUS](#orbitus) | stick : glisser sur l'orbite, croix gauche / droite : tourner, **✕ tirer** | ennemis en piqué ×2 ; capsule de l'ennemi blanc : double tir ; une vie par stage | sans fin ; de 4 à 7 vagues (7 au stage 7) |
-| 6 | CASSE BRIQUES | [CASSE BRIQUES](#casse-briques) | gauche / droite (stick proportionnel), **✕ lancer / tirer** | capsules : raquette large, balle lente, 3 balles, tir, vie | 6 tableaux en boucle, sans fin ; vitesse de la balle plafonnée au stage 10 |
+| 6 | CASSE BRIQUES | [CASSE BRIQUES](#casse-briques) | gauche / droite (stick proportionnel), **✕ lancer / tirer** | capsules : raquette large, balle lente, 3 balles, tir, vie, **porte** (5 s, sortie en bas à droite : stage suivant +2000) ; piège bleu : raquette réduite 10 s | 6 tableaux en boucle, sans fin ; vitesse de la balle plafonnée au stage 10 |
 | 7 | TETRIS | [BLOCS](#blocs) | gauche / droite, **bas** accélère, **haut** chute directe, **✕ / ○ tourner** | 1 à 4 lignes : 100, 300, 500, 800 × niveau | niveau suivant toutes les 10 lignes ; vitesse maximale au niveau 12 ; une seule partie |
 | 8 | CANDY CRUCH | [CRUCH](#cruch) | croix / stick : curseur, **✕ prendre**, direction : échanger, **○ annuler** | 4 alignés : bonbon rayé ; 5 : bombe ; chaînes ; coups restants ; une vie par niveau | sans fin ; objectif +700 points à chaque niveau |
 | 9 | DIG DUG | [TAUPE](#taupe) | croix / stick, **✕ ou ○ jet de boue** | rocher qui écrase : gros bonus ; plus la créature est profonde, plus elle rapporte | sans fin ; jusqu'à 5 rochers ; vitesse plafonnée au stage 8 |
@@ -32,6 +32,7 @@ Dans tous les jeux : **OPTIONS ou L2 = pause** ; en pause, **○ revient au menu
 | 13 | TURBO ROUTE | [TURBO ROUTE](#turbo-route) | gauche / droite : braquer, **✕ / R2 / haut accélérer**, **bas freiner**, stick droit : accélérer / freiner, **○ turbo** | pièce 250 ; voiture doublée 50 ; bidon de turbo ; police semée 2000, police KO 3000 ; secondes restantes × 100 | sans fin ; 4 décors en boucle ; distance plafonnée au stage 6, circulation au stage 8 |
 | 14 | PINCAB | [PINCAB](#pincab) | **croix gauche (ou L1)** flipper gauche, **○ (ou R1)** flipper droit, **✕ maintenu puis relâché** : lanceur | 3 cibles : +2000 et multiplicateur jusqu'à x5 ; **multiball** (3 balles, tout ×2) ; gueule 1500 ; poisson 500 ; balle rendue dans les 4 s | sans fin ; stage suivant toutes les 2 séries de cibles |
 | 15 | RENARD | [RENARD](#renard) | **✕ ou haut sauter** (tenir : plus haut), **bas se baisser** (en l'air : retomber vite) | gemme +100 ; étoile : invincible 5 s (traverse tout, +50 par obstacle) | sans fin ; stage tous les 1000 points ; vitesse maximale atteinte peu à peu ; jour et nuit en alternance |
+| 16 | SCARABEE 3D | [SCARABEE 3D](#scarabee-3d) | croix / stick, **✕ ou ○ sauter** | comme LABYRINTHE (grosse graine, créatures 200 à 1600, créature sautée +100) | sans fin ; couleurs du décor différentes à chaque stage ; vitesse plafonnée au stage 8 |
 
 
 ## Deux manettes (Bluepad32)
@@ -41,7 +42,7 @@ Depuis la V3.84, le Game-hub utilise **Bluepad32** : jusqu'à **4 manettes Bluet
 - **Menu « JOUEURS 1 / 2 »** (2e ligne, une étoile par manette connectée) : seuls les jeux à deux joueurs utilisent la 2e manette.
   - **RAQUETTES** : match à deux (raquette de droite pour le joueur 2), **le premier à 7 points gagne**.
   - **SPACE DEFENDER** : coopération, un 2e vaisseau **vert** pour le joueur 2, vies et score communs ; les ennemis piquent sur l'un ou l'autre ; la manette du joueur touché vibre.
-- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V4.11_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
+- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V4.12_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
 - **Mémoire** : environ 81 Ko libres avec 2 dalles en 3 bits et deux manettes connectées.
 
 # SPACE DEFENDER
@@ -138,6 +139,7 @@ Un petit scarabée vert ramasse toutes les graines d'un labyrinthe original, pou
 - **Sur une seule dalle (128x64)**, le labyrinthe garde des cases de 6 pixels et **défile verticalement** pour suivre le scarabée. Il tient en entier à partir de 128x128.
 - **Graphisme :** murs « néon » aux coins arrondis (couleur différente à chaque stage), grosses graines qui pulsent, créatures aux piquants qui tournent et aux yeux qui regardent où elles vont, scarabée avec carapace, reflet, tête et pattes qui bougent.
 - **Commandes :** croix ou stick pour diriger le scarabée. La direction choisie est gardée jusqu'au prochain croisement possible.
+- **Saut (V4.12) :** **✕ ou ○** : le scarabée saute par-dessus une créature (+100), son ombre reste au sol ; petit délai avant de ressauter. En démo, il saute tout seul quand une créature arrive.
 - **Les créatures :** chacune a son caractère.
   - La violette fonce droit sur toi.
   - L'orange vise devant toi.
@@ -181,7 +183,7 @@ Un casse-briques original. Une raquette en bas renvoie la balle vers un mur de b
 - **Vies :** de petites balles blanches en haut à droite.
 - **Commandes :** stick ou croix gauche / droite pour la raquette (au **stick**, elle va d'autant plus vite que tu le pousses loin), **✕ pour lancer la balle**.
 - **Briques :** de couleur (1 coup, plus elles sont hautes plus elles rapportent), **d'argent** (2 coups, 3 à partir du stage 6) et **d'or** (incassables, à partir du stage 4). Chaque brique a un reflet et une ombre.
-- **Capsules :** une brique cassée lâche parfois une capsule qui tombe. Cyan : **raquette large**. Orange : **balle lente**. Magenta : **3 balles**. Jaune : **tir** (15 s : deux canons au bout de la raquette, ✕ tire vers les briques). Rouge : **une vie**.
+- **Capsules :** une brique cassée lâche parfois une capsule qui tombe. Cyan : **raquette large**. Orange : **balle lente**. Magenta : **3 balles**. Jaune : **tir** (15 s : deux canons au bout de la raquette, ✕ tire vers les briques). Rouge : **une vie**. Verte : **porte** (V4.12) : une sortie s'ouvre en bas à droite **pendant 5 s** (elle clignote vite avant de se refermer) ; pousse la raquette contre le bord droit pour sortir : stage suivant et +2000. Bleue : **piège**, la raquette rétrécit 10 s (-100).
 - **Raquette :** trois rangées en dégradé avec un reflet, embouts rouges arrondis, centre cyan qui pulse.
 - **Tableaux :** 6 dessins (mur plein, damier, pyramide, losange, rangées avec argent, motif) qui reviennent en boucle. Tout casser (sauf l'or) fait passer au suivant, avec une balle plus rapide et une vie en plus.
 
@@ -299,6 +301,18 @@ Une course sans fin originale (V4.11) : un petit renard orange court tout seul, 
 
 ![RENARD : jour, nuit, étoile](docs/renard-rendus.png)
 
+### SCARABEE 3D
+
+![SCARABEE 3D](docs/jeu-scarabee3d.gif)
+
+Le labyrinthe du scarabée (mêmes règles que LABYRINTHE) **vu en relief et en biais** (V4.12) : les couloirs horizontaux restent horizontaux, la profondeur part en diagonale.
+- **Décor :** murs fins en blocs (dessus clair avec arête éclairée, face avant et côté gauche dans l'ombre), sol en damier, couleurs différentes à chaque stage ; la vue **défile** et suit le scarabée en douceur.
+- **Personnages :** créatures piquantes ombrées (9 pixels) aux yeux qui regardent où elles vont, scarabée avec carapace, taches, antennes et pattes qui bougent ; ombres au sol.
+- **Commandes :** croix ou stick pour diriger, **✕ ou ○ pour sauter** par-dessus une créature (+100) : l'ombre rétrécit pendant le saut.
+- **Mémoire :** l'image est dessinée en mémoire puis envoyée d'un bloc (32 Ko pendant le jeu seulement) : pas de scintillement.
+
+![SCARABEE 3D : stage 1, saut, grosse graine](docs/scarabee3d-rendus.png)
+
 ### CRUCH
 
 ![CRUCH](docs/jeu-cruch.gif)
@@ -324,7 +338,7 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. **La démo cha
 
 | Ligne | Action |
 |---|---|
-| **JOUER** | **gauche / droite : choix du jeu** (16 jeux ; leurs noms se changent dans le tableau `GAME_NAME` en haut de `games/games.ino`). Au démarrage : le premier jeu de la liste. ✕ ou OPTIONS lance la partie. |
+| **JOUER** | **gauche / droite : choix du jeu** (17 jeux ; leurs noms se changent dans le tableau `GAME_NAME` en haut de `games/games.ino`). Au démarrage : le premier jeu de la liste. ✕ ou OPTIONS lance la partie. |
 | **NIVEAU** | Facile / Normal / Difficile (gauche / droite ou ✕), choix gardé en mémoire |
 | **LUMINOSITE** | 0 à 100 % par pas de 10 % (gauche / droite ou ✕), visible tout de suite et gardée en mémoire. À 0 %, les dalles restent très faiblement allumées pour qu'on voie encore le menu. |
 | **VOLUME** | volume du son, 0 à 100 % par pas de 10 % (gauche / droite ou ✕). Un bip fait entendre le niveau. 0 % = muet. C'est le rapport cyclique du PWM : le potentiomètre de l'ampli règle le maximum. |
@@ -457,8 +471,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V4.11_complet.bin](firmware/GameHub_V4.11_complet.bin) | 0x0 | `029a416eb61841bc415b6e9aff315a75` |
-| [firmware/GameHub_V4.11.bin](firmware/GameHub_V4.11.bin) | 0x10000 | `8831ef6cb27838d4f48cda7ee5fdbaca` |
+| [firmware/GameHub_V4.12_complet.bin](firmware/GameHub_V4.12_complet.bin) | 0x0 | `bff2cb34460fdf0298b812d6989d625f` |
+| [firmware/GameHub_V4.12.bin](firmware/GameHub_V4.12.bin) | 0x10000 | `20aa76c1a39546bdaa283ae8e1443603` |
 | [firmware/GameHub_V3.86_complet.bin](firmware/GameHub_V3.86_complet.bin) | 0x0 | `dc451b01c498df647da822a1427a1a5e` |
 | [firmware/GameHub_V3.86.bin](firmware/GameHub_V3.86.bin) | 0x10000 | `ee1945d390b91eb82240245a1e52821f` |
 
@@ -476,6 +490,6 @@ Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB S
 - **Carte :** installée avec la configuration `build/bp32/arduino-cli.yaml` (adresse du paquet Bluepad32 ajoutée). Le programme d'essai `bp32test/` affiche l'état des manettes et la mémoire libre.
 - **Bibliothèques :** ESP32-HUB75-MatrixPanel-I2S-DMA et Adafruit GFX ; Bluepad32 est fourni avec la carte.
 - **Manettes :** une petite couche d'adaptation (`PadShim`) garde les noms `PS4.Cross()`, `PS4.LStickX()`... utilisés par les jeux ; `PAD2` lit la 2e manette. L'ancienne bibliothèque PS4Controller (une seule manette, adresse de la console à recopier) reste dans l'historique Git (V3.70, commit `11e9556`).
-- **Plans, aperçus et GIF :** `python docs/branchement.py`, `python docs/rendu.py`, `python docs/gif_manette_ps4.py`, `python docs/gif_arrivee.py`, `python docs/gif_menus.py`, `python docs/gif_jeux.py [raid raquettes bulles labyrinthe orbite briques blocs cruch taupe billes escadrille]`, `python docs/gif_bunker.py`, `python docs/gif_turbo.py`, `python docs/gif_pincab.py`, `python docs/gif_renard.py`, `python docs/branchement_son.py` (Pillow).
+- **Plans, aperçus et GIF :** `python docs/branchement.py`, `python docs/rendu.py`, `python docs/gif_manette_ps4.py`, `python docs/gif_arrivee.py`, `python docs/gif_menus.py`, `python docs/gif_jeux.py [raid raquettes bulles labyrinthe orbite briques blocs cruch taupe billes escadrille]`, `python docs/gif_bunker.py`, `python docs/gif_turbo.py`, `python docs/gif_pincab.py`, `python docs/gif_renard.py`, `python docs/gif_scarabee3d.py`, `python docs/branchement_son.py` (Pillow).
 
 L'ancienne version avec wifi, page web et manette ESP-NOW reste disponible dans l'historique Git, jusqu'au commit `fb11367`.
