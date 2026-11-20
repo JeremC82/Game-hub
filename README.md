@@ -1,8 +1,8 @@
 # Game hub : jeux d'arcade sur dalles LED HUB75 (ESP32 + manette PS4)
 
-![Logo GAMEHUB au démarrage](docs/logo-boot.png)
+![Logo GAMEHUB au démarrage](docs/logo-boot.gif)
 
-Au démarrage, le logo **GAMEHUB** (une manette, des lettres arc-en-ciel en dégradé) s'affiche 2 s avec la version et les réglages en cours (V4.15, corrigé en V4.16).
+Au démarrage, le logo **GAMEHUB** (une manette, des lettres arc-en-ciel en dégradé) s'affiche 2 s avec la version et les réglages en cours. Il est **animé** (V4.19) : un reflet balaie les lettres, les étoiles scintillent, les perles changent de couleur et la dalle pulse doucement. En démo, à chaque changement de jeu : le **tableau des scores** du jeu qui finit (2 s), puis le logo avec le nom du jeu suivant (2 s).
 
 Jeux d'arcade sur 1 à 4 dalles LED 128x64, avec un ESP32 classique et une **manette PS4 reliée en Bluetooth**.
 
@@ -10,11 +10,11 @@ Jeux d'arcade sur 1 à 4 dalles LED 128x64, avec un ESP32 classique et une **man
 - **Partition unique de 3 Mo :** il reste de la place pour d'autres jeux.
 - **Son en option :** une broche PWM vers un petit ampli et un haut-parleur.
 
-**17 jeux originaux**, à choisir dans le menu (gauche / droite sur la ligne JOUER). Au démarrage, c'est toujours le **1er jeu de la liste** qui est proposé. Les noms affichés au menu se changent dans le tableau `GAME_NAME` en haut de `games/games.ino`.
+**18 jeux originaux**, à choisir dans le menu (gauche / droite sur la ligne JOUER). Au démarrage, c'est toujours le **1er jeu de la liste** qui est proposé. Les noms affichés au menu se changent dans le tableau `GAME_NAME` en haut de `games/games.ino`.
 
-Les 17 jeux ont en commun les niveaux de difficulté, les stages, les vies, les meilleurs scores avec les noms et la démo automatique.
+Les 18 jeux ont en commun les niveaux de difficulté, les stages, les vies, les meilleurs scores avec les noms et la démo automatique.
 
-## Les 17 jeux en un coup d'œil
+## Les 18 jeux en un coup d'œil
 
 Dans tous les jeux : **OPTIONS ou L2 = pause** ; en pause, **○ revient au menu** (le score est enregistré). Les deux manettes pilotent le menu. « Sans fin » : les stages continuent tant qu'il reste des vies ; la difficulté monte puis **plafonne** au stage indiqué.
 
@@ -23,7 +23,7 @@ Dans tous les jeux : **OPTIONS ou L2 = pause** ; en pause, **○ revient au menu
 | 0 | GALAGA | [SPACE DEFENDER](#space-defender) | gauche / droite (croix ou stick), **✕ tirer** | vaisseau qui évolue (tir rapide, double, triple canon) ; ennemis abattus en vol ×2 ; fin de stage 500 × stage ; boss 2000 × n° ; une vie par stage | sans fin ; 4 mondes en boucle ; boss tous les 4 stages ; difficulté plafonnée au stage 12 |
 | 1 | SHOOTME | [RAID](#raid) | croix / stick : bouger, **✕ tirer**, **○ bombe** | capsules **P** (arme, jusqu'à 5 tirs), **S** bouclier, **B** bombe ; boss : 2000 × stage + une vie | sans fin ; boss après 8 vagues à chaque stage |
 | 2 | PONG | [RAQUETTES](#raquettes) | haut / bas (stick : vitesse proportionnelle) | point gagné 100 × stage ; effet donné par la raquette | sans fin ; stage suivant tous les 5 points ; 3 points encaissés = fin (à deux : premier à 7) |
-| 3 | BULLES | [BULLES](#bulles) | gauche / droite, **haut ou ○ sauter**, **✕ bulle** | cristal 500 ; bonus de chaîne ; une vie par niveau | sans fin ; un nouveau plan de plateformes à chaque niveau |
+| 3 | BULLES | [BULLES](#bulles) | gauche / droite, **haut ou ○ sauter**, **✕ bulle** | cristal 500 ; bonus de chaîne ; boss 3000 × stage ; une vie par niveau | sans fin ; 4 niveaux par stage (le 4e : boss géant) ; 8 plans de plateformes, en miroir un stage sur deux |
 | 4 | PAC MAN | [LABYRINTHE](#labyrinthe) | croix / stick, **✕ ou ○ sauter** par-dessus une créature | grosse graine : créatures bleues 200, 400, 800, 1600 ; créature sautée +100 ; une vie par stage | sans fin ; vitesse plafonnée au stage 8 |
 | 5 | ORBITUS | [ORBITUS](#orbitus) | stick : glisser sur l'orbite, croix gauche / droite : tourner, **✕ tirer** | ennemis en piqué ×2 ; capsule de l'ennemi blanc : double tir ; une vie par stage | sans fin ; de 4 à 7 vagues (7 au stage 7) |
 | 6 | CASSE BRIQUES | [CASSE BRIQUES](#casse-briques) | gauche / droite (stick proportionnel), **✕ lancer / tirer** | capsules : raquette large, balle lente, 3 balles, tir, vie, **porte** (5 s, sortie en bas à droite : stage suivant +2000) ; piège bleu : raquette réduite 10 s | 6 tableaux en boucle, sans fin ; vitesse de la balle plafonnée au stage 10 |
@@ -31,12 +31,13 @@ Dans tous les jeux : **OPTIONS ou L2 = pause** ; en pause, **○ revient au menu
 | 8 | CANDY CRUCH | [CRUCH](#cruch) | croix / stick : curseur, **✕ prendre**, direction : échanger, **○ annuler** | 4 alignés : bonbon rayé ; 5 : bombe ; chaînes ; coups restants ; une vie par niveau | sans fin ; objectif +700 points à chaque niveau |
 | 9 | DIG DUG | [TAUPE](#taupe) | croix / stick, **✕ ou ○ jet de boue** | rocher qui écrase : gros bonus ; plus la créature est profonde, plus elle rapporte | sans fin ; jusqu'à 5 rochers ; vitesse plafonnée au stage 8 |
 | 10 | BILLES | [BILLES](#billes) | gauche / droite : viser (stick direct), **✕ tirer** | billes qui tombent : gros bonus | sans fin ; de 4 à 6 couleurs (6 au stage 6) ; une seule partie |
-| 11 | 1945 | [ESCADRILLE](#escadrille) | croix / stick, **✕ (□, R1, R2) tirer**, **○ tonneau** | capsules **P** arme (5 tirs), **T** tonneau, **+** vie ; boss 2000 × stage | sans fin ; boss après 10 vagues (2 avions en alternance) |
+| 11 | 1945 | [ESCADRILLE](#escadrille) | croix / stick, **✕ (□, R1, R2) tirer**, **○ tonneau** | capsules **P** arme (5 tirs), **T** tonneau, **+** vie ; boss 2000 × stage | sans fin ; boss après 10 vagues (3 avions chacun son tour) |
 | 12 | BUNKER 3D | [BUNKER 3D](#bunker-3d) | stick gauche : avancer / pas de côté, stick droit : pivoter, L1 / R1 pas de côté, **✕ / R2 tirer**, **□ ouvrir**, **○ arme**, **△ carte** | soin, munitions, armure, carte rouge, arme lourde ; combos DOUBLE, TRIPLE, CARNAGE ; barils en chaîne | sans fin ; un nouveau bunker généré à chaque stage |
 | 13 | TURBO ROUTE | [TURBO ROUTE](#turbo-route) | gauche / droite : braquer, **✕ / R2 / haut accélérer**, **bas freiner**, stick droit : accélérer / freiner, **○ turbo** | pièce 250 ; voiture doublée 50 ; bidon de turbo ; police semée 2000, police KO 3000 ; secondes restantes × 100 | sans fin ; 4 décors en boucle ; distance plafonnée au stage 6, circulation au stage 8 |
 | 14 | RENARD | [RENARD](#renard) | **✕ ou haut sauter** (tenir : plus haut), **bas se baisser** (en l'air : retomber vite) | gemme +100 ; étoile : invincible 5 s (traverse tout, +50 par obstacle) | sans fin ; stage tous les 1000 points ; vitesse maximale atteinte peu à peu ; jour et nuit en alternance |
 | 15 | PAC MANIA | [SCARABEE 3D](#scarabee-3d) | croix / stick, **✕ ou ○ sauter** | comme LABYRINTHE (grosse graine, créatures 200 à 1600, créature sautée +100) | sans fin ; couleurs du décor différentes à chaque stage ; vitesse plafonnée au stage 8 |
 | 16 | RALLYE 3D | [RALLYE 3D](#rallye-3d) | gauche / droite (stick) : tourner, **✕ / R2 / haut accélérer**, **bas freiner**, stick droit : accélérer / freiner | tour bouclé 500 ; balise 10 ; arrivée : 1000 × stage × (4 − place) | sans fin ; 3 tours contre 3 adversaires, finir dans les 3 premiers pour passer ; 4 décors en boucle, circuit en miroir un stage sur deux ; adversaires plafonnés au stage 8 |
+| 17 | VORTEX 3D | [VORTEX 3D](#vortex-3d) | gauche / droite (stick), **haut / bas : vitesse**, **✕ tirer**, **○ sauter** | caisse 50, mine 30, soucoupe 300, orbe 200 (double tir 10 s) ; fin de stage 1000 × stage | sans fin ; une distance par stage ; trous dans la route à partir du stage 2 ; vitesse et obstacles plafonnés au stage 8 |
 
 
 ## Deux manettes (Bluepad32)
@@ -46,7 +47,7 @@ Depuis la V3.84, le Game-hub utilise **Bluepad32** : jusqu'à **4 manettes Bluet
 - **Menu « JOUEURS 1 / 2 »** (2e ligne, une étoile par manette connectée) : seuls les jeux à deux joueurs utilisent la 2e manette.
   - **RAQUETTES** : match à deux (raquette de droite pour le joueur 2), **le premier à 7 points gagne**.
   - **SPACE DEFENDER** : coopération, un 2e vaisseau **vert** pour le joueur 2, vies et score communs ; les ennemis piquent sur l'un ou l'autre ; la manette du joueur touché vibre.
-- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V4.16_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
+- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V4.23_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
 - **Mémoire** : environ 81 Ko libres avec 2 dalles en 3 bits et deux manettes connectées.
 
 # SPACE DEFENDER
@@ -127,6 +128,9 @@ Un shoot vertical : tu te déplaces partout dans le bas de l'écran, et les vagu
 ![BULLES](docs/jeu-bulles.gif)
 
 Un petit blob cyan original souffle des bulles, sur un écran de plateformes différent à chaque niveau.
+- **Niveaux et stages (V4.20) :** 4 niveaux par stage (affichés 1-1, 1-2...), 8 plans de plateformes dessinés, en miroir un stage sur deux ; couleur des plateformes et ennemis différents à chaque stage ; plus d'ennemis et plus rapides au fil des niveaux.
+- **Boss :** au 4e niveau de chaque stage, un monstre géant rebondit dans l'arène (barre de vie en haut). Chaque bulle qui le touche lui enlève de la vie ; à partir du stage 2 il crache des boules de feu. Vaincu, il est pris dans une bulle géante : touche-la pour la faire éclater (3000 × stage et pluie de cristaux).
+- **Sans scintillement :** l'image est dessinée en mémoire puis envoyée d'un bloc (32 Ko pendant le jeu seulement). « VITE ! » s'affiche quand les ennemis s'énervent.
 - **Le décor :** murs de 5 pixels et plateformes épaisses en briques, avec une arête claire et des joints, aux couleurs du niveau.
 - **Commandes :** gauche / droite pour marcher, **haut ou ○ pour sauter**, **✕ pour souffler une bulle**. On traverse les plateformes par-dessous en sautant, et on retombe dessus.
 - **Piéger un ennemi :** une bulle qui touche un ennemi l'**enferme**, puis monte vers le plafond. **Touche la bulle** pour la faire éclater : l'ennemi devient un **cristal** qui tombe, et le ramasser rapporte 500 points. Éclater plusieurs bulles à la suite donne un bonus de chaîne.
@@ -238,7 +242,7 @@ Un shoot vertical original au-dessus de la mer (V3.85, remplace ESCALADE ; nouve
 - **Ton avion :** un chasseur **vert foncé** à étoiles blanches (V3.93 ; les chasseurs ennemis sont rouge brique), hélice qui tourne, avec un **contour sombre** et une **ombre sur la mer** pour bien le voir. Les avions ennemis ont aussi leur ombre.
 - **Ennemis :** des chasseurs (rouge brique, argent ou jaunes) en V, en vague sinueuse, par le côté ou en piqué ; des **bombardiers bimoteurs** qui tirent en éventail ; des **navires** qui avancent sur la mer (vague d'étrave, sillage d'écume, tourelles qui suivent ton avion) : vedette, destroyer à cheminées qui fument, et **porte-avions** (pont gris, îlot, avions posés) qui fait décoller des chasseurs.
 - **Capsules :** **P** jaune = arme (2, 3, 4 puis 5 tirs en éventail), **T** bleue = un tonneau de plus, **+** rouge = une vie (laissée par le porte-avions). Une vie perdue fait baisser l'arme d'un niveau.
-- **Boss :** après 10 vagues ; il tire peu (éventail de 3 balles et un tir visé de temps en temps) ; sous la moitié de sa vie, il bouge plus vite, tire en éventail de 5 et en spirale lente.
+- **Boss :** après 10 vagues, chacun son tour (V4.23, d'après des dessins fournis) : **bimoteur rouge à double poutre**, **grand quadrimoteur kaki**, **aile volante bleue** aux moteurs jaunes ; il tire peu (éventail de 3 balles et un tir visé de temps en temps) ; sous la moitié de sa vie, il bouge plus vite, tire en éventail de 5 et en spirale lente.
 - **Points :** chasseur 100, piqueur 150, vedette 300, bombardier 500, destroyer 600, porte-avions 1500, boss 2000 × le stage.
 
 ### BUNKER 3D
@@ -315,6 +319,18 @@ Une course sur circuit originale (V4.14) **vue en relief et en biais**, comme SC
 
 ![RALLYE 3D : verdure, désert, neige, volcan](docs/rallye3d-rendus.png)
 
+### VORTEX 3D
+
+![VORTEX 3D](docs/jeu-vortex3d.gif)
+
+Un tir sur route en 3D original (V4.21 à V4.23) : la route flotte dans l'espace et file vers l'horizon, avec ses **virages en S**, ses **bosses** et sa **plongée** au loin derrière la crête ; une planète à anneau se lève sur l'horizon.
+- **Commandes :** gauche / droite (ou stick) pour se déplacer, **haut / bas pour la vitesse**, **✕ pour tirer**, **○ pour sauter**. Dans les virages, la route te pousse vers l'extérieur.
+- **Obstacles :** caisses (2 tirs, ou sauter par-dessus), mines (sauter ou tirer), **murs** avec une ouverture où passer, **piliers** violets indestructibles à éviter, **trous** dans la route (à sauter, à partir du stage 2), **soucoupes** qui reculent devant toi et tirent ; **orbe** jaune : double tir 10 s.
+- **Stages :** une distance à parcourir (barre verte en haut), puis stage suivant : plus vite, plus d'obstacles, autres couleurs (route, rails, planète).
+- **Graphisme :** route en bandes de couleur, rails néon, voies en pointillés, poteaux lumineux qui défilent, objets à l'échelle de la distance ; vaisseau en flèche avec cockpit et réacteurs, son ombre sur la route quand il saute. Image dessinée en mémoire (32 Ko pendant le jeu seulement) : pas de scintillement.
+
+![VORTEX 3D : stages 1, 2 et 3](docs/vortex3d-rendus.png)
+
 ### CRUCH
 
 ![CRUCH](docs/jeu-cruch.gif)
@@ -340,7 +356,7 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. **La démo cha
 
 | Ligne | Action |
 |---|---|
-| **JOUER** | **gauche / droite : choix du jeu** (17 jeux ; leurs noms se changent dans le tableau `GAME_NAME` en haut de `games/games.ino`). Au démarrage : le premier jeu de la liste. ✕ ou OPTIONS lance la partie. |
+| **JOUER** | **gauche / droite : choix du jeu** (18 jeux ; leurs noms se changent dans le tableau `GAME_NAME` en haut de `games/games.ino`). Au démarrage : le premier jeu de la liste. ✕ ou OPTIONS lance la partie. |
 | **NIVEAU** | Facile / Normal / Difficile (gauche / droite ou ✕), choix gardé en mémoire |
 | **LUMINOSITE** | 0 à 100 % par pas de 10 % (gauche / droite ou ✕), visible tout de suite et gardée en mémoire. À 0 %, les dalles restent très faiblement allumées pour qu'on voie encore le menu. |
 | **VOLUME** | volume du son, 0 à 100 % par pas de 10 % (gauche / droite ou ✕). Un bip fait entendre le niveau. 0 % = muet. C'est le rapport cyclique du PWM : le potentiomètre de l'ampli règle le maximum. |
@@ -454,7 +470,8 @@ De la V2.01 à la V2.22, le son passait par un ampli I2S MAX98357A (GPIO 22, 21,
 | `v N` | volume du son, de 0 à 10 |
 | `l N` | luminosité des dalles, de 0 à 100 % (gardée en mémoire, comme la ligne LUMINOSITE du menu) ; `l` seul affiche la valeur actuelle |
 | `e 0` / `e 1` / `e x` | test des pertes Bluetooth : LED éteintes / rallumées / transfert vers les dalles arrêté (jusqu'au redémarrage) |
-| `j N` | test : lance la démo du jeu N (0 SPACE DEFENDER ... 12 BUNKER 3D), sans manette |
+| `j N` | test : lance la démo du jeu N (0 à 17), sans manette |
+| `n` | démo : passe tout de suite au jeu suivant (tableau des scores, puis logo) |
 
 Les commandes `a`, `c` et `p` redémarrent l'ESP32. Les réglages sont gardés en mémoire.
 
@@ -473,8 +490,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V4.16_complet.bin](firmware/GameHub_V4.16_complet.bin) | 0x0 | `55ecb17786d8c394b4b305b251e20cbb` |
-| [firmware/GameHub_V4.16.bin](firmware/GameHub_V4.16.bin) | 0x10000 | `a9ab7a45df5eef4915f67c26e79c6c23` |
+| [firmware/GameHub_V4.23_complet.bin](firmware/GameHub_V4.23_complet.bin) | 0x0 | `3491b3ab1ff2696b249367d51378cc20` |
+| [firmware/GameHub_V4.23.bin](firmware/GameHub_V4.23.bin) | 0x10000 | `8952aad1ef3a1b9c0faa2e660275be2a` |
 | [firmware/GameHub_V3.86_complet.bin](firmware/GameHub_V3.86_complet.bin) | 0x0 | `dc451b01c498df647da822a1427a1a5e` |
 | [firmware/GameHub_V3.86.bin](firmware/GameHub_V3.86.bin) | 0x10000 | `ee1945d390b91eb82240245a1e52821f` |
 
@@ -492,6 +509,6 @@ Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB S
 - **Carte :** installée avec la configuration `build/bp32/arduino-cli.yaml` (adresse du paquet Bluepad32 ajoutée). Le programme d'essai `bp32test/` affiche l'état des manettes et la mémoire libre.
 - **Bibliothèques :** ESP32-HUB75-MatrixPanel-I2S-DMA et Adafruit GFX ; Bluepad32 est fourni avec la carte.
 - **Manettes :** une petite couche d'adaptation (`PadShim`) garde les noms `PS4.Cross()`, `PS4.LStickX()`... utilisés par les jeux ; `PAD2` lit la 2e manette. L'ancienne bibliothèque PS4Controller (une seule manette, adresse de la console à recopier) reste dans l'historique Git (V3.70, commit `11e9556`).
-- **Plans, aperçus et GIF :** `python docs/branchement.py`, `python docs/rendu.py`, `python docs/gif_manette_ps4.py`, `python docs/gif_arrivee.py`, `python docs/gif_menus.py`, `python docs/gif_jeux.py [raid raquettes bulles labyrinthe orbite briques blocs cruch taupe billes escadrille]`, `python docs/gif_bunker.py`, `python docs/gif_turbo.py`, `python docs/gif_renard.py`, `python docs/gif_scarabee3d.py`, `python docs/gif_rallye3d.py`, `python docs/logo_boot.py`, `python docs/branchement_son.py` (Pillow).
+- **Plans, aperçus et GIF :** `python docs/branchement.py`, `python docs/rendu.py`, `python docs/gif_manette_ps4.py`, `python docs/gif_arrivee.py`, `python docs/gif_menus.py`, `python docs/gif_jeux.py [raid raquettes bulles labyrinthe orbite briques blocs cruch taupe billes escadrille]`, `python docs/gif_bunker.py`, `python docs/gif_turbo.py`, `python docs/gif_renard.py`, `python docs/gif_scarabee3d.py`, `python docs/gif_rallye3d.py`, `python docs/logo_boot.py`, `python docs/gif_vortex3d.py`, `python docs/avions_1945.py`, `python docs/branchement_son.py` (Pillow).
 
 L'ancienne version avec wifi, page web et manette ESP-NOW reste disponible dans l'historique Git, jusqu'au commit `fb11367`.

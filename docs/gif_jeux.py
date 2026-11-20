@@ -103,6 +103,7 @@ def save(frames, name, ms=80):
 
 
 # ================================================================ RAID
+SRC_INO = open(os.path.join(DOC, '..', 'games', 'games.ino'), encoding='utf-8').read()
 SPR_BOSS_ROWS = re.findall(r'"([^"]*)"', re.search(r'SPR_BOSS\[9\] = \{(.*?)\};', open(os.path.join(DOC, '..', 'games', 'games.ino'), encoding='utf-8').read(), re.S).group(1))
 
 
@@ -1954,8 +1955,7 @@ def escadrille():
     ROLL = ("...........", ".....B.....", "....BcB....", "..BBBBBBB..", "..bWBbBWb..", "...bBBBb...", ".....B.....", "...BBBBB...", "....bBb....")
     FIGHT = (("...gGg...", "....G....", "GGGGGGGGG", "gGGGgGGGg", "...GcG...", "....G....", "........."),
              ("...gGg...", "....G....", "GGGGGGGGG", "gGGGgGGGg", "...GcG...", "....G....", "........."))
-    BOMBER = ("......GGGGG......", "........G........", "........G........", "...g....G....g...", "GGGGGGGGGGGGGGGGG",
-              "gGGGGgGGGGGgGGGGg", "....ggg.G.ggg....", "....ggg.G.ggg....", "....kkk.G.kkk....", "........G........", ".......GcG.......")
+    BOMBER = tuple(re.findall(r'"([^"]*)"', re.search(r'SPR_A_BOMBER\[11\] = \{(.*?)\};', SRC_INO, re.S).group(1)))
     BOAT = ("..S..", ".SSS.", ".SkS.", "SSSSS", "SSsSS", "SsssS", "SSsSS", "SSSSS", ".SSS.", ".SkS.", ".SSS.", ".www.")
     DEST = ("...S...", "..SSS..", "..SkS..", ".SSSSS.", ".SSkSS.", "SSSSSSS", "SSsssSS", "SSsssSS", "SSskSSS", "SSsssSS",
             "SSSSSSS", "SSSkSSS", "SSSSSSS", "SSsssSS", "SSSSSSS", ".SSkSS.", ".SSSSS.", "..SSS..", "..www..", ".w...w.")
@@ -1965,7 +1965,8 @@ def escadrille():
     def col(ch, var):
         return {'B': (0, 90, 20) if var == 3 else (20, 150, 40), 'b': (0, 90, 20), 'W': (255, 255, 255), 'y': (255, 220, 0),
                 'o': (255, 140, 0), 'c': (120, 220, 255), 'k': (40, 40, 50), 'G': GV[var % 3][0], 'g': GV[var % 3][1],
-                'S': (188, 192, 202), 's': (150, 155, 165), 'n': (160, 105, 55), 'N': (230, 210, 170)}.get(ch, (200, 230, 255))
+                'S': (188, 192, 202), 's': (150, 155, 165), 'n': (160, 105, 55), 'N': (230, 210, 170), 'L': (235, 240, 250),
+                'H': ((255, 140, 110), (235, 235, 250), (255, 240, 130))[var % 3]}.get(ch, (200, 230, 255))
 
     def spr(sc, rows, x0, y0, var=0, white=False):
         for r, line in enumerate(rows):

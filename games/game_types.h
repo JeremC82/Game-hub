@@ -22,3 +22,4 @@ struct VCar { float x, y, vy, tx; uint8_t type, col; int8_t lane; bool on, passe
 struct VDeco { float y; int16_t x; uint8_t type; bool on; };  // TURBO ROUTE : decor du bord de la route
 struct RuObj { float x; int8_t type, h; bool on; };  // RENARD : 0 rocher, 1 buissons (h : nombre), 2 tronc, 3 chauve-souris (h : hauteur), 4 gemme, 5 etoile
 struct XCar { float x, y, a, v; int8_t wp, lap; uint8_t col, fin; };  // RALLYE 3D : voiture (fin : place a l arrivee, 0 en course)
+struct VxObj { float d, x, len; uint8_t flash, type, hp; bool on; };  // VORTEX 3D : obstacle (0 caisse, 1 mur, 2 mine, 3 soucoupe, 4 orbe, 5 trou, 6 pilier)

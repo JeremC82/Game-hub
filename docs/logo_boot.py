@@ -2,6 +2,7 @@
 
   python docs/logo_boot.py   -> docs/logo-boot.png (ecran 128x128)
 """
+import math
 import os
 import sys
 
@@ -19,7 +20,7 @@ RAINBOW = [(255, 40, 40), (255, 150, 0), (255, 230, 0), (40, 230, 60), (0, 210, 
 W = H = 128
 
 
-def word(im, txt, size, y, col0):
+def word(im, txt, size, y, col0, shine=-99):
     px = im.load()
 
     def P(x, yy, c):
@@ -46,6 +47,11 @@ def word(im, txt, size, y, col0):
         band = max(0, min(2, (yy - 1) * 3 // th))
         k = RAINBOW[(col0 + max(0, min(6, (xx - 1) // (6 * size)))) % 7]
         c = tuple(min(255, v + 90) for v in k) if band == 0 else k if band == 1 else tuple(v * 7 // 10 for v in k)
+        d = shine - (xx + yy)
+        if 0 <= d < 3:
+            c = (255, 255, 255)
+        elif 3 <= d < 6:
+            c = tuple(min(255, v + 120) for v in k)
         if yy <= size and (xx, yy - 1) not in bits:
             c = (255, 255, 255)
         P(x0 + xx, y + yy, c)
@@ -66,27 +72,41 @@ def pad(d, cx, y):
     d.rectangle((cx - 2, y + 4, cx + 1, y + 5), fill=(0, 150, 255))
 
 
-def render():
+def render(t=-1):
     im = Image.new('RGB', (W, H))
     d = ImageDraw.Draw(im)
+    shine = -99 if t < 0 else int((t % 1100) * .16) - 20
     y = H // 2 - 52
     pad(d, W // 2, y)
-    word(im, 'GAME', 3, y + 20, 0)
-    word(im, 'HUB', 3, y + 46, 4)
-    for i, (dx, dy) in enumerate(((-50, 22), (52, 26), (-46, 52), (47, 58), (-30, 4), (32, 6))):
+    word(im, 'GAME', 3, y + 20, 0, shine)
+    word(im, 'HUB', 3, y + 46, 4, shine - 26)
+    SP = ((-50, 22), (52, 26), (-46, 52), (47, 58), (-30, 4), (32, 6), (-56, 40), (57, 44))
+    for i, (dx, dy) in enumerate(SP):
         k = RAINBOW[(i * 3) % 7]
         x, yy = W // 2 + dx, y + dy
-        for a, b in ((-1, 0), (1, 0), (0, -1), (0, 1)):
-            d.point((x + a, yy + b), fill=k)
-        d.point((x, yy), fill=(255, 255, 255))
+        ph = 0 if t < 0 else (t // 70 + i * 5) % 14
+        if ph < 4:
+            for a, b in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                d.point((x + a, yy + b), fill=k)
+            d.point((x, yy), fill=(255, 255, 255))
+        elif ph < 7:
+            d.point((x, yy), fill=k)
     for i in range(9):
-        d.rectangle((W // 2 - 41 + i * 10, y + 72, W // 2 - 40 + i * 10, y + 73), fill=RAINBOW[i % 7])
+        k = RAINBOW[(i + (0 if t < 0 else t // 120)) % 7]
+        d.rectangle((W // 2 - 41 + i * 10, y + 72, W // 2 - 40 + i * 10, y + 73), fill=k)
     yb = y + 74
-    for t, yy, c in (('V4.15', yb + 4, (150, 150, 170)), ('ECRAN 128X128', yb + 16, (0, 200, 255)), ('COULEURS 3 BITS', yb + 24, (0, 200, 255)), ('LUMI 50%  VOL 60%', yb + 32, (0, 200, 255))):
-        GB.tiny(d, (W - (len(t) * 4 - 1)) // 2, yy, t, c)
+    for tx, yy, c in (('V4.19', yb + 4, (150, 150, 170)), ('ECRAN 128X128', yb + 16, (0, 200, 255)), ('COULEURS 3 BITS', yb + 24, (0, 200, 255)), ('LUMI 50%  VOL 60%', yb + 32, (0, 200, 255))):
+        GB.tiny(d, (W - (len(tx) * 4 - 1)) // 2, yy, tx, c)
+    if t >= 0:  # la dalle pulse doucement
+        f = .78 + .22 * math.sin(t * .009)
+        im = im.point(lambda v: int(v * f))
     return im
 
 
 if __name__ == '__main__':
     GB.leds(render(), P=5).save(os.path.join(DOC, 'logo-boot.png'))
+    frames = [GB.leds(render(t), P=4) for t in range(0, 2200, 40)]
+    pal = frames[10].quantize(colors=128, method=Image.Quantize.MEDIANCUT)
+    q = [fr.quantize(palette=pal, dither=Image.Dither.NONE) for fr in frames]
+    q[0].save(os.path.join(DOC, 'logo-boot.gif'), save_all=True, append_images=q[1:], duration=40, loop=0, optimize=True)
     print('ok')
