@@ -2,7 +2,7 @@
 
 ![Logo GAMEHUB au démarrage](docs/logo-boot.png)
 
-Au démarrage, le logo **GAMEHUB** (une manette, des lettres arc-en-ciel en dégradé) s'affiche 2 s avec la version et les réglages en cours (V4.15).
+Au démarrage, le logo **GAMEHUB** (une manette, des lettres arc-en-ciel en dégradé) s'affiche 2 s avec la version et les réglages en cours (V4.15, corrigé en V4.16).
 
 Jeux d'arcade sur 1 à 4 dalles LED 128x64, avec un ESP32 classique et une **manette PS4 reliée en Bluetooth**.
 
@@ -46,7 +46,7 @@ Depuis la V3.84, le Game-hub utilise **Bluepad32** : jusqu'à **4 manettes Bluet
 - **Menu « JOUEURS 1 / 2 »** (2e ligne, une étoile par manette connectée) : seuls les jeux à deux joueurs utilisent la 2e manette.
   - **RAQUETTES** : match à deux (raquette de droite pour le joueur 2), **le premier à 7 points gagne**.
   - **SPACE DEFENDER** : coopération, un 2e vaisseau **vert** pour le joueur 2, vies et score communs ; les ennemis piquent sur l'un ou l'autre ; la manette du joueur touché vibre.
-- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V4.15_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
+- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V4.16_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
 - **Mémoire** : environ 81 Ko libres avec 2 dalles en 3 bits et deux manettes connectées.
 
 # SPACE DEFENDER
@@ -473,8 +473,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V4.15_complet.bin](firmware/GameHub_V4.15_complet.bin) | 0x0 | `d848c80e5993b74b772714befb43cc21` |
-| [firmware/GameHub_V4.15.bin](firmware/GameHub_V4.15.bin) | 0x10000 | `eca524b412a19a2fc6f955c994348054` |
+| [firmware/GameHub_V4.16_complet.bin](firmware/GameHub_V4.16_complet.bin) | 0x0 | `55ecb17786d8c394b4b305b251e20cbb` |
+| [firmware/GameHub_V4.16.bin](firmware/GameHub_V4.16.bin) | 0x10000 | `a9ab7a45df5eef4915f67c26e79c6c23` |
 | [firmware/GameHub_V3.86_complet.bin](firmware/GameHub_V3.86_complet.bin) | 0x0 | `dc451b01c498df647da822a1427a1a5e` |
 | [firmware/GameHub_V3.86.bin](firmware/GameHub_V3.86.bin) | 0x10000 | `ee1945d390b91eb82240245a1e52821f` |
 

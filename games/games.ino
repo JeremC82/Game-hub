@@ -28,7 +28,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "4.15"
+#define GAMES_VERSION "4.16"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -7958,9 +7958,10 @@ void handleSerial() {
 const uint8_t BOOT_RAINBOW[7][3] = { { 255, 40, 40 }, { 255, 150, 0 }, { 255, 230, 0 }, { 40, 230, 60 }, { 0, 210, 255 }, { 60, 110, 255 }, { 220, 60, 255 } };
 void bootWord(const char *txt, int size, int y, int col0) {
   int tw = strlen(txt) * 6 * size - size, th = 7 * size;
-  GFXcanvas1 cv(tw + 2, th + 2);
+  GFXcanvas1 cv(tw + size + 2, th + 2);  // un peu de marge : la derniere lettre ne doit pas passer a la ligne
   cv.fillScreen(0);
   cv.setFont(NULL);
+  cv.setTextWrap(false);
   cv.setTextSize(size);
   cv.setTextColor(1);
   cv.setCursor(1, 1);
