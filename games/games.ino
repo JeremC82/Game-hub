@@ -28,7 +28,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "4.12"
+#define GAMES_VERSION "4.13"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -376,7 +376,7 @@ void sfxHit() {  // ton vaisseau explose : long grondement grave + sirene qui ch
   sndPlay(1600, 40, 1200, 1.0f, true, 3);
   sndPlay(1000, 70, 950, 0.85f, false, 3);
 }
-void sfxDive() { sndPlay(1200, 380, 450, 0.22f, false, 1); }                              // piqué qui descend
+void sfxDive() { sndPlay(1200, 380, 450, 0.22f, false, 1); }                              // piquÃ© qui descend
 
 void sndTimerStart(void *) {  // cree l'interruption depuis le coeur 0 (elle y reste)
   sndTimer = timerBegin(0, 80, true);  // 1 MHz
@@ -7276,7 +7276,7 @@ void iDraw() {
   for (int i = 0; i < 9; i++) palFull[i] = rgb(G_PAL_RGB[i][0], G_PAL_RGB[i][1], G_PAL_RGB[i][2]);
   const int VH = H - 8;
   // camera : suit le scarabee en douceur (vue en biais : la profondeur part en diagonale)
-  float MW = L_COLS * I_TW + L_ROWS * I_SK, MH = L_ROWS * I_TD + I_WH;
+  float MW = L_COLS * I_TW + L_ROWS * I_SK, MH = L_ROWS * I_TD + I_WH + 6;  // + socle
   float px = iPX(lP.x / 6.0f, lP.y / 6.0f) + iCamX, py = iPY(lP.y / 6.0f) + iCamY;
   float tx = MW <= W ? -(W - MW) / 2.0f : constrain(px - W / 2.0f, 0.0f, MW - W);
   float ty = MH <= VH ? -(VH - MH) / 2.0f : constrain(py - 8 - VH / 2.0f, 0.0f, MH - VH);
@@ -7285,30 +7285,61 @@ void iDraw() {
   iCamY += (ty - iCamY) * 0.2f;
   c.fillScreen(0);
   static const uint8_t WC[4][3] = { { 255, 150, 0 }, { 0, 200, 255 }, { 230, 60, 230 }, { 60, 230, 90 } };
-  static const uint8_t FC[4][3] = { { 0, 0, 170 }, { 160, 0, 160 }, { 0, 0, 170 }, { 0, 0, 170 } };
   int st = (gWave - 1) % 4;
-  const uint8_t *wc = WC[st], *fc = FC[st];
+  const uint8_t *wc = WC[st];  // sol bleu nuit uni (le plus sombre qui reste stable en 3 bits)
   uint16_t top = rgb(wc[0], wc[1], wc[2]), edge = rgb(min(255, wc[0] + 120), min(255, wc[1] + 120), min(255, wc[2] + 120));
   uint16_t front = rgb(wc[0] * 2 / 3, wc[1] * 2 / 3, wc[2] * 2 / 3), side = rgb(wc[0] * 3 / 5, wc[1] * 3 / 5, wc[2] * 3 / 5);
-  uint16_t fl = rgb(fc[0], fc[1], fc[2]), seed = rgb(255, 230, 170);
-  // 1) sol en damier (parallelogrammes) et graines
+  uint16_t fl = colorBits >= 4 ? rgb(0, 0, 100) : rgb(0, 0, 150), seed = rgb(255, 230, 170);
+  // 0) etoiles autour du plateau (defilent moins vite que le labyrinthe)
+  for (int i = 0; i < 36; i++) {
+    int sx = ((i * 53 + 17) * 7 - (int)(iCamX * 0.4f)) % W, sy = 8 + ((i * 29 + 5) * 11 - (int)(iCamY * 0.4f)) % (H - 8);
+    if (sx < 0) sx += W;
+    if (sy < 8) sy += H - 8;
+    c.drawPixel(sx, sy, ((i + gFrame / 20) % 7) ? rgb(150, 150, 170) : palFull[0]);
+  }
+  // 1) socle du plateau (epaisseur sous le sol : face avant et cote gauche), puis sol uni
+  const float SL = 5;
+  uint16_t slabF = rgb(wc[0] * 3 / 5, wc[1] * 3 / 5, wc[2] * 3 / 5), slabS = rgb(wc[0] / 2 + 20, wc[1] / 2 + 20, wc[2] / 2 + 20);
+  iQuad(c, iPX(0, 0), iPY(0), iPX(0, L_ROWS), iPY(L_ROWS), iPX(0, L_ROWS), iPY(L_ROWS) + SL, iPX(0, 0), iPY(0) + SL, slabS);
+  iQuad(c, iPX(0, L_ROWS), iPY(L_ROWS), iPX(L_COLS, L_ROWS), iPY(L_ROWS), iPX(L_COLS, L_ROWS), iPY(L_ROWS) + SL, iPX(0, L_ROWS), iPY(L_ROWS) + SL, slabF);
+  for (int k = 0; k < L_COLS; k += 2)  // joints du socle
+    c.drawFastVLine(lroundf(iPX(k, L_ROWS)), lroundf(iPY(L_ROWS)) + 1, SL - 1, 0);
+  iQuad(c, iPX(0, 0), iPY(0), iPX(L_COLS, 0), iPY(0), iPX(L_COLS, L_ROWS), iPY(L_ROWS), iPX(0, L_ROWS), iPY(L_ROWS), fl);
+  c.drawLine(lroundf(iPX(0, L_ROWS)), lroundf(iPY(L_ROWS)), lroundf(iPX(L_COLS, L_ROWS)) - 1, lroundf(iPY(L_ROWS)), rgb(150, 150, 255));  // bord eclaire
+  // 2) ombres portees des murs sur le sol (vers la droite et l'avant)
+  const float M = 0.32f;  // retrait du mur de chaque cote : murs fins, sol visible autour
   for (int r = 0; r < L_ROWS; r++) {
-    float ya = iPY(r), yb = iPY(r + 1);
-    if (ya >= H || yb <= 8) continue;
+    if (iPY(r) >= H || iPY(r + 1) + 3 <= 8) continue;
     for (int col = 0; col < L_COLS; col++) {
-      float xa = iPX(col, r), xb = iPX(col, r + 1);
-      if (min(xa, xb) >= W || max(xa, xb) + I_TW <= 0) continue;
-      if ((r + col) & 1) iQuad(c, xa, ya, xa + I_TW, ya, xb + I_TW, yb, xb, yb, fl);
+      if (L_MAZE[r][col] != '#') continue;
+      if (iPX(col, r + 1) >= W || iPX(col + 1, r) + 3 <= 0) continue;
+      bool wl = lWall(r, col - 1), wr = lWall(r, col + 1), wu = lWall(r - 1, col), wd = lWall(r + 1, col);
+      float x0 = col + (wl ? 0 : M), x1 = col + 1 - (wr ? 0 : M), y0 = r + (wu ? 0 : M), y1 = min((float)L_ROWS, r + 1 - (wd ? 0 : M) + 0.3f);
+      x1 = min((float)L_COLS, x1 + 0.3f);
+      iQuad(c, iPX(x0, y0) + 2, iPY(y0) + 1, iPX(x1, y0), iPY(y0) + 1, iPX(x1, y1), iPY(y1), iPX(x0, y1) + 2, iPY(y1), 0);
+    }
+  }
+  // 3) graines : petites perles avec reflet et ombre ; grosses graines qui flottent et pulsent
+  for (int r = 0; r < L_ROWS; r++) {
+    float ya = iPY(r);
+    if (ya >= H || iPY(r + 1) <= 8) continue;
+    for (int col = 0; col < L_COLS; col++) {
       uint8_t d = L_MAZE[r][col] == '#' ? 0 : lDot[r][col];
+      if (!d) continue;
       int bx = lroundf(iPX(col + 0.5f, r + 0.5f)), by = lroundf(iPY(r + 0.5f));
-      if (d == 1) c.fillRect(bx - 1, by - 1, 2, 2, seed);
-      else if (d == 2) {  // grosse graine : boule qui pulse, avec son ombre
+      if (bx < -3 || bx > W + 3) continue;
+      if (d == 1) {
+        c.drawPixel(bx + 1, by + 1, 0);
+        c.fillRect(bx - 1, by - 1, 2, 2, seed);
+        c.drawPixel(bx - 1, by - 1, palFull[0]);
+      } else {
         uint16_t gc = (gFrame & 8) ? palFull[0] : palFull[2];
-        int bb = by - 2 - ((gFrame >> 3) & 1);
-        c.drawFastHLine(bx - 1, by + 1, 3, 0);
+        int bb = by - 3 - ((gFrame >> 3) & 1);
+        c.drawFastHLine(bx - 2, by + 1, 5, 0);
         c.fillRect(bx - 1, bb - 1, 3, 3, gc);
         c.drawPixel(bx, bb - 2, gc); c.drawPixel(bx, bb + 2, gc); c.drawPixel(bx - 2, bb, gc); c.drawPixel(bx + 2, bb, gc);
         c.drawPixel(bx - 1, bb - 1, palFull[0]);
+        if (gFrame & 8) { c.drawPixel(bx - 3, bb - 3, palFull[2]); c.drawPixel(bx + 3, bb - 3, palFull[2]); c.drawPixel(bx + 3, bb + 3, palFull[2]); c.drawPixel(bx - 3, bb + 3, palFull[2]); }
       }
     }
   }
@@ -7316,7 +7347,6 @@ void iDraw() {
   c.drawLine(lroundf(iPX(10, 8.5f)), lroundf(iPY(8.5f)), lroundf(iPX(11, 8.5f)) - 1, lroundf(iPY(8.5f)), palFull[7]);
   // 2) rangee par rangee (du fond vers l'avant, de droite a gauche) : les murs fins, puis ce qui se tient sur la rangee
   static const uint8_t EC[4][3] = { { 200, 60, 255 }, { 255, 140, 0 }, { 170, 230, 40 }, { 230, 230, 230 } };
-  const float M = 0.32f;  // retrait du mur de chaque cote : murs fins, sol visible autour
   for (int r = 0; r < L_ROWS; r++) {
     if (iPY(r) - I_WH < H && iPY(r + 1) > 8)
       for (int col = L_COLS - 1; col >= 0; col--) {
@@ -7329,7 +7359,9 @@ void iDraw() {
         if (!wl) iQuad(c, iPX(x0, y0), iPY(y0) - h, iPX(x0, y1), iPY(y1) - h, iPX(x0, y1), iPY(y1), iPX(x0, y0), iPY(y0), side);
         if (!wd) iQuad(c, iPX(x0, y1), iPY(y1) - h, iPX(x1, y1), iPY(y1) - h, iPX(x1, y1), iPY(y1), iPX(x0, y1), iPY(y1), front);
         iQuad(c, iPX(x0, y0), iPY(y0) - h, iPX(x1, y0), iPY(y0) - h, iPX(x1, y1), iPY(y1) - h, iPX(x0, y1), iPY(y1) - h, top);
-        if (!wu) c.drawLine(lroundf(iPX(x0, y0)), lroundf(iPY(y0) - h), lroundf(iPX(x1, y0)) - 1, lroundf(iPY(y0) - h), edge);  // arete eclairee
+        if (!wu) c.drawLine(lroundf(iPX(x0, y0)), lroundf(iPY(y0) - h), lroundf(iPX(x1, y0)) - 1, lroundf(iPY(y0) - h), edge);  // aretes eclairees
+        if (!wl) c.drawLine(lroundf(iPX(x0, y0)), lroundf(iPY(y0) - h), lroundf(iPX(x0, y1)), lroundf(iPY(y1) - h), edge);
+        if (!wd) c.drawLine(lroundf(iPX(x0, y1)), lroundf(iPY(y1)) - 1, lroundf(iPX(x1, y1)) - 1, lroundf(iPY(y1)) - 1, 0);  // pied du mur
       }
     // creatures de cette rangee : boules a piquants ombrees, yeux qui regardent ou elles vont
     for (int i = 0; i < 4; i++) {

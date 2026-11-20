@@ -42,7 +42,7 @@ Depuis la V3.84, le Game-hub utilise **Bluepad32** : jusqu'à **4 manettes Bluet
 - **Menu « JOUEURS 1 / 2 »** (2e ligne, une étoile par manette connectée) : seuls les jeux à deux joueurs utilisent la 2e manette.
   - **RAQUETTES** : match à deux (raquette de droite pour le joueur 2), **le premier à 7 points gagne**.
   - **SPACE DEFENDER** : coopération, un 2e vaisseau **vert** pour le joueur 2, vies et score communs ; les ennemis piquent sur l'un ou l'autre ; la manette du joueur touché vibre.
-- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V4.12_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
+- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V4.13_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
 - **Mémoire** : environ 81 Ko libres avec 2 dalles en 3 bits et deux manettes connectées.
 
 # SPACE DEFENDER
@@ -305,8 +305,8 @@ Une course sans fin originale (V4.11) : un petit renard orange court tout seul, 
 
 ![SCARABEE 3D](docs/jeu-scarabee3d.gif)
 
-Le labyrinthe du scarabée (mêmes règles que LABYRINTHE) **vu en relief et en biais** (V4.12) : les couloirs horizontaux restent horizontaux, la profondeur part en diagonale.
-- **Décor :** murs fins en blocs (dessus clair avec arête éclairée, face avant et côté gauche dans l'ombre), sol en damier, couleurs différentes à chaque stage ; la vue **défile** et suit le scarabée en douceur.
+Le labyrinthe du scarabée (mêmes règles que LABYRINTHE) **vu en relief et en biais** (V4.12, décor V4.13) : les couloirs horizontaux restent horizontaux, la profondeur part en diagonale.
+- **Décor :** murs fins en blocs (dessus clair aux arêtes éclairées, face avant et côté gauche dans l'ombre) qui projettent leur **ombre** sur un sol uni bleu nuit, plateau posé sur un **socle**, étoiles autour ; couleurs des murs différentes à chaque stage ; la vue **défile** et suit le scarabée en douceur.
 - **Personnages :** créatures piquantes ombrées (9 pixels) aux yeux qui regardent où elles vont, scarabée avec carapace, taches, antennes et pattes qui bougent ; ombres au sol.
 - **Commandes :** croix ou stick pour diriger, **✕ ou ○ pour sauter** par-dessus une créature (+100) : l'ombre rétrécit pendant le saut.
 - **Mémoire :** l'image est dessinée en mémoire puis envoyée d'un bloc (32 Ko pendant le jeu seulement) : pas de scintillement.
@@ -471,8 +471,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V4.12_complet.bin](firmware/GameHub_V4.12_complet.bin) | 0x0 | `bff2cb34460fdf0298b812d6989d625f` |
-| [firmware/GameHub_V4.12.bin](firmware/GameHub_V4.12.bin) | 0x10000 | `20aa76c1a39546bdaa283ae8e1443603` |
+| [firmware/GameHub_V4.13_complet.bin](firmware/GameHub_V4.13_complet.bin) | 0x0 | `d7865bb353feb64275f5b7af35796589` |
+| [firmware/GameHub_V4.13.bin](firmware/GameHub_V4.13.bin) | 0x10000 | `cdf3e2688f1b8cd4635f375d1b828d41` |
 | [firmware/GameHub_V3.86_complet.bin](firmware/GameHub_V3.86_complet.bin) | 0x0 | `dc451b01c498df647da822a1427a1a5e` |
 | [firmware/GameHub_V3.86.bin](firmware/GameHub_V3.86.bin) | 0x10000 | `ee1945d390b91eb82240245a1e52821f` |
 

@@ -18,7 +18,7 @@ MAZE = re.findall(r'"([^"]*)"', re.search(r'L_MAZE\[L_ROWS\] = \{(.*?)\};', SRC,
 R, C = len(MAZE), len(MAZE[0])
 TW, TD, SK, WH = 10, 7, 4, 5
 WC = [(255, 150, 0), (0, 200, 255), (230, 60, 230), (60, 230, 90)]
-FC = [(0, 0, 170), (160, 0, 160), (0, 0, 170), (0, 0, 170)]
+FC = [(0, 0, 150)] * 4
 EC = [(200, 60, 255), (255, 140, 0), (170, 230, 40), (230, 230, 230)]
 WHITE, YEL = (255, 255, 255), (255, 220, 0)
 
@@ -56,7 +56,7 @@ def render(st, dots, player, ghosts, frame, score, W=128, H=128):
     dr = ImageDraw.Draw(cv.im)
     VH = H - 8
     px_, py_, pdx, pdy, jump = player
-    MW, MH = C * TW + R * SK, R * TD + WH
+    MW, MH = C * TW + R * SK, R * TD + WH + 6
     rawx = (px_ / 6) * TW + (R - py_ / 6) * SK
     rawy = 8 + WH + (py_ / 6) * TD
     cx = -(W - MW) / 2 if MW <= W else max(0, min(MW - W, rawx - W / 2))
@@ -74,26 +74,49 @@ def render(st, dots, player, ghosts, frame, score, W=128, H=128):
 
     wc, fc = WC[st], FC[st]
     top, edge, front, side = wc, add(wc, 120), mul(wc, 2, 3), mul(wc, 3, 5)
+    for i in range(36):
+        sx = ((i * 53 + 17) * 7 - int(cx * 0.4)) % W
+        sy = 8 + ((i * 29 + 5) * 11 - int(cy * 0.4)) % (H - 8)
+        cv.p(sx, sy, (150, 150, 170) if (i + frame // 20) % 7 else WHITE)
+    SL = 5
+    slabF, slabS = mul(wc, 3, 5), tuple(v // 2 + 20 for v in wc)
+    quad([(PX(0, 0), PY(0)), (PX(0, R), PY(R)), (PX(0, R), PY(R) + SL), (PX(0, 0), PY(0) + SL)], slabS)
+    quad([(PX(0, R), PY(R)), (PX(C, R), PY(R)), (PX(C, R), PY(R) + SL), (PX(0, R), PY(R) + SL)], slabF)
+    for k in range(0, C, 2):
+        cv.rect(round(PX(k, R)), round(PY(R)) + 1, 1, SL - 1, (0, 0, 0))
+    quad([(PX(0, 0), PY(0)), (PX(C, 0), PY(0)), (PX(C, R), PY(R)), (PX(0, R), PY(R))], fc)
+    dr.line([(round(PX(0, R)), round(PY(R))), (round(PX(C, R)) - 1, round(PY(R)))], fill=(150, 150, 255))
+    M = 0.32
     for r in range(R):
         for c in range(C):
-            if (r + c) & 1:
-                quad([(PX(c, r), PY(r)), (PX(c, r) + TW - 1, PY(r)), (PX(c, r + 1) + TW - 1, PY(r + 1) - 1), (PX(c, r + 1), PY(r + 1) - 1)], fc)
+            if MAZE[r][c] != '#':
+                continue
+            wl, wr, wu, wd = wall(r, c - 1), wall(r, c + 1), wall(r - 1, c), wall(r + 1, c)
+            x0, x1 = c + (0 if wl else M), min(C, c + 1 - (0 if wr else M) + .3)
+            y0, y1 = r + (0 if wu else M), min(R, r + 1 - (0 if wd else M) + .3)
+            quad([(PX(x0, y0) + 2, PY(y0) + 1), (PX(x1, y0), PY(y0) + 1), (PX(x1, y1), PY(y1)), (PX(x0, y1) + 2, PY(y1))], (0, 0, 0))
+    for r in range(R):
+        for c in range(C):
             if MAZE[r][c] == '#':
                 continue
             d = dots.get((r, c), 0)
             bx, by = round(PX(c + .5, r + .5)), round(PY(r + .5))
             if d == 1:
+                cv.p(bx + 1, by + 1, (0, 0, 0))
                 cv.rect(bx - 1, by - 1, 2, 2, (255, 230, 170))
+                cv.p(bx - 1, by - 1, WHITE)
             elif d == 2:
                 gc = WHITE if frame & 8 else YEL
-                bb = by - 2 - ((frame >> 3) & 1)
-                cv.rect(bx - 1, by + 1, 3, 1, (0, 0, 0))
+                bb = by - 3 - ((frame >> 3) & 1)
+                cv.rect(bx - 2, by + 1, 5, 1, (0, 0, 0))
                 cv.rect(bx - 1, bb - 1, 3, 3, gc)
                 for a, b in ((0, -2), (0, 2), (-2, 0), (2, 0)):
                     cv.p(bx + a, bb + b, gc)
                 cv.p(bx - 1, bb - 1, WHITE)
+                if frame & 8:
+                    for a, b in ((-3, -3), (3, -3), (3, 3), (-3, 3)):
+                        cv.p(bx + a, bb + b, YEL)
     dr.line([(round(PX(10, 8.5)), round(PY(8.5))), (round(PX(11, 8.5)) - 1, round(PY(8.5)))], fill=(255, 120, 200))
-    M = 0.32
     for r in range(R):
         for c in range(C - 1, -1, -1):
             if MAZE[r][c] != '#':
@@ -109,6 +132,10 @@ def render(st, dots, player, ghosts, frame, score, W=128, H=128):
             quad([(PX(x0, y0), PY(y0) - h), (PX(x1, y0), PY(y0) - h), (PX(x1, y1), PY(y1) - h), (PX(x0, y1), PY(y1) - h)], top)
             if not wu:
                 dr.line([(round(PX(x0, y0)), round(PY(y0) - h)), (round(PX(x1, y0)) - 1, round(PY(y0) - h))], fill=edge)
+            if not wl:
+                dr.line([(round(PX(x0, y0)), round(PY(y0) - h)), (round(PX(x0, y1)), round(PY(y1) - h))], fill=edge)
+            if not wd:
+                dr.line([(round(PX(x0, y1)), round(PY(y1)) - 1), (round(PX(x1, y1)) - 1, round(PY(y1)) - 1)], fill=(0, 0, 0))
         for i, (gx, gy, gdx, gdy, fr) in enumerate(ghosts):
             if min(R - 1, int(gy / 6)) != r:
                 continue
