@@ -1,5 +1,9 @@
 # Game hub : jeux d'arcade sur dalles LED HUB75 (ESP32 + manette PS4)
 
+![Logo GAMEHUB au démarrage](docs/logo-boot.png)
+
+Au démarrage, le logo **GAMEHUB** (une manette, des lettres arc-en-ciel en dégradé) s'affiche 2 s avec la version et les réglages en cours (V4.15).
+
 Jeux d'arcade sur 1 à 4 dalles LED 128x64, avec un ESP32 classique et une **manette PS4 reliée en Bluetooth**.
 
 - **Pas de wifi :** la manette se connecte directement à l'ESP32 des dalles.
@@ -30,9 +34,9 @@ Dans tous les jeux : **OPTIONS ou L2 = pause** ; en pause, **○ revient au menu
 | 11 | 1945 | [ESCADRILLE](#escadrille) | croix / stick, **✕ (□, R1, R2) tirer**, **○ tonneau** | capsules **P** arme (5 tirs), **T** tonneau, **+** vie ; boss 2000 × stage | sans fin ; boss après 10 vagues (2 avions en alternance) |
 | 12 | BUNKER 3D | [BUNKER 3D](#bunker-3d) | stick gauche : avancer / pas de côté, stick droit : pivoter, L1 / R1 pas de côté, **✕ / R2 tirer**, **□ ouvrir**, **○ arme**, **△ carte** | soin, munitions, armure, carte rouge, arme lourde ; combos DOUBLE, TRIPLE, CARNAGE ; barils en chaîne | sans fin ; un nouveau bunker généré à chaque stage |
 | 13 | TURBO ROUTE | [TURBO ROUTE](#turbo-route) | gauche / droite : braquer, **✕ / R2 / haut accélérer**, **bas freiner**, stick droit : accélérer / freiner, **○ turbo** | pièce 250 ; voiture doublée 50 ; bidon de turbo ; police semée 2000, police KO 3000 ; secondes restantes × 100 | sans fin ; 4 décors en boucle ; distance plafonnée au stage 6, circulation au stage 8 |
-| 14 | PINCAB | [PINCAB](#pincab) | **croix gauche (ou L1)** flipper gauche, **○ (ou R1)** flipper droit, **✕ maintenu puis relâché** : lanceur | 3 cibles : +2000 et multiplicateur jusqu'à x5 ; **multiball** (3 balles, tout ×2) ; gueule 1500 ; poisson 500 ; balle rendue dans les 4 s | sans fin ; stage suivant toutes les 2 séries de cibles |
-| 15 | RENARD | [RENARD](#renard) | **✕ ou haut sauter** (tenir : plus haut), **bas se baisser** (en l'air : retomber vite) | gemme +100 ; étoile : invincible 5 s (traverse tout, +50 par obstacle) | sans fin ; stage tous les 1000 points ; vitesse maximale atteinte peu à peu ; jour et nuit en alternance |
-| 16 | SCARABEE 3D | [SCARABEE 3D](#scarabee-3d) | croix / stick, **✕ ou ○ sauter** | comme LABYRINTHE (grosse graine, créatures 200 à 1600, créature sautée +100) | sans fin ; couleurs du décor différentes à chaque stage ; vitesse plafonnée au stage 8 |
+| 14 | RENARD | [RENARD](#renard) | **✕ ou haut sauter** (tenir : plus haut), **bas se baisser** (en l'air : retomber vite) | gemme +100 ; étoile : invincible 5 s (traverse tout, +50 par obstacle) | sans fin ; stage tous les 1000 points ; vitesse maximale atteinte peu à peu ; jour et nuit en alternance |
+| 15 | PAC MANIA | [SCARABEE 3D](#scarabee-3d) | croix / stick, **✕ ou ○ sauter** | comme LABYRINTHE (grosse graine, créatures 200 à 1600, créature sautée +100) | sans fin ; couleurs du décor différentes à chaque stage ; vitesse plafonnée au stage 8 |
+| 16 | RALLYE 3D | [RALLYE 3D](#rallye-3d) | gauche / droite (stick) : tourner, **✕ / R2 / haut accélérer**, **bas freiner**, stick droit : accélérer / freiner | tour bouclé 500 ; balise 10 ; arrivée : 1000 × stage × (4 − place) | sans fin ; 3 tours contre 3 adversaires, finir dans les 3 premiers pour passer ; 4 décors en boucle, circuit en miroir un stage sur deux ; adversaires plafonnés au stage 8 |
 
 
 ## Deux manettes (Bluepad32)
@@ -42,7 +46,7 @@ Depuis la V3.84, le Game-hub utilise **Bluepad32** : jusqu'à **4 manettes Bluet
 - **Menu « JOUEURS 1 / 2 »** (2e ligne, une étoile par manette connectée) : seuls les jeux à deux joueurs utilisent la 2e manette.
   - **RAQUETTES** : match à deux (raquette de droite pour le joueur 2), **le premier à 7 points gagne**.
   - **SPACE DEFENDER** : coopération, un 2e vaisseau **vert** pour le joueur 2, vies et score communs ; les ennemis piquent sur l'un ou l'autre ; la manette du joueur touché vibre.
-- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V4.14_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
+- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V4.15_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
 - **Mémoire** : environ 81 Ko libres avec 2 dalles en 3 bits et deux manettes connectées.
 
 # SPACE DEFENDER
@@ -273,21 +277,6 @@ Un jeu de voiture original vu de dessus (V3.94) : tu doubles voitures et camions
 
 ![Les 4 décors de TURBO ROUTE](docs/turbo-decors.png)
 
-### PINCAB
-
-![PINCAB](docs/jeu-pincab.gif)
-
-Un flipper original sur le thème d'un **lagon maudit** (V4.06, thème et multiball en V4.08, obstacles en V4.09), avec sa propre créature des marais.
-- **Fronton :** une créature originale qui sort de l'eau (crête de nageoires, yeux jaunes à pupille fendue qui clignent, crocs), pleine lune, roseaux, logo PINCAB vert et jaune qui coule, afficheur vert (score, balle, multiplicateur) avec les griffes de la créature agrippées au cadre. Elle **réagit** : yeux rouges quand un bumper sonne, gueule ouverte quand elle avale la balle.
-- **Plateau :** eau bleu profond avec des vagues turquoise qui avancent, murs en roseaux, feuilles de nénuphar, touffes de roseaux dans les coins, bulles qui montent, algues qui luisent. Au centre, **l'œil de la créature** (iris jaune, pupille fendue) qui cligne et luit tant qu'il reste des cibles.
-- **Éléments :** 3 **bumpers nénuphars** (onde de choc au contact), 2 **rochers moussus** qui renvoient la balle, 2 **plots en caoutchouc**, 3 **cibles** orange, la **gueule de la créature** (elle avale la balle, la garde une seconde en grondant puis la recrache : +1500), un **poisson** qui nage d'un bord à l'autre (+500, il fait demi-tour), le lanceur à droite. Les points gagnés s'affichent au point de choc.
-- **Grand écran (128x128) :** la table occupe toute la largeur et **défile** : la vue suit la balle (la plus basse en multiball). Chaque image est dessinée en mémoire puis envoyée d'un bloc (32 Ko pendant le jeu seulement) : pas de scintillement.
-- **Commandes :** **croix gauche (ou L1)** flipper gauche, **○ (ou R1)** flipper droit, **✕ maintenu puis relâché** pour lancer la balle (plus tu tiens, plus elle part fort).
-- **Points :** bumper 100, rebond 10, plot 10, cible 250, poisson 500, gueule 1500 ; les 3 cibles : +2000 et **multiplicateur** (x2 à x5).
-- **Multiball :** la 1re série de cibles d'un stage lance **2 balles de plus** (3 en jeu) : tout compte **double** ; une vie n'est perdue qu'à la chute de la dernière balle. Deux séries de cibles : stage suivant. Une balle perdue dans les 4 s après le lancement est rendue. 3 balles.
-
-![PINCAB : fronton, multiball et bas de la table](docs/pincab-rendus.png)
-
 ### RENARD
 
 ![RENARD](docs/jeu-renard.gif)
@@ -305,13 +294,26 @@ Une course sans fin originale (V4.11) : un petit renard orange court tout seul, 
 
 ![SCARABEE 3D](docs/jeu-scarabee3d.gif)
 
-Le labyrinthe du scarabée (mêmes règles que LABYRINTHE) **vu en relief et en biais** (V4.12, décor V4.13) : les couloirs horizontaux restent horizontaux, la profondeur part en diagonale.
-- **Décor :** murs fins en blocs (dessus clair aux arêtes éclairées, face avant et côté gauche dans l'ombre) qui projettent leur **ombre** sur un sol uni bleu nuit, plateau posé sur un **socle**, étoiles autour ; couleurs des murs différentes à chaque stage ; la vue **défile** et suit le scarabée en douceur.
+Le labyrinthe du scarabée (mêmes règles que LABYRINTHE, « PAC MANIA » au menu) **vu en relief et en biais** (V4.12 ; décor amélioré en V4.13 ; murs en dégradé et contour bas en V4.14) : les couloirs horizontaux restent horizontaux, la profondeur part en diagonale.
+- **Décor :** murs fins en blocs (dessus clair aux arêtes éclairées, face avant et côté gauche en **dégradé**, contour du plateau bas et discret) qui projettent leur **ombre** sur un sol uni bleu nuit, plateau posé sur un **socle**, étoiles autour ; couleurs des murs différentes à chaque stage ; la vue **défile** et suit le scarabée en douceur.
 - **Personnages :** créatures piquantes ombrées (9 pixels) aux yeux qui regardent où elles vont, scarabée avec carapace, taches, antennes et pattes qui bougent ; ombres au sol.
 - **Commandes :** croix ou stick pour diriger, **✕ ou ○ pour sauter** par-dessus une créature (+100) : l'ombre rétrécit pendant le saut.
 - **Mémoire :** l'image est dessinée en mémoire puis envoyée d'un bloc (32 Ko pendant le jeu seulement) : pas de scintillement.
 
 ![SCARABEE 3D : stage 1, saut, grosse graine](docs/scarabee3d-rendus.png)
+
+### RALLYE 3D
+
+![RALLYE 3D](docs/jeu-rallye3d.gif)
+
+Une course sur circuit originale (V4.14) **vue en relief et en biais**, comme SCARABEE 3D : ta voiture rouge contre 3 adversaires (bleu, jaune, blanc), 3 tours.
+- **Commandes :** gauche / droite (ou stick gauche, proportionnel) pour tourner, **✕, R2 ou haut pour accélérer**, **bas pour freiner** ; le stick droit accélère (haut) et freine (bas).
+- **Pilotage :** dans l'herbe la voiture ralentit et secoue ; contre un arbre ou un immeuble elle s'arrête (l'image tremble, la manette vibre) ; les voitures se poussent.
+- **Course :** départ 3, 2, 1, GO ; le classement (1ER, 2E...) s'affiche en haut à droite. **Dans les 3 premiers :** stage suivant et bonus ; **4e :** une vie perdue, on recommence la course.
+- **Progression :** adversaires plus rapides à chaque stage, 4 décors (verdure, désert, neige, volcan), **circuit en miroir** un stage sur deux, arbres et immeubles placés autrement.
+- **Graphisme :** route lisse aux virages arrondis, bordures rouges et blanches, pointillés au centre, ligne d'arrivée en damier ; arbres ronds et immeubles aux fenêtres éclairées avec leurs ombres ; voitures en volume (ombre, caisse, vitres, toit, phares, feux) qui tournent vraiment. La vue défile et regarde devant la voiture. Image dessinée en mémoire (32 Ko pendant le jeu seulement) : pas de scintillement.
+
+![RALLYE 3D : verdure, désert, neige, volcan](docs/rallye3d-rendus.png)
 
 ### CRUCH
 
@@ -471,8 +473,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V4.14_complet.bin](firmware/GameHub_V4.14_complet.bin) | 0x0 | `3ae7e29ecfa38cb056d7ce2baece596e` |
-| [firmware/GameHub_V4.14.bin](firmware/GameHub_V4.14.bin) | 0x10000 | `ff26467f77844c545d087a157551b7b7` |
+| [firmware/GameHub_V4.15_complet.bin](firmware/GameHub_V4.15_complet.bin) | 0x0 | `d848c80e5993b74b772714befb43cc21` |
+| [firmware/GameHub_V4.15.bin](firmware/GameHub_V4.15.bin) | 0x10000 | `eca524b412a19a2fc6f955c994348054` |
 | [firmware/GameHub_V3.86_complet.bin](firmware/GameHub_V3.86_complet.bin) | 0x0 | `dc451b01c498df647da822a1427a1a5e` |
 | [firmware/GameHub_V3.86.bin](firmware/GameHub_V3.86.bin) | 0x10000 | `ee1945d390b91eb82240245a1e52821f` |
 
@@ -490,6 +492,6 @@ Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB S
 - **Carte :** installée avec la configuration `build/bp32/arduino-cli.yaml` (adresse du paquet Bluepad32 ajoutée). Le programme d'essai `bp32test/` affiche l'état des manettes et la mémoire libre.
 - **Bibliothèques :** ESP32-HUB75-MatrixPanel-I2S-DMA et Adafruit GFX ; Bluepad32 est fourni avec la carte.
 - **Manettes :** une petite couche d'adaptation (`PadShim`) garde les noms `PS4.Cross()`, `PS4.LStickX()`... utilisés par les jeux ; `PAD2` lit la 2e manette. L'ancienne bibliothèque PS4Controller (une seule manette, adresse de la console à recopier) reste dans l'historique Git (V3.70, commit `11e9556`).
-- **Plans, aperçus et GIF :** `python docs/branchement.py`, `python docs/rendu.py`, `python docs/gif_manette_ps4.py`, `python docs/gif_arrivee.py`, `python docs/gif_menus.py`, `python docs/gif_jeux.py [raid raquettes bulles labyrinthe orbite briques blocs cruch taupe billes escadrille]`, `python docs/gif_bunker.py`, `python docs/gif_turbo.py`, `python docs/gif_pincab.py`, `python docs/gif_renard.py`, `python docs/gif_scarabee3d.py`, `python docs/branchement_son.py` (Pillow).
+- **Plans, aperçus et GIF :** `python docs/branchement.py`, `python docs/rendu.py`, `python docs/gif_manette_ps4.py`, `python docs/gif_arrivee.py`, `python docs/gif_menus.py`, `python docs/gif_jeux.py [raid raquettes bulles labyrinthe orbite briques blocs cruch taupe billes escadrille]`, `python docs/gif_bunker.py`, `python docs/gif_turbo.py`, `python docs/gif_renard.py`, `python docs/gif_scarabee3d.py`, `python docs/gif_rallye3d.py`, `python docs/logo_boot.py`, `python docs/branchement_son.py` (Pillow).
 
 L'ancienne version avec wifi, page web et manette ESP-NOW reste disponible dans l'historique Git, jusqu'au commit `fb11367`.
