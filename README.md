@@ -38,7 +38,7 @@ Dans tous les jeux : **OPTIONS ou L2 = pause** ; en pause, **○ revient au menu
 | 13 | TURBO ROUTE | [TURBO ROUTE](#turbo-route) | gauche / droite : braquer, **✕ / R2 / haut accélérer**, **bas freiner**, stick droit : accélérer / freiner, **○ turbo** | pièce 250 ; voiture doublée 50 ; bidon de turbo ; police semée 2000, police KO 3000 ; secondes restantes × 100 | sans fin ; 4 décors en boucle ; distance plafonnée au stage 6, circulation au stage 8 |
 | 14 | RENARD | [RENARD](#renard) | **✕ ou haut sauter** (tenir : plus haut), **bas se baisser** (en l'air : retomber vite) | gemme +100 ; étoile : invincible 5 s (traverse tout, +50 par obstacle) | sans fin ; stage tous les 1000 points ; vitesse maximale atteinte peu à peu ; jour et nuit en alternance |
 | 15 | PAC MANIA | [SCARABEE 3D](#scarabee-3d) | croix / stick, **✕ ou ○ sauter** | comme LABYRINTHE (grosse graine, créatures 200 à 1600, créature sautée +100) | sans fin ; couleurs du décor différentes à chaque stage ; vitesse plafonnée au stage 8 |
-| 16 | RALLYE 3D | [RALLYE 3D](#rallye-3d) | gauche / droite (stick) : tourner, **✕ / R2 / haut accélérer**, **bas freiner**, stick droit : accélérer / freiner | tour bouclé 500 ; balise 10 ; arrivée : 1000 × stage × (4 − place) | sans fin ; 3 tours contre 3 adversaires, finir dans les 3 premiers pour passer ; 4 décors en boucle, circuit en miroir un stage sur deux ; adversaires plafonnés au stage 8 |
+| 16 | RALLYE 3D | [RALLYE 3D](#rallye-3d) | **croix / stick : direction à l'écran** (la voiture y va et accélère), **✕ / R2 accélérer**, **○ freiner**, stick droit : accélérer / freiner | tour bouclé 500 ; balise 10 ; arrivée : 1000 × stage × (4 − place) | sans fin ; 3 tours contre 3 adversaires, finir dans les 3 premiers pour passer ; 4 décors en boucle, circuit en miroir un stage sur deux ; adversaires plafonnés au stage 8 |
 | 17 | VORTEX 3D | [VORTEX 3D](#vortex-3d) | gauche / droite (stick), **haut / bas : vitesse**, **✕ tirer**, **○ sauter** | caisse 50, mine 30, soucoupe 300, orbe 200 (double tir 10 s) ; fin de stage 1000 × stage | sans fin ; une distance par stage ; trous dans la route à partir du stage 2 ; vitesse et obstacles plafonnés au stage 8 |
 
 
@@ -49,7 +49,7 @@ Depuis la V3.84, le Game-hub utilise **Bluepad32** : jusqu'à **4 manettes Bluet
 - **Menu « JOUEURS 1 / 2 »** (2e ligne, une étoile par manette connectée) : seuls les jeux à deux joueurs utilisent la 2e manette.
   - **RAQUETTES** : match à deux (raquette de droite pour le joueur 2), **le premier à 7 points gagne**.
   - **SPACE DEFENDER** : coopération, un 2e vaisseau **vert** pour le joueur 2, vies et score communs ; les ennemis piquent sur l'un ou l'autre ; la manette du joueur touché vibre.
-- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V4.28_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
+- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V4.29_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
 - **Mémoire** : environ 81 Ko libres avec 2 dalles en 3 bits et deux manettes connectées.
 
 # SPACE DEFENDER
@@ -317,7 +317,7 @@ Le labyrinthe du scarabée (mêmes règles que LABYRINTHE, « PAC MANIA » au me
 ![RALLYE 3D](docs/jeu-rallye3d.gif)
 
 Une course sur circuit originale (V4.14) **vue en relief et en biais**, comme SCARABEE 3D : ta voiture rouge contre 3 adversaires (bleu, jaune, blanc), 3 tours.
-- **Commandes :** gauche / droite (ou stick gauche, proportionnel) pour tourner, **✕, R2 ou haut pour accélérer**, **bas pour freiner** ; le stick droit accélère (haut) et freine (bas).
+- **Commandes (V4.29) :** **croix ou stick gauche : la voiture va dans la direction poussée** (haut = haut de l'écran, diagonales comprises), s'y tourne en douceur et accélère ; **✕ / R2 accélérer**, **○ freiner** ; le stick droit accélère (haut) et freine (bas).
 - **Pilotage :** dans l'herbe la voiture ralentit et secoue ; contre un arbre ou un immeuble elle s'arrête (l'image tremble, la manette vibre) ; les voitures se poussent.
 - **Course :** départ 3, 2, 1, GO ; le classement (1ER, 2E...) s'affiche en haut à droite. **Dans les 3 premiers :** stage suivant et bonus ; **4e :** une vie perdue, on recommence la course.
 - **Progression :** adversaires plus rapides à chaque stage, 4 décors (verdure, désert, neige, volcan), **circuit en miroir** un stage sur deux, arbres et immeubles placés autrement.
@@ -496,8 +496,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V4.28_complet.bin](firmware/GameHub_V4.28_complet.bin) | 0x0 | `47795ab54dff8297a001e0ccf979e344` |
-| [firmware/GameHub_V4.28.bin](firmware/GameHub_V4.28.bin) | 0x10000 | `1f15b4ed93da224d951a5c620b5cb9ef` |
+| [firmware/GameHub_V4.29_complet.bin](firmware/GameHub_V4.29_complet.bin) | 0x0 | `b017a72999fd3c7650f217ce41fa4756` |
+| [firmware/GameHub_V4.29.bin](firmware/GameHub_V4.29.bin) | 0x10000 | `f7b1ed07a1f6c17ccabd3eb20d8182fd` |
 | [firmware/GameHub_V3.86_complet.bin](firmware/GameHub_V3.86_complet.bin) | 0x0 | `dc451b01c498df647da822a1427a1a5e` |
 | [firmware/GameHub_V3.86.bin](firmware/GameHub_V3.86.bin) | 0x10000 | `ee1945d390b91eb82240245a1e52821f` |
 

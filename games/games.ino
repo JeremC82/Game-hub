@@ -28,7 +28,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "4.28"
+#define GAMES_VERSION "4.29"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -7101,7 +7101,8 @@ void iDraw() {
 
 // ---------------------------------------------------------------- RALLYE 3D
 // Course sur circuit vue en relief et en biais (comme SCARABEE 3D) : ta voiture rouge contre 3 adversaires, 3 tours.
-// Gauche / droite (ou stick) : tourner ; X, R2 ou haut : accelerer ; bas : freiner (stick droit : les deux).
+// Croix ou stick : la voiture va dans la direction poussee (haut = haut de l'ecran) et accelere ; X / R2 accelerer,
+// rond freiner (stick droit : accelerer / freiner).
 // Dans l'herbe, on ralentit ; arbres et immeubles arretent la voiture. Dans les 3 premiers : stage suivant
 // (adversaires plus rapides, autre decor, circuit en miroir un stage sur deux) ; 4e : une vie perdue, on recommence.
 #define XR_C 30
@@ -7248,14 +7249,28 @@ void xrStep() {
     float maxV;
     if (i == 0 && !gDemo && !c.fin) {  // toi
       maxV = 0.165f;
-      int sx = PS4.LStickX();
-      if (abs(sx) > 20) steer = sx / 127.0f;
-      else steer = (k & 1) ? -1 : (k & 2) ? 1 : 0;
-      gas = (k & 4) || (k & 8);
-      brake = (k & 16) != 0;
+      // direction directe : la voiture va la ou pousse la croix ou le stick (haut = haut de l'ecran), elle s'y tourne
+      // en douceur et accelere ; X / R2 accelere sans changer de cap, rond freine (stick droit : accelerer / freiner)
+      int sx = PS4.LStickX(), sy = PS4.LStickY();
+      float dx = 0, dy = 0;
+      if (sx * sx + sy * sy > 45 * 45) { dx = sx; dy = -sy; }
+      else { dx = ((k & 2) ? 1 : 0) - ((k & 1) ? 1 : 0); dy = ((k & 16) ? 1 : 0) - ((k & 8) ? 1 : 0); }
+      bool dir = dx != 0 || dy != 0;
+      if (dir) {
+        float wy = dy / XR_TD, wx = (dx + XR_SK * wy) / XR_TW;  // direction de l'ecran -> direction sur le circuit (vue en biais)
+        float da = atan2f(wy, wx) - c.a;
+        while (da > 3.14159f) da -= 6.28318f;
+        while (da < -3.14159f) da += 6.28318f;
+        float rate = 0.05f + 0.35f * min(1.0f, fabsf(c.v) / 0.12f) * 0.1f;  // tourne meme presque a l'arret
+        c.a += constrain(da, -rate, rate);
+        gas = fabsf(da) < 2.2f;  // demi-tour : on tourne d'abord
+      }
+      if (k & 4) gas = true;
+      brake = (k & 32) != 0;
       float rs = PS4.RStickY() / 127.0f;
       if (rs > 0.2f) gas = true;
       else if (rs < -0.2f) brake = true;
+      steer = 0;
     } else {
       xrPilot(c, i, steer, gas, brake);
       maxV = i == 0 ? 0.15f : 0.118f + 0.005f * lvl + 0.006f * (gEffDiff() - 1) + (i - 2) * 0.004f;
