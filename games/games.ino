@@ -28,7 +28,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "4.31"
+#define GAMES_VERSION "4.32"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -7786,12 +7786,14 @@ void vxDraw() {
   uint16_t ca = rgb(RA[st][0], RA[st][1], RA[st][2]), cb = rgb(RB[st][0], RB[st][1], RB[st][2]), rail = rgb(RL[st][0], RL[st][1], RL[st][2]);
   float yh = vxYH(), S = vxS0();
   // ciel : degrade de couleur au-dessus de l'horizon (bandes franches en 3 bits), etoiles, 3 planetes
-  {
-    static const uint8_t SKY[4][4][3] = { { { 0, 0, 150 }, { 0, 0, 220 }, { 0, 150, 255 }, { 170, 230, 255 } },
+  static const uint8_t SKY[4][4][3] = { { { 0, 0, 150 }, { 0, 0, 220 }, { 0, 150, 255 }, { 170, 230, 255 } },
                                           { { 0, 0, 150 }, { 150, 0, 150 }, { 255, 0, 150 }, { 255, 170, 220 } },
                                           { { 0, 0, 150 }, { 0, 150, 150 }, { 0, 230, 150 }, { 200, 255, 220 } },
                                           { { 0, 0, 150 }, { 200, 0, 0 }, { 255, 140, 0 }, { 255, 230, 150 } } };
-    int band[4] = { 10, 6, 4, 2 }, y = (int)yh - 22;
+  int skyH = (int)yh - 8, band[4] = { skyH * 45 / 100, skyH * 25 / 100, skyH * 18 / 100, 0 }, skyTop = (int)yh - skyH + band[0];
+  band[3] = skyH - band[0] - band[1] - band[2];
+  {  // ciel sur tout le haut de l'ecran : du bleu nuit (etoiles) a la lueur de l'horizon
+    int y = 8;
     for (int b = 0; b < 4; b++) {
       gfx->fillRect(0, y, W, band[b], rgb(SKY[st][b][0], SKY[st][b][1], SKY[st][b][2]));
       y += band[b];
@@ -7800,7 +7802,7 @@ void vxDraw() {
   for (int i = 0; i < 40; i++) {
     int x = ((i * 53 + 11) * 7 + (int)(vxHead * 220 + 4000) * (1 + (i & 1))) % W, y = 9 + ((i * 37 + 3) * 13) % (int)(yh - 6);
     if (x < 0) x += W;
-    if (y < yh - 22) gfx->drawPixel(x, y, (i % 5) ? rgb(150, 150, 170) : palFull[0]);
+    if (y < skyTop) gfx->drawPixel(x, y, (i % 5) ? rgb(150, 150, 170) : palFull[0]);
   }
   {  // planetes lointaines : une lune grise et une geante a bandes, qui glissent plus lentement que les etoiles
     int mx = ((int)(W * 0.18f - vxHead * 90) % (W + 30) + W + 30) % (W + 30) - 15, gx = ((int)(W * 0.45f - vxHead * 130) % (W + 40) + W + 40) % (W + 40) - 20;
@@ -7822,7 +7824,11 @@ void vxDraw() {
     gfx->fillCircle(px, py, pr - 3, pc);
     gfx->drawFastHLine(px - pr - 6, py + 2, 2 * pr + 12, palFull[0]);
     gfx->drawFastHLine(px - pr - 3, py + 3, 2 * pr + 6, rgb(150, 150, 170));
-    gfx->fillRect(0, (int)yh + 1, W, H - (int)yh - 1, 0);  // sous l'horizon : le vide
+    // sous l'horizon : degrade jusqu'en bas de l'ecran (lueur de l'horizon, teinte moyenne, puis bleu nuit), sans quadrillage
+    int gy = (int)yh + 1;
+    gfx->fillRect(0, gy, W, 2, rgb(SKY[st][2][0], SKY[st][2][1], SKY[st][2][2]));
+    gfx->fillRect(0, gy + 2, W, 6, rgb(SKY[st][1][0], SKY[st][1][1], SKY[st][1][2]));
+    gfx->fillRect(0, gy + 8, W, H - gy - 8, rgb(SKY[st][0][0], SKY[st][0][1], SKY[st][0][2]));
   }
   // route : tranches de l'horizon vers toi (virages et bosses ; une bosse cache ce qui est derriere), trous, rails, voies
   vxProj();

@@ -146,14 +146,19 @@ def render(g):
     yf = lambda dz: lerp(2, dz)
     SKY = [[(0, 0, 150), (0, 0, 220), (0, 150, 255), (170, 230, 255)], [(0, 0, 150), (150, 0, 150), (255, 0, 150), (255, 170, 220)],
            [(0, 0, 150), (0, 150, 150), (0, 230, 150), (200, 255, 220)], [(0, 0, 150), (200, 0, 0), (255, 140, 0), (255, 230, 150)]]
-    y = int(yh) - 22
-    for b, hgt in enumerate((10, 6, 4, 2)):
-        d.rectangle((0, y, W - 1, y + hgt - 1), fill=SKY[st][b])
+    skyH = int(yh) - 8
+    bands = [skyH * 45 // 100, skyH * 25 // 100, skyH * 18 // 100]
+    bands.append(skyH - sum(bands))
+    skyTop = 8 + bands[0]
+    y = 8
+    for b, hgt in enumerate(bands):
+        if hgt > 0:
+            d.rectangle((0, y, W - 1, y + hgt - 1), fill=SKY[st][b])
         y += hgt
     for i in range(40):
         x = ((i * 53 + 11) * 7 + int(g.head * 220 + 4000) * (1 + (i & 1))) % W
         y = 9 + ((i * 37 + 3) * 13) % int(yh - 6)
-        if y < yh - 22:
+        if y < skyTop:
             d.point((x, y), fill=(150, 150, 170) if i % 5 else (255, 255, 255))
     mx = (int(W * .18 - g.head * 90) % (W + 30)) - 15
     gx = (int(W * .45 - g.head * 130) % (W + 40)) - 20
@@ -174,6 +179,10 @@ def render(g):
     d.line((px - pr - 6, py + 2, px + pr + 5, py + 2), fill=(255, 255, 255))
     d.line((px - pr - 3, py + 3, px + pr + 2, py + 3), fill=(150, 150, 170))
     d.rectangle((0, int(yh) + 1, W, H), fill=(0, 0, 0))
+    gy = int(yh) + 1
+    d.rectangle((0, gy, W - 1, gy + 1), fill=SKY[st][2])
+    d.rectangle((0, gy + 2, W - 1, gy + 7), fill=SKY[st][1])
+    d.rectangle((0, gy + 8, W - 1, H - 1), fill=SKY[st][0])
     def quad(pts, c):
         d.polygon([(round(x), round(y)) for x, y in pts], fill=c)
     for i in range(NP - 2, -1, -1):

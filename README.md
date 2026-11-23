@@ -49,7 +49,7 @@ Depuis la V3.84, le Game-hub utilise **Bluepad32** : jusqu'à **4 manettes Bluet
 - **Menu « JOUEURS 1 / 2 »** (2e ligne, une étoile par manette connectée) : seuls les jeux à deux joueurs utilisent la 2e manette.
   - **RAQUETTES** : match à deux (raquette de droite pour le joueur 2), **le premier à 7 points gagne**.
   - **SPACE DEFENDER** : coopération, un 2e vaisseau **vert** pour le joueur 2, vies et score communs ; les ennemis piquent sur l'un ou l'autre ; la manette du joueur touché vibre.
-- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V4.31_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
+- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V4.32_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
 - **Mémoire** : environ 81 Ko libres avec 2 dalles en 3 bits et deux manettes connectées.
 
 # SPACE DEFENDER
@@ -334,7 +334,7 @@ Un tir sur route en 3D original (V4.21 à V4.25, plus rapide et nouveau vaisseau
 - **Commandes :** gauche / droite (ou stick) pour se déplacer, **haut / bas pour la vitesse**, **✕ pour tirer**, **○ pour sauter**. Dans les virages, la route te pousse vers l'extérieur.
 - **Obstacles :** caisses (2 tirs, ou sauter par-dessus), mines (sauter ou tirer), **murs** avec une ouverture où passer, **piliers** violets indestructibles à éviter, **trous** dans la route (à sauter, à partir du stage 2), **soucoupes** qui reculent devant toi et tirent ; **orbe** jaune : double tir 10 s.
 - **Stages :** une distance à parcourir (barre verte en haut), puis stage suivant : plus vite, plus d'obstacles, autres couleurs (route, rails, planète).
-- **Graphisme :** route en bandes de couleur et bandes noires (moitié moins de LED allumées : moins de courant pour les dalles), rails néon, voies en pointillés, objets à l'échelle de la distance ; vaisseau original (armature en X en métal avec son épaisseur, 4 réacteurs incandescents qui pulsent, verrière cyan) qui s'incline dans les virages, gros missiles rouge et orange ; ciel en dégradé à l'horizon (couleurs du stage), planète à anneau, lune et géante à bandes en fond (V4.30) ; jeu plus rapide, objets plus près de la route, chasseurs plus nombreux (jusqu'à 2 à la fois) ; **chasseurs** (V4.28) qui descendent des étoiles, se posent au bout de la route, foncent, se placent en face et tirent avant de repartir (3 tirs, 400 points), son ombre sur la route quand il saute. Image dessinée en mémoire (32 Ko pendant le jeu seulement) : pas de scintillement.
+- **Graphisme :** route en bandes de couleur et bandes noires (moitié moins de LED allumées : moins de courant pour les dalles), rails néon, voies en pointillés, objets à l'échelle de la distance ; vaisseau original (armature en X en métal avec son épaisseur, 4 réacteurs incandescents qui pulsent, verrière cyan) qui s'incline dans les virages, gros missiles rouge et orange ; ciel en dégradé sur tout le haut de l'écran et reflet jusqu'en bas (couleurs du stage, V4.32), planète à anneau, lune et géante à bandes en fond (V4.30) ; jeu plus rapide, objets plus près de la route, chasseurs plus nombreux (jusqu'à 2 à la fois) ; **chasseurs** (V4.28) qui descendent des étoiles, se posent au bout de la route, foncent, se placent en face et tirent avant de repartir (3 tirs, 400 points), son ombre sur la route quand il saute. Image dessinée en mémoire (32 Ko pendant le jeu seulement) : pas de scintillement.
 
 ![VORTEX 3D : stages 1, 2 et 3](docs/vortex3d-rendus.png)
 
@@ -497,8 +497,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V4.31_complet.bin](firmware/GameHub_V4.31_complet.bin) | 0x0 | `9b133b47e6f10af6b1c20e73134a864c` |
-| [firmware/GameHub_V4.31.bin](firmware/GameHub_V4.31.bin) | 0x10000 | `cfaae9281a38fbaa26e6c6c29fa95e51` |
+| [firmware/GameHub_V4.32_complet.bin](firmware/GameHub_V4.32_complet.bin) | 0x0 | `fbfcd8c7a54681158bb926ac2dbc02b6` |
+| [firmware/GameHub_V4.32.bin](firmware/GameHub_V4.32.bin) | 0x10000 | `8fd362e83c85c1ef92bd7206d10e7259` |
 | [firmware/GameHub_V3.86_complet.bin](firmware/GameHub_V3.86_complet.bin) | 0x0 | `dc451b01c498df647da822a1427a1a5e` |
 | [firmware/GameHub_V3.86.bin](firmware/GameHub_V3.86.bin) | 0x10000 | `ee1945d390b91eb82240245a1e52821f` |
 
