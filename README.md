@@ -499,10 +499,6 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 |---|---|---|
 | [firmware/GameHub_V4.33_complet.bin](firmware/GameHub_V4.33_complet.bin) | 0x0 | `5d4b49d46f57affce7eccb9702b251c3` |
 | [firmware/GameHub_V4.33.bin](firmware/GameHub_V4.33.bin) | 0x10000 | `442a541a5fe8a4ec7a0bb273c83bff3b` |
-| [firmware/GameHub_V3.86_complet.bin](firmware/GameHub_V3.86_complet.bin) | 0x0 | `dc451b01c498df647da822a1427a1a5e` |
-| [firmware/GameHub_V3.86.bin](firmware/GameHub_V3.86.bin) | 0x10000 | `ee1945d390b91eb82240245a1e52821f` |
-
-La **V3.86** (sans BUNKER 3D) est remise à disposition pour comparer la connexion des manettes avec la version actuelle.
 
 Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB SPIFFS)** dans Outils → Partition Scheme.
 
