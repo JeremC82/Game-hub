@@ -28,7 +28,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "4.30"
+#define GAMES_VERSION "4.31"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -1299,6 +1299,7 @@ float rX, rY;
 int rTier = 0, rCool = 0, rGroups = 0, rSpawnT = 0, rInv = 0, rShield = 0, rBombs = 0, rFlash = 0;
 bool rBoss = false, rPrevBomb = false;
 float rBX, rBY;
+float rBPh = 0;  // phase du balancement du boss
 int rBHp, rBMax, rBT = 0, rBFlash = 0;
 
 void rNewStage() {
@@ -1448,7 +1449,7 @@ void rStep() {
     if (rGroups < R_GROUPS) {
       if (--rSpawnT <= 0) { rSpawnGroup(); rSpawnT = 140; }
     } else if (!any) {  // le boss arrive
-      rBoss = true; rBX = W / 2 - 16; rBY = -18; rBT = 0;
+      rBoss = true; rBX = W / 2 - 17; rBY = -18; rBT = 0; rBPh = 0;
       rBMax = rBHp = (40 + 25 * gWave) * (gEffDiff() + 1) / 2;
       sfxDive();
     }
@@ -1524,7 +1525,10 @@ void rStep() {
     if (rBFlash > 0) rBFlash--;
     bool phase2 = rBHp < rBMax / 2;
     if (rBY < 16) rBY += 0.5f;
-    else rBX = W / 2 - 17 + sinf(rBT * 0.02f) * (W / 2 - 20);
+    else {  // balancement : la phase part de 0 a l'arrivee (avant, il sautait d'un coup vers le bord)
+      rBPh += 0.02f;
+      rBX = W / 2 - 17 + sinf(rBPh) * (W / 2 - 20);
+    }
     if (rBY >= 16 && gDead == 0) {
       int every = max(30, (phase2 ? 40 : 60) - 3 * (gWave / 2) - 10 * (gEffDiff() - 1));
       if (rBT % every == 0) {
