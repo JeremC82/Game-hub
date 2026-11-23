@@ -28,7 +28,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "4.32"
+#define GAMES_VERSION "4.33"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -8890,7 +8890,8 @@ void setup() {
 
   gDiff = prefs.getUChar("diff", 1) % 3;
   gPlayers = constrain(prefs.getUChar("players", 1), 1, 2);
-  gGame = 0;  // demarrage toujours sur ESSAIM (choix d'un autre jeu : gauche / droite dans le menu)
+  randomSeed(esp_random());
+  do gGame = random(N_GAMES); while (!gameOn(gGame));  // demarrage : demo d'un jeu au hasard (le menu propose ce jeu)
   cfgButtonBegin();  // bouton du shield (GPIO 34)
   ps4Begin();
   audioBegin();

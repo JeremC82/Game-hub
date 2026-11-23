@@ -10,7 +10,7 @@ Jeux d'arcade sur 1 à 4 dalles LED 128x64, avec un ESP32 classique et une **man
 - **Partition unique de 3 Mo :** il reste de la place pour d'autres jeux.
 - **Son en option :** une broche PWM vers un petit ampli et un haut-parleur.
 
-**18 jeux originaux** (16 dans le firmware actuel : BUNKER 3D et RENARD en sont retirés pour l'instant, leur code reste dans `games.ino`, voir `GAME_BUNKER` / `GAME_RENARD`), à choisir dans le menu (gauche / droite sur la ligne JOUER). Au démarrage, c'est toujours le **1er jeu de la liste** qui est proposé. Les noms affichés au menu se changent dans le tableau `GAME_NAME` en haut de `games/games.ino`.
+**18 jeux originaux** (16 dans le firmware actuel : BUNKER 3D et RENARD en sont retirés pour l'instant, leur code reste dans `games.ino`, voir `GAME_BUNKER` / `GAME_RENARD`), à choisir dans le menu (gauche / droite sur la ligne JOUER). Au démarrage, la démo part sur un **jeu tiré au hasard** (V4.33), et c'est ce jeu que le menu propose. Les noms affichés au menu se changent dans le tableau `GAME_NAME` en haut de `games/games.ino`.
 
 Les 18 jeux ont en commun les niveaux de difficulté, les stages, les vies, les meilleurs scores avec les noms et la démo automatique.
 
@@ -49,7 +49,7 @@ Depuis la V3.84, le Game-hub utilise **Bluepad32** : jusqu'à **4 manettes Bluet
 - **Menu « JOUEURS 1 / 2 »** (2e ligne, une étoile par manette connectée) : seuls les jeux à deux joueurs utilisent la 2e manette.
   - **RAQUETTES** : match à deux (raquette de droite pour le joueur 2), **le premier à 7 points gagne**.
   - **SPACE DEFENDER** : coopération, un 2e vaisseau **vert** pour le joueur 2, vies et score communs ; les ennemis piquent sur l'un ou l'autre ; la manette du joueur touché vibre.
-- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V4.32_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
+- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V4.33_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
 - **Mémoire** : environ 81 Ko libres avec 2 dalles en 3 bits et deux manettes connectées.
 
 # SPACE DEFENDER
@@ -363,7 +363,7 @@ Sans partie en cours, le jeu tourne tout seul en démo, sans son. **La démo cha
 
 | Ligne | Action |
 |---|---|
-| **JOUER** | **gauche / droite : choix du jeu** (18 jeux ; leurs noms se changent dans le tableau `GAME_NAME` en haut de `games/games.ino`). Au démarrage : le premier jeu de la liste. ✕ ou OPTIONS lance la partie. |
+| **JOUER** | **gauche / droite : choix du jeu** (18 jeux ; leurs noms se changent dans le tableau `GAME_NAME` en haut de `games/games.ino`). Au démarrage : le jeu de la démo, tiré au hasard. ✕ ou OPTIONS lance la partie. |
 | **NIVEAU** | Facile / Normal / Difficile (gauche / droite ou ✕), choix gardé en mémoire |
 | **LUMINOSITE** | 0 à 100 % par pas de 10 % (gauche / droite ou ✕), visible tout de suite et gardée en mémoire. À 0 %, les dalles restent très faiblement allumées pour qu'on voie encore le menu. |
 | **VOLUME** | volume du son, 0 à 100 % par pas de 10 % (gauche / droite ou ✕). Un bip fait entendre le niveau. 0 % = muet. C'est le rapport cyclique du PWM : le potentiomètre de l'ampli règle le maximum. |
@@ -497,8 +497,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V4.32_complet.bin](firmware/GameHub_V4.32_complet.bin) | 0x0 | `fbfcd8c7a54681158bb926ac2dbc02b6` |
-| [firmware/GameHub_V4.32.bin](firmware/GameHub_V4.32.bin) | 0x10000 | `8fd362e83c85c1ef92bd7206d10e7259` |
+| [firmware/GameHub_V4.33_complet.bin](firmware/GameHub_V4.33_complet.bin) | 0x0 | `5d4b49d46f57affce7eccb9702b251c3` |
+| [firmware/GameHub_V4.33.bin](firmware/GameHub_V4.33.bin) | 0x10000 | `442a541a5fe8a4ec7a0bb273c83bff3b` |
 | [firmware/GameHub_V3.86_complet.bin](firmware/GameHub_V3.86_complet.bin) | 0x0 | `dc451b01c498df647da822a1427a1a5e` |
 | [firmware/GameHub_V3.86.bin](firmware/GameHub_V3.86.bin) | 0x10000 | `ee1945d390b91eb82240245a1e52821f` |
 
