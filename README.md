@@ -10,11 +10,13 @@ Jeux d'arcade sur 1 à 4 dalles LED 128x64, avec un ESP32 classique et une **man
 - **Partition unique de 3 Mo :** il reste de la place pour d'autres jeux.
 - **Son en option :** une broche PWM vers un petit ampli et un haut-parleur.
 
-**18 jeux originaux**, à choisir dans le menu (gauche / droite sur la ligne JOUER). Au démarrage, c'est toujours le **1er jeu de la liste** qui est proposé. Les noms affichés au menu se changent dans le tableau `GAME_NAME` en haut de `games/games.ino`.
+**18 jeux originaux** (16 dans le firmware actuel : BUNKER 3D et RENARD en sont retirés pour l'instant, leur code reste dans `games.ino`, voir `GAME_BUNKER` / `GAME_RENARD`), à choisir dans le menu (gauche / droite sur la ligne JOUER). Au démarrage, c'est toujours le **1er jeu de la liste** qui est proposé. Les noms affichés au menu se changent dans le tableau `GAME_NAME` en haut de `games/games.ino`.
 
 Les 18 jeux ont en commun les niveaux de difficulté, les stages, les vies, les meilleurs scores avec les noms et la démo automatique.
 
 ## Les 18 jeux en un coup d'œil
+
+Dans tous les jeux : 3 min sans toucher aux manettes, elles s'éteignent et la démo reprend (V4.26). Les jeux qui redessinent tout l'écran sont dessinés en mémoire puis envoyés d'un bloc : plus de LED qui clignote (V4.27).
 
 Dans tous les jeux : **OPTIONS ou L2 = pause** ; en pause, **○ revient au menu** (le score est enregistré). Les deux manettes pilotent le menu. « Sans fin » : les stages continuent tant qu'il reste des vies ; la difficulté monte puis **plafonne** au stage indiqué.
 
@@ -30,7 +32,7 @@ Dans tous les jeux : **OPTIONS ou L2 = pause** ; en pause, **○ revient au menu
 | 7 | TETRIS | [BLOCS](#blocs) | gauche / droite, **bas** accélère, **haut** chute directe, **✕ / ○ tourner** | 1 à 4 lignes : 100, 300, 500, 800 × niveau | niveau suivant toutes les 10 lignes ; vitesse maximale au niveau 12 ; une seule partie |
 | 8 | CANDY CRUCH | [CRUCH](#cruch) | croix / stick : curseur, **✕ prendre**, direction : échanger, **○ annuler** | 4 alignés : bonbon rayé ; 5 : bombe ; chaînes ; coups restants ; une vie par niveau | sans fin ; objectif +700 points à chaque niveau |
 | 9 | DIG DUG | [TAUPE](#taupe) | croix / stick, **✕ ou ○ jet de boue** | rocher qui écrase : gros bonus ; plus la créature est profonde, plus elle rapporte | sans fin ; jusqu'à 5 rochers ; vitesse plafonnée au stage 8 |
-| 10 | BILLES | [BILLES](#billes) | gauche / droite : viser (stick direct), **✕ tirer** | billes qui tombent : gros bonus | sans fin ; de 4 à 6 couleurs (6 au stage 6) ; une seule partie |
+| 10 | BILLES | [BILLES](#billes) | gauche / droite : viser (stick direct), **✕ tirer** | billes qui tombent : gros bonus | sans fin ; **50 billes éclatées ou tombées par stage** (compteur à droite) ; de 4 à 6 couleurs (6 au stage 6) ; une seule partie |
 | 11 | 1945 | [ESCADRILLE](#escadrille) | croix / stick, **✕ (□, R1, R2) tirer**, **○ tonneau** | capsules **P** arme (5 tirs), **T** tonneau, **+** vie ; boss 2000 × stage | sans fin ; boss après 10 vagues (3 avions chacun son tour) |
 | 12 | BUNKER 3D | [BUNKER 3D](#bunker-3d) | stick gauche : avancer / pas de côté, stick droit : pivoter, L1 / R1 pas de côté, **✕ / R2 tirer**, **□ ouvrir**, **○ arme**, **△ carte** | soin, munitions, armure, carte rouge, arme lourde ; combos DOUBLE, TRIPLE, CARNAGE ; barils en chaîne | sans fin ; un nouveau bunker généré à chaque stage |
 | 13 | TURBO ROUTE | [TURBO ROUTE](#turbo-route) | gauche / droite : braquer, **✕ / R2 / haut accélérer**, **bas freiner**, stick droit : accélérer / freiner, **○ turbo** | pièce 250 ; voiture doublée 50 ; bidon de turbo ; police semée 2000, police KO 3000 ; secondes restantes × 100 | sans fin ; 4 décors en boucle ; distance plafonnée au stage 6, circulation au stage 8 |
@@ -47,7 +49,7 @@ Depuis la V3.84, le Game-hub utilise **Bluepad32** : jusqu'à **4 manettes Bluet
 - **Menu « JOUEURS 1 / 2 »** (2e ligne, une étoile par manette connectée) : seuls les jeux à deux joueurs utilisent la 2e manette.
   - **RAQUETTES** : match à deux (raquette de droite pour le joueur 2), **le premier à 7 points gagne**.
   - **SPACE DEFENDER** : coopération, un 2e vaisseau **vert** pour le joueur 2, vies et score communs ; les ennemis piquent sur l'un ou l'autre ; la manette du joueur touché vibre.
-- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V4.25_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
+- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V4.28_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
 - **Mémoire** : environ 81 Ko libres avec 2 dalles en 3 bits et deux manettes connectées.
 
 # SPACE DEFENDER
@@ -247,6 +249,8 @@ Un shoot vertical original au-dessus de la mer (V3.85, remplace ESCALADE ; nouve
 
 ### BUNKER 3D
 
+*Retiré du firmware depuis la V4.26 (`#define GAME_BUNKER 0` en haut de `games.ino` ; mettre 1 pour le remettre).*
+
 ![BUNKER 3D](docs/jeu-bunker.gif)
 
 Un jeu de tir original **en vue subjective** (V3.88) : tu avances dans une base souterraine comme si tu y étais.
@@ -282,6 +286,8 @@ Un jeu de voiture original vu de dessus (V3.94) : tu doubles voitures et camions
 ![Les 4 décors de TURBO ROUTE](docs/turbo-decors.png)
 
 ### RENARD
+
+*Retiré du firmware depuis la V4.26 (`#define GAME_RENARD 0` en haut de `games.ino` ; mettre 1 pour le remettre).*
 
 ![RENARD](docs/jeu-renard.gif)
 
@@ -327,7 +333,7 @@ Un tir sur route en 3D original (V4.21 à V4.25, plus rapide et nouveau vaisseau
 - **Commandes :** gauche / droite (ou stick) pour se déplacer, **haut / bas pour la vitesse**, **✕ pour tirer**, **○ pour sauter**. Dans les virages, la route te pousse vers l'extérieur.
 - **Obstacles :** caisses (2 tirs, ou sauter par-dessus), mines (sauter ou tirer), **murs** avec une ouverture où passer, **piliers** violets indestructibles à éviter, **trous** dans la route (à sauter, à partir du stage 2), **soucoupes** qui reculent devant toi et tirent ; **orbe** jaune : double tir 10 s.
 - **Stages :** une distance à parcourir (barre verte en haut), puis stage suivant : plus vite, plus d'obstacles, autres couleurs (route, rails, planète).
-- **Graphisme :** route en bandes de couleur et bandes noires (moitié moins de LED allumées : moins de courant pour les dalles), rails néon, voies en pointillés, poteaux lumineux qui défilent, objets à l'échelle de la distance ; vaisseau vu de derrière (dôme vitré, ailes en métal, ailerons rouges, deux réacteurs aux flammes qui vacillent) qui s'incline dans les virages, son ombre sur la route quand il saute. Image dessinée en mémoire (32 Ko pendant le jeu seulement) : pas de scintillement.
+- **Graphisme :** route en bandes de couleur et bandes noires (moitié moins de LED allumées : moins de courant pour les dalles), rails néon, voies en pointillés, objets à l'échelle de la distance ; vaisseau original (armature en X en métal, 4 réacteurs incandescents qui pulsent, verrière cyan) qui s'incline dans les virages, gros tirs lumineux ; **chasseurs** (V4.28) qui descendent des étoiles, se posent au bout de la route, foncent, se placent en face et tirent avant de repartir (3 tirs, 400 points), son ombre sur la route quand il saute. Image dessinée en mémoire (32 Ko pendant le jeu seulement) : pas de scintillement.
 
 ![VORTEX 3D : stages 1, 2 et 3](docs/vortex3d-rendus.png)
 
@@ -490,8 +496,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V4.25_complet.bin](firmware/GameHub_V4.25_complet.bin) | 0x0 | `9eedc4368d4942878b6d4f0f3d133910` |
-| [firmware/GameHub_V4.25.bin](firmware/GameHub_V4.25.bin) | 0x10000 | `6d455aa70b5948ba27d71986bbf894ad` |
+| [firmware/GameHub_V4.28_complet.bin](firmware/GameHub_V4.28_complet.bin) | 0x0 | `47795ab54dff8297a001e0ccf979e344` |
+| [firmware/GameHub_V4.28.bin](firmware/GameHub_V4.28.bin) | 0x10000 | `1f15b4ed93da224d951a5c620b5cb9ef` |
 | [firmware/GameHub_V3.86_complet.bin](firmware/GameHub_V3.86_complet.bin) | 0x0 | `dc451b01c498df647da822a1427a1a5e` |
 | [firmware/GameHub_V3.86.bin](firmware/GameHub_V3.86.bin) | 0x10000 | `ee1945d390b91eb82240245a1e52821f` |
 

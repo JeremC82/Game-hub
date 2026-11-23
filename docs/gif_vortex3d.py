@@ -15,7 +15,7 @@ import gif_bunker as GB  # noqa: E402
 
 W = H = 128
 import re  # noqa: E402
-SHIP_SPR = re.findall(r'"([^"]*)"', re.search(r'VX_SHIP_SPR\[14\] = \{(.*?)\};', open(os.path.join(DOC, '..', 'games', 'games.ino'), encoding='utf-8').read(), re.S).group(1))
+SHIP_SPR = re.findall(r'"([^"]*)"', re.search(r'VX_SHIP_SPR\[21\] = \{(.*?)\};', open(os.path.join(DOC, '..', 'games', 'games.ino'), encoding='utf-8').read(), re.S).group(1))
 SHIP = 6.0
 RA = [(0, 150, 220), (190, 0, 170), (0, 180, 60), (220, 110, 0)]
 RB = [(0, 0, 0)] * 4
@@ -176,15 +176,6 @@ def render(g):
             for sd in (-1, 1):
                 lf, ln, wf, wn = cf + sd * hf / 3, cn + sd * hn / 3, .012 * S / zf + .3, .012 * S / zn + .3
                 quad([(lf - wf, yf_), (lf + wf, yf_), (ln + wn, yn), (ln - wn, yn)], rail)
-    pd = math.ceil(g.pos / 3) * 3 + 45
-    while pd > g.pos + 4.2:
-        dz = pd - g.pos
-        gy, h, w = int(yf(dz)), max(2, int(.45 * S / dz)), max(1, int(.05 * S / dz))
-        for side in (-1, 1):
-            x = int(cxf(dz) + side * 1.32 * S / dz)
-            d.rectangle((x - w // 2, gy - h, x - w // 2 + w - 1, gy - 1), fill=(150, 150, 170))
-            d.rectangle((x - w, gy - h - w, x + w, gy - h), fill=rail if (int(pd / 3) + side) & 1 else (255, 40, 60))
-        pd -= 3
     for o in sorted([o for o in g.objs if o[3] != 5], key=lambda o: -o[0]):
         dz = o[0] - g.pos
         if dz < 4 or dz > 46:
@@ -226,31 +217,54 @@ def render(g):
         elif t == 4:
             r, fy = max(1, int(.1 * sc)) + ((g.frame >> 2) & 1), gy - int(.3 * sc)
             d.ellipse((cx - r, fy - r, cx + r, fy + r), fill=(255, 220, 0))
+        elif t == 7:
+            w, h, fy = max(5, int(.62 * sc)), max(2, int(.24 * sc)), gy - int(.45 * sc)
+            d.line((cx - w // 3, gy, cx + w // 3, gy), fill=(0, 0, 0))
+            d.polygon([(cx - w // 2, fy), (cx + w // 2, fy), (cx, fy + h)], fill=(200, 60, 255))
+            d.line((cx - w // 2, fy, cx + w // 2, fy), fill=(255, 170, 255))
+            r = max(1, w // 8)
+            d.ellipse((cx - r, fy + h // 3 - r, cx + r, fy + h // 3 + r), fill=(255, 40, 40))
+            eng = (255, 230, 0)
+            ew, eh = max(2, w // 8), max(1, h // 3)
+            d.rectangle((cx - w // 3 - 1, fy - eh, cx - w // 3 - 2 + ew, fy - 1), fill=eng)
+            d.rectangle((cx + w // 3 - ew + 1, fy - eh, cx + w // 3, fy - 1), fill=eng)
         elif t == 6:
             w, h = max(1, int(.18 * sc)), max(3, int(1.0 * sc))
             d.rectangle((cx - w // 2, gy - h, cx - w // 2 + w - 1, gy - 1), fill=(170, 60, 255))
             d.line((cx - w // 2, gy - h, cx - w // 2, gy - 1), fill=(230, 170, 255))
             for y in range(gy - h, gy, max(2, h // 5)):
                 d.line((cx - w // 2, y, cx - w // 2 + w - 1, y), fill=(255, 255, 255))
+    if getattr(g, 'descent', None) is not None:  # chasseur qui descend des etoiles (60 images)
+        t = g.descent / 60
+        sx0, ex, ey = 30, cxf(46) + .5 * S / 46, yf(46) - .45 * S / 46
+        for k in range(4, 0, -1):
+            tk = max(0, t - k * .05)
+            d.point((int(sx0 + (ex - sx0) * tk * tk), int(10 + (ey - 10) * tk * tk)), fill=(255, 150, 0) if k < 3 else (150, 0, 150))
+        x, y = int(sx0 + (ex - sx0) * t * t), int(10 + (ey - 10) * t * t)
+        d.line((x - 2, y, x + 2, y), fill=(200, 60, 255))
+        d.point((x, y + 1), fill=(255, 40, 40))
+        d.point((x, y - 1), fill=(255, 255, 255))
     for s in g.shots:
         dz = s[0] - g.pos
         if dz > 4:
-            x, y = int(cxf(dz) + s[1] * S / dz), int(yf(dz)) - int(.2 * S / dz)
-            d.rectangle((x, y, x + max(1, int(.05 * S / dz)) - 1, y + max(1, int(.15 * S / dz)) - 1), fill=(120, 255, 255))
+            w, h = max(2, int(.14 * S / dz)), max(3, int(.45 * S / dz))
+            x, y = int(cxf(dz) + s[1] * S / dz) - w // 2, int(yf(dz)) - int(.25 * S / dz) - h
+            d.rounded_rectangle((x - 1, y - 1, x + w, y + h), (w + 2) // 2, fill=(0, 170, 255))
+            d.rounded_rectangle((x, y, x + w - 1, y + h - 1), max(0, w // 2 - 1), fill=(200, 255, 255))
     sx, sy = W // 2, int(yf(SHIP))
     jz = int(g.z * S / SHIP * .6)
     sw = 15 - jz // 6
     d.rounded_rectangle((sx - sw, sy - 1, sx + sw, sy + 1), 1, fill=(0, 0, 0))
-    x0, y0, fl = sx - 15, sy - 15 - jz, g.frame & 2
+    x0, y0, fl = sx - 13, sy - 20 - jz, g.frame & 2
     pix = im.load()
     for r, line in enumerate(SHIP_SPR):
         for c, ch in enumerate(line):
-            if ch == '.' or (r == 13 and fl):
+            if ch == '.':
                 continue
             col = {'k': (20, 20, 30), 'W': (255, 255, 255), 'L': (225, 230, 245), 'S': (170, 175, 195), 's': (150, 150, 170),
                    'R': (255, 40, 60), 'c': (0, 170, 255), 'C': (160, 240, 255),
                    'o': (255, 230, 0) if fl else (255, 120, 0)}.get(ch, (255, 120, 0) if fl else (255, 230, 0))
-            px, py = x0 + c, y0 + r + round((c - 15) * g.bank * .18)
+            px, py = x0 + c, y0 + r + round((c - 13) * g.bank * .18)
             if 0 <= px < W and 0 <= py < H:
                 pix[px, py] = col
     d.rectangle((0, 0, W, 7), fill=(0, 0, 0))
@@ -270,9 +284,10 @@ if __name__ == '__main__':
             g.step()
         P0 = g.pos
         g.objs = [[P0 + 9, -.5, 0, 0, 2, 0], [P0 + 13, .45, 0, 3, 3, 0], [P0 + 20, .2, 0, 1, 255, 0], [P0 + 11, .75, 0, 6, 255, 0],
-                  [P0 + 15, -.2, 0, 2, 1, 0], [P0 + 26, -.6, 0, 4, 1, 0]]
+                  [P0 + 15, -.2, 0, 2, 1, 0], [P0 + 26, -.6, 0, 4, 1, 0], [P0 + SHIP + 4, -.25, 0, 7, 3, 0]]
         if wave == 2:
             g.objs.append([P0 + 30, 0, 3.4, 5, 255, 0])
+        g.descent = 40
         im = GB.leds(render(g), P=4)
         pg = Image.new('RGB', (im.width, im.height + 34), (16, 16, 22))
         pg.paste(im, (0, 34))

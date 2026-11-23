@@ -28,7 +28,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "4.25"
+#define GAMES_VERSION "4.28"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -127,6 +127,8 @@ bool gAttract = false;              // mode demo : menu cache (ligne DEMO, ou 30
 #define MENU_IDLE_MS 30000UL        // menu sans activite : passage en mode demo
 bool menuScores = false;            // page des meilleurs scores affichee
 // numeros des jeux (ordre du menu)
+#define GAME_BUNKER 0  // BUNKER 3D compile dans le firmware (0 : retire du build, code garde)
+#define GAME_RENARD 0  // RENARD compile dans le firmware (0 : retire du build, code garde)
 enum GameId : uint8_t { G_SPACE, G_RAID, G_RAQ, G_BUL, G_LAB, G_ORB, G_BRI, G_BLO, G_CRU, G_TAU, G_BIL, G_ESQ, G_BUN, G_CAR, G_RUN, G_ISO, G_RAL, G_VOR };
 #define N_GAMES 18
 // ===== NOMS DES JEUX : a modifier ici, ils s'affichent dans le menu, les scores et la demo =====
@@ -152,7 +154,8 @@ const char *const GAME_NAME[N_GAMES] = {
   "RALLYE 3D",       // G_RAL
   "VORTEX 3D",       // G_VOR
 };
-uint8_t gGame = 0;                  // jeu choisi dans le menu (gauche / droite sur la ligne JOUER)
+uint8_t gGame = 0;  // jeu choisi dans le menu (gauche / droite sur la ligne JOUER)
+bool gameOn(int g) { return !(g == 12 && !GAME_BUNKER) && !(g == 14 && !GAME_RENARD); }  // jeu present dans le firmware (12 BUNKER 3D, 14 RENARD)
 const char *topKey() { static const char *const K[N_GAMES] = { "top", "top1", "top3", "top4", "top5", "top7", "top8", "top9", "top10", "top11", "top12", "top14", "top15", "top16", "top18", "top19", "top20", "top21" }; return K[gGame % N_GAMES]; }  // top2 (COURSE), top6 (SAUTERELLE), top13 (ESCALADE), top17 (PINCAB) : jeux retires
 #define TOP_N 5
 HiScore gBest[TOP_N];                // meilleurs scores (gardes en memoire)
@@ -161,6 +164,7 @@ bool gNameEntry = false;            // saisie du nom apres un score qui entre au
 char gName[4] = "AAA";              // nom en cours de saisie (3 lettres)
 uint8_t gNamePos = 0;               // lettre en cours (0 a 2)
 const char NAME_CHARS[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 -";
+#define PAD_SLEEP_MS 180000UL       // 3 min sans toucher aux manettes : elles sont eteintes, retour a la demo
 #define IDLE_TO_DEMO_MS 60000UL     // partie abandonnee : retour a la demo apres 1 min sans appui
 char ipText[20] = "";  // adresse Bluetooth de l'ESP32 (moniteur serie)
 ControllerPtr gPads[BP32_MAX_GAMEPADS];  // manettes connectees : [0] joueur 1, [1] joueur 2...
@@ -1029,7 +1033,8 @@ void hudTop(uint16_t *palFull) {
   }
 }
 void gameDraw() {
-  if (gOverflow) {  // des zones n'ont pas ete notees : on efface tout (plus de restes, ex. icones de vies)
+  if (gCvBegin()) gNOld = 0;  // dessin en memoire (plus de LED qui clignote) : rien a effacer
+  else if (gOverflow) {  // des zones n'ont pas ete notees : on efface tout (plus de restes, ex. icones de vies)
     gOverflow = false;
     gNOld = 0;
     gfx->fillScreen(0);
@@ -1584,7 +1589,7 @@ void rDrawBoss(uint16_t *palFull) {  // le vaisseau-mere du 1er jeu, en double t
   gMark(10, 12, bw, 3);
 }
 void rDraw() {
-  eraseOld();
+  if (!gCvBegin()) eraseOld();  // dessin en memoire, envoye d'un bloc : pas de LED qui clignote
   uint16_t palFull[9];
   altBackground(1.4f, palFull);  // defilement rapide : on avance
   for (auto &f : rFar) gPix(f[0], f[1], rgb(45, 45, 60));  // etoiles lointaines (plus lentes)
@@ -1755,7 +1760,7 @@ void qStep() {
   if (gStageT > 0) gStageT--;
 }
 void qDraw() {
-  eraseOld();
+  if (!gCvBegin()) eraseOld();  // dessin en memoire, envoye d'un bloc : pas de LED qui clignote
   uint16_t palFull[9];
   altBackground(0.05f, palFull);
   int mid = W / 2;
@@ -2487,7 +2492,7 @@ void lStep() {
 bool lWall(int r, int c) { return r >= 0 && r < L_ROWS && c >= 0 && c < L_COLS && L_MAZE[r][c] == '#'; }
 bool lFloor(int r, int c) { return r >= 0 && r < L_ROWS && c >= 0 && c < L_COLS && L_MAZE[r][c] != '#'; }
 void lDraw() {
-  eraseOld();
+  if (!gCvBegin()) eraseOld();  // dessin en memoire, envoye d'un bloc : pas de LED qui clignote
   uint16_t palFull[9];
   for (int i = 0; i < 9; i++) palFull[i] = rgb(G_PAL_RGB[i][0], G_PAL_RGB[i][1], G_PAL_RGB[i][2]);
   int t = lTile, VH = H - 8, mh = L_ROWS * t;
@@ -2802,7 +2807,7 @@ void oStep() {
   }
 }
 void oDraw() {
-  eraseOld();
+  if (!gCvBegin()) eraseOld();  // dessin en memoire, envoye d'un bloc : pas de LED qui clignote
   uint16_t palFull[9];
   for (int i = 0; i < 9; i++) palFull[i] = rgb(G_PAL_RGB[i][0], G_PAL_RGB[i][1], G_PAL_RGB[i][2]);
   for (int i = 0; i < O_STARS; i++) {  // etoiles : plus claires en s'approchant
@@ -2956,6 +2961,9 @@ void kReset() {
   kRows = H >= 128 ? 10 : 6;
   kOY = H >= 128 ? 14 : 11;
   kPX = W / 2 - 9;
+  gCvAlloc();
+  gfx->fillScreen(0);
+  gNOld = 0;
   kBuild();
   kNewBall();
 }
@@ -3111,7 +3119,7 @@ void kStep() {
   }
 }
 void kDraw() {
-  eraseOld();
+  if (!gCvBegin()) eraseOld();  // dessin en memoire, envoye d'un bloc : plus de points qui restent
   uint16_t palFull[9];
   altBackground(0.04f, palFull);
   const uint16_t kShadow = rgb(6, 6, 12);
@@ -3422,7 +3430,7 @@ void tCellDraw(int x, int y, int s, uint8_t v, bool ghost) {  // bloc en relief 
   }
 }
 void tDraw() {
-  eraseOld();
+  if (!gCvBegin()) eraseOld();  // dessin en memoire, envoye d'un bloc : pas de LED qui clignote
   uint16_t palFull[9];
   for (int i = 0; i < 9; i++) palFull[i] = rgb(G_PAL_RGB[i][0], G_PAL_RGB[i][1], G_PAL_RGB[i][2]);
   int s = tC, bw = T_COLS * s, bh = tRows * s;
@@ -3767,7 +3775,7 @@ void yGem(int x, int y, uint8_t v, int s, bool flash) {  // un bonbon (forme sel
   if (v & 0x20) { gfx->drawFastVLine(x + s / 2 - 2, y + 1, s - 2, rgb(255, 255, 255)); gfx->drawFastVLine(x + s / 2 + 1, y + 1, s - 2, rgb(255, 255, 255)); }
 }
 void yDraw() {
-  eraseOld();
+  if (!gCvBegin()) eraseOld();  // dessin en memoire, envoye d'un bloc : pas de LED qui clignote
   uint16_t palFull[9];
   for (int i = 0; i < 9; i++) palFull[i] = rgb(G_PAL_RGB[i][0], G_PAL_RGB[i][1], G_PAL_RGB[i][2]);
   int s = yS;
@@ -4039,7 +4047,7 @@ void dSpr(const char *const *rows, int w, int h, int x, int y, bool flip, uint16
     }
 }
 void dDraw() {
-  eraseOld();
+  if (!gCvBegin()) eraseOld();  // dessin en memoire, envoye d'un bloc : pas de LED qui clignote
   uint16_t palFull[9];
   for (int i = 0; i < 9; i++) palFull[i] = rgb(G_PAL_RGB[i][0], G_PAL_RGB[i][1], G_PAL_RGB[i][2]);
   // ciel (degrade) et herbe
@@ -4098,6 +4106,8 @@ void dDraw() {
 #define P_ROWS 14
 struct PMem { uint8_t g[P_ROWS][P_COLS], mk1[P_ROWS][P_COLS], mk2[P_ROWS][P_COLS]; int16_t q[P_ROWS * P_COLS]; };
 #define pG (GMEM(PMem)->g)  // 0 vide, 1..6 couleur
+#define P_GOAL 50  // billes a faire eclater ou tomber pour finir un stage
+int pDone = 0;
 int pNC = 8, pB = 6, pRH = 5, pX0 = 30, pY0 = 9, pRowsVis = 9, pShots = 0, pDrop = 0, pNColors = 4;
 float pAng = 0, pBX, pBY, pVX, pVY;
 uint8_t pCur = 1, pNext = 2, pPrevK = 0;
@@ -4125,7 +4135,7 @@ uint8_t pPick() {  // couleur parmi celles encore presentes
 }
 void pLevel() {
   memset(pG, 0, sizeof(pG));
-  pDrop = 0; pShots = 0;
+  pDrop = 0; pShots = 0; pDone = 0;
   pNColors = min(6, 4 + gWave / 3);  // rouge, jaune, vert, bleu des le 1er stage
   int rows = min(pRowsVis - 3, 4 + gWave / 2);
   for (int r = 0; r < rows; r++)
@@ -4174,6 +4184,7 @@ void pLand(int r, int c) {
       for (int cc = 0; cc < P_COLS; cc++)
         if (mk[rr][cc]) { pG[rr][cc] = 0; if (random(3) == 0) gBoomAt(pCX(rr, cc), pCY(rr)); }
     gScore += 10UL * n;
+    pDone += n;
     sfxBoom();
     memset(mk, 0, sizeof(mk));  // celles qui ne tiennent plus au plafond tombent
     for (int cc = 0; cc < P_COLS; cc++) if (pG[0][cc] && !mk[0][cc]) pFlood(0, cc, 0, mk);
@@ -4181,7 +4192,7 @@ void pLand(int r, int c) {
     for (int rr = 0; rr < P_ROWS; rr++)
       for (int cc = 0; cc < P_COLS; cc++)
         if (pG[rr][cc] && !mk[rr][cc]) { pG[rr][cc] = 0; fall++; gBoomAt(pCX(rr, cc), pCY(rr)); }
-    if (fall) { gScore += 20UL << min(fall, 10); sndMelody(JINGLE_STAGE, 3); }
+    if (fall) { gScore += 20UL << min(fall, 10); pDone += fall; sndMelody(JINGLE_STAGE, 3); }
   } else sndPlay(400, 300, 50, 0.3f, false, 1);
   if (++pShots >= 8) {  // le plafond descend d'un rang
     pShots = 0;
@@ -4197,7 +4208,7 @@ void pLand(int r, int c) {
       if (pG[rr][cc]) { any = true; if (rr >= pRowsVis) over = true; }
   if (!gDemo && gScore > gHi) gHi = gScore;
   if (over) { altLoseLife(W / 2, H - 6); return; }
-  if (!any) {
+  if (!any || pDone >= P_GOAL) {  // puits vide, ou 50 billes : stage gagne
     gWave++;
     gStageT = 80;
     altStageClear(1000UL * gWave);
@@ -4321,7 +4332,7 @@ void pBall(int cx, int cy, uint8_t col) {  // bille ronde avec reflet
   }
 }
 void pDraw() {
-  eraseOld();
+  if (!gCvBegin()) eraseOld();  // dessin en memoire, envoye d'un bloc : pas de LED qui clignote
   uint16_t palFull[9];
   for (int i = 0; i < 9; i++) palFull[i] = rgb(G_PAL_RGB[i][0], G_PAL_RGB[i][1], G_PAL_RGB[i][2]);
   int bw = pNC * pB + pB / 2, by1 = pY0 + pRowsVis * pRH + pB / 2;
@@ -4350,6 +4361,12 @@ void pDraw() {
   gMark(W - 12, 0, 12, 8);
   for (int i = 0; i < 8 - pShots; i++) jRect(px + i * 3, H - 6, 2, 3, rgb(255, 160, 40));  // tirs avant que le plafond descende
   gMark(px, H - 6, 26, 3);
+  char pb[8];  // billes du stage : il en faut 50
+  snprintf(pb, sizeof(pb), "%d", min(pDone, P_GOAL));
+  jRect(px, H / 2 - 7, W - px, 13, 0);
+  tinyText(*gfx, px, H / 2 - 7, pb, rgb(255, 220, 0));
+  tinyText(*gfx, px, H / 2 + 1, "/50", rgb(110, 110, 140));
+  gMark(px, H / 2 - 7, W - px, 13);
   altBooms(palFull);
   altHud(palFull);
 }
@@ -5059,6 +5076,7 @@ void aDraw() {
 }
 
 // ---------------------------------------------------------------- BUNKER 3D
+#if GAME_BUNKER
 // Jeu de tir original en vue subjective (lancer de rayons) : tu avances dans une base souterraine, murs textures,
 // sol et plafond en perspective, brouillard avec la distance. Robots ennemis (drone, sentinelle, colosse) qui te
 // traquent et tirent du plasma ; portes coulissantes ; soins, munitions, armure, arme lourde ; carte rouge pour
@@ -6076,6 +6094,13 @@ void zDraw() {
   gfx->drawRGBBitmap(0, VH, zHudCv->getBuffer(), W, hh);  // barre d'etat
   gNOld = 0;  // tout l'ecran est redessine a chaque image
 }
+#else  // BUNKER 3D retire du build
+void *zD = nullptr;
+void zReset() {}
+void zStep() {}
+void zDraw() {}
+void zRelease() {}
+#endif
 
 // ---------------------------------------------------------------- TURBO ROUTE
 // Jeu de voiture original vu de dessus : tu doubles voitures et camions sur une route a 3 ou 4 voies et tu evites
@@ -6594,6 +6619,7 @@ void vDraw() {
 }
 
 // ---------------------------------------------------------------- RENARD
+#if GAME_RENARD
 // Course sans fin originale : un petit renard court tout seul ; X ou haut pour sauter (tenir : plus haut), bas pour se
 // baisser (ou retomber vite). Obstacles : rochers, buissons epineux, troncs, chauves-souris (basses, moyennes, hautes).
 // Gemmes +100 ; etoile rare : invincible 5 s. La vitesse monte ; stage tous les 1000 points ; jour et nuit en alternance.
@@ -6853,6 +6879,13 @@ void ruDraw() {
   gfx->drawRGBBitmap(0, 0, c.getBuffer(), W, H);
   altBooms(palFull);
 }
+#else  // RENARD retire du build
+GFXcanvas16 *ruCv = nullptr;
+void ruReset() {}
+void ruStep() {}
+void ruDraw() {}
+void ruRelease() {}
+#endif
 
 
 // ---------------------------------------------------------------- SCARABEE 3D
@@ -7473,7 +7506,7 @@ int vxCool = 0, vxDouble = 0, vxInv = 0, vxFlashT = 0;
 bool vxPrevJump = false;
 float vxS0() { return W * 2.25f; }                                  // echelle horizontale a distance 1
 float vxYH() { return H * 0.30f; }                                  // ligne d'horizon
-const char *const VX_SHIP_SPR[14] = { "...............k...............", "..............kWk..............", ".............kCcCk.............", "............kCcccCk............", "k..........kCcccccCk..........k", "kk........kLLLLLLLLLk........kk", "kRk......kLLLLLLLLLLLk......kRk", "kRRk...kkLLLLLLLLLLLLLkk...kRRk", "kRWRkkkLLLLLSSSSSSSLLLLLkkkRWRk", "kRRRRLLLLLLSSSsssSSSLLLLLLRRRRk", ".kkRRSSSSSSSkkkkkkkSSSSSSSRRkk.", "...kkkkkkkkkoyokoyokkkkkkkkk...", "............yoy.yoy............", ".............o...o............." };  // ton vaisseau, vu de derriere
+const char *const VX_SHIP_SPR[21] = { "...........................", ".Rkk...................kkR.", ".LLLk.......ooo.......kLLL.", "..kLLk.....oWyyo.....kLLk..", "....LLk....oyyyo....kLL....", ".....LLkk..oyyyo..kkLL.....", "......LLLk..ooo..kLLL......", ".......kLLkkLLLkkLLk.......", ".....ooo.kkLLLSSkk.ooo.....", "....oWyyoLLLLCSSSsoWyyo....", "....oyyyoLLLCccSssoyyyo....", "....oyyyoLLSScSsssoyyyo....", ".....ooo.kkSSSsskk.ooo.....", ".......kSSkkSsskkSSk.......", "......SSSk..ooo..kSSS......", ".....SSkk..oWyyo..kkSS.....", "....SSk....oyyyo....kSS....", "..kSSk.....oyyyo.....kSSk..", ".SSSk.......ooo.......kSSS.", ".Rkk...................kkR.", "..........................." };  // ton vaisseau (original) : armature en X, 4 reacteurs incandescents, verriere
 // route : virages (courbure qui s'accumule) et bosses ; projection recalculee a chaque image (echantillons de pres a loin)
 #define VX_NP 56
 float vxPZ[VX_NP], vxPXw[VX_NP], vxPYs[VX_NP], vxHead = 0;
@@ -7506,6 +7539,11 @@ void vxSpawn() {
     for (auto &o : vxO)
       if (!o.on) { o = { d, x, len, 0, type, hp, true }; return; }
   };
+  bool fighter = false;
+  for (auto &o : vxO) if (o.on && o.type == 7) fighter = true;
+  if (!fighter && random(100) < 10 + 2 * st)  // chasseur : descend des etoiles (len : depart dans le ciel, en x ecran)
+    for (auto &o : vxO)
+      if (!o.on) { o = { d, random(-60, 61) / 100.0f, (float)random(16, W - 16), 0, 7, 3, true }; break; }
   int r = random(100);
   if (r < 26) add(0, random(-80, 81) / 100.0f, 2, 0);                          // caisse
   else if (r < 40) { add(2, random(-80, 81) / 100.0f, 1, 0); if (st >= 2) add(2, random(-80, 81) / 100.0f, 1, 0); }  // mines
@@ -7538,7 +7576,7 @@ void vxReset() {
   vxDouble = 0;
   vxStart();
 }
-float vxHalfW(const VxObj &o) { return o.type == 0 ? 0.22f : o.type == 2 ? 0.12f : o.type == 3 ? 0.26f : o.type == 4 ? 0.12f : o.type == 6 ? 0.1f : 2; }
+float vxHalfW(const VxObj &o) { return o.type == 7 ? 0.3f : o.type == 0 ? 0.22f : o.type == 2 ? 0.12f : o.type == 3 ? 0.26f : o.type == 4 ? 0.12f : o.type == 6 ? 0.1f : 2; }
 uint8_t vxAuto() {  // demo : evite, vise, saute
   uint8_t k = 0;
   float tx = 0, best = 99;
@@ -7614,7 +7652,7 @@ void vxStep() {
     s.d += 1.7f;
     if (s.d - vxPos > 44) { s.on = false; continue; }
     for (auto &o : vxO) {
-      if (!o.on || o.type == 5 || o.type == 4) continue;
+      if (!o.on || o.type == 5 || o.type == 4 || (o.type == 7 && o.ph == 0)) continue;
       if (fabsf(o.d - s.d) < 1.8f && (o.type == 1 ? fabsf(s.x - o.x) > 0.3f : fabsf(s.x - o.x) < vxHalfW(o) + 0.05f)) {
         s.on = false;
         if (o.hp == 255) { sndPlay(2000, 1800, 30, 0.2f, false, 0); break; }  // mur ou pilier : indestructible
@@ -7623,7 +7661,7 @@ void vxStep() {
           o.on = false;
           float dz = o.d - vxPos;
           gBoomAt((int)(vxCX(dz) + o.x * vxS0() / dz), (int)vxY(dz) - 3);
-          gScore += o.type == 3 ? 300 : o.type == 0 ? 50 : 30;
+          gScore += o.type == 7 ? 400 : o.type == 3 ? 300 : o.type == 0 ? 50 : 30;
           sfxBoom();
         } else sfxMenu();
         break;
@@ -7636,6 +7674,23 @@ void vxStep() {
   for (auto &o : vxO) {
     if (!o.on) continue;
     if (o.flash) o.flash--;
+    if (o.type == 7) {  // chasseur : descend des etoiles, se pose au bout de la route, fonce, se place en face, tire, repart
+      if (o.ph == 0) { o.d = vxPos + 45.9f; if (++o.t >= 60) { o.ph = 1; o.t = 0; } }
+      else if (o.ph == 1) {
+        o.d -= 0.35f;
+        o.x = constrain(o.x + sinf(gFrame * 0.06f + o.len) * 0.012f, -0.9f, 0.9f);
+        if (o.d - vxPos <= VX_SHIP + 4) { o.ph = 2; o.t = 0; }
+      } else if (o.ph == 2) {
+        o.d = vxPos + VX_SHIP + 4;
+        o.t++;
+        o.x = constrain(o.x + (vxX - o.x) * 0.025f + sinf(o.t * 0.08f) * 0.02f, -0.9f, 0.9f);
+        if ((int)o.t % 40 == 20)
+          for (auto &e : vxE)
+            if (!e.on) { e = { o.d, o.x, true }; sndPlay(700, 250, 90, 0.25f, true, 0); break; }
+        if (o.t > 280) o.ph = 3;
+      } else { o.d += 0.9f; if (o.d - vxPos > 46) o.on = false; }  // repart vers les etoiles
+      continue;
+    }
     float dz = o.d - vxPos;
     if (o.type == 3) {
       o.x += sinf((gFrame + o.d * 10) * 0.04f) * 0.012f;
@@ -7728,16 +7783,6 @@ void vxDraw() {
         vxQuad(lf - wf, yf, lf + wf, yf, ln + wn, yn, ln - wn, yn, rail);
       }
   }
-  // poteaux lumineux le long des rails : ils defilent avec la vitesse
-  for (float pd = ceilf(vxPos / 3) * 3 + 45; pd > vxPos + 4.2f; pd -= 3) {
-    float dz = pd - vxPos;
-    int gy = (int)vxY(dz), h = max(2, (int)(0.45f * S / dz)), w = max(1, (int)(0.05f * S / dz));
-    for (int side = -1; side <= 1; side += 2) {
-      int x = (int)(vxCX(dz) + side * 1.32f * S / dz);
-      gfx->fillRect(x - w / 2, gy - h, w, h, rgb(150, 150, 170));
-      gfx->fillRect(x - w, gy - h - w, 2 * w + 1, w + 1, ((int)(pd / 3) + side) & 1 ? rail : rgb(255, 40, 60));
-    }
-  }
   // objets : du plus loin au plus proche
   bool drawn[VX_N] = {};
   for (int pass = 0; pass < VX_N; pass++) {
@@ -7792,6 +7837,30 @@ void vxDraw() {
         gfx->drawFastHLine(cx - 1, gy, 3, rgb(0, 0, 0));
         break;
       }
+      case 7: {  // chasseur : traine lumineuse en descendant des etoiles, puis aile en fleche violette au-dessus de la route
+        if (o.ph == 0) {
+          float t = o.t / 60.0f, e = t * t, ex = vxCX(46) + o.x * S / 46, ey = vxY(46) - 0.45f * S / 46;
+          int x = (int)(o.len + (ex - o.len) * e), y = (int)(10 + (ey - 10) * e);
+          for (int k = 1; k <= 4; k++) {  // traine
+            float tk = max(0.0f, t - k * 0.05f), ek = tk * tk;
+            gfx->drawPixel((int)(o.len + (ex - o.len) * ek), (int)(10 + (ey - 10) * ek), k < 3 ? rgb(255, 150, 0) : rgb(150, 0, 150));
+          }
+          gfx->drawFastHLine(x - 2, y, 5, rgb(200, 60, 255));
+          gfx->drawPixel(x, y + 1, rgb(255, 40, 40));
+          gfx->drawPixel(x, y - 1, (gFrame & 2) ? rgb(255, 255, 255) : rgb(255, 220, 0));
+          break;
+        }
+        int w = max(5, (int)(0.62f * sc)), h = max(2, (int)(0.24f * sc)), fy = gy - (int)(0.45f * sc);
+        uint16_t body = o.flash ? fl : rgb(200, 60, 255), edge = o.flash ? fl : rgb(255, 170, 255);
+        gfx->drawFastHLine(cx - w / 3, gy, 2 * w / 3, rgb(0, 0, 0));  // ombre
+        gfx->fillTriangle(cx - w / 2, fy, cx + w / 2, fy, cx, fy + h, body);
+        gfx->drawLine(cx - w / 2, fy, cx + w / 2, fy, edge);
+        gfx->fillCircle(cx, fy + h / 3, max(1, w / 8), o.flash ? fl : rgb(255, 40, 40));  // cockpit
+        uint16_t eng = (gFrame & 2) ? rgb(255, 230, 0) : rgb(255, 120, 0);
+        gfx->fillRect(cx - w / 3 - 1, fy - max(1, h / 3), max(2, w / 8), max(1, h / 3), eng);  // reacteurs
+        gfx->fillRect(cx + w / 3 - max(2, w / 8) + 1, fy - max(1, h / 3), max(2, w / 8), max(1, h / 3), eng);
+        break;
+      }
       case 6: {  // pilier violet a anneaux
         int w = max(1, (int)(0.18f * sc)), h = max(3, (int)(1.0f * sc));
         gfx->fillRect(cx - w / 2, gy - h, w, h, rgb(170, 60, 255));
@@ -7803,7 +7872,14 @@ void vxDraw() {
   }
   // tirs : traits qui filent vers l'horizon ; tirs ennemis rouges
   for (auto &s : vxS)
-    if (s.on) { float dz = s.d - vxPos; if (dz > 4.0f) { int x = (int)(vxCX(dz) + s.x * S / dz), y = (int)vxY(dz) - (int)(0.2f * S / dz); gfx->fillRect(x, y, max(1, (int)(0.05f * S / dz)), max(1, (int)(0.15f * S / dz)), rgb(120, 255, 255)); } }
+    if (s.on) {  // tirs : gros traits lumineux (coeur blanc, bord cyan)
+      float dz = s.d - vxPos;
+      if (dz > 4.0f) {
+        int w = max(2, (int)(0.14f * S / dz)), h = max(3, (int)(0.45f * S / dz)), x = (int)(vxCX(dz) + s.x * S / dz) - w / 2, y = (int)vxY(dz) - (int)(0.25f * S / dz) - h;
+        gfx->fillRoundRect(x - 1, y - 1, w + 2, h + 2, (w + 2) / 2, rgb(0, 170, 255));
+        gfx->fillRoundRect(x, y, w, h, w / 2, rgb(200, 255, 255));
+      }
+    }
   for (auto &e : vxE)
     if (e.on) { float dz = e.d - vxPos; if (dz > 4.0f) { int x = (int)(vxCX(dz) + e.x * S / dz), y = (int)vxY(dz) - (int)(0.25f * S / dz), r = max(1, (int)(0.06f * S / dz)); gfx->fillCircle(x, y, r, (gFrame & 2) ? rgb(255, 40, 40) : rgb(255, 200, 0)); } }
   // ton vaisseau (vu de derriere) : ombre sur la route, dome vitre, ailes metal, ailerons rouges, reacteurs qui crachent ;
@@ -7812,13 +7888,12 @@ void vxDraw() {
     int sx = W / 2, sy = (int)vxY(VX_SHIP), jz = (int)(vxZ * S / VX_SHIP * 0.6f);
     int sw = 15 - jz / 6;
     gfx->fillRoundRect(sx - sw, sy - 1, 2 * sw + 1, 3, 1, rgb(0, 0, 0));
-    int x0 = sx - 15, y0 = sy - 15 - jz;
+    int x0 = sx - 13, y0 = sy - 20 - jz;
     bool fl = gFrame & 2;
-    for (int r = 0; r < 14; r++)
-      for (int c = 0; c < 31; c++) {
+    for (int r = 0; r < 21; r++)
+      for (int c = 0; c < 27; c++) {
         char ch = VX_SHIP_SPR[r][c];
         if (ch == '.') continue;
-        if (r == 13 && fl) continue;  // bout de flamme qui vacille
         uint16_t col;
         switch (ch) {
           case 'k': col = rgb(20, 20, 30); break;
@@ -7832,10 +7907,10 @@ void vxDraw() {
           case 'o': col = fl ? rgb(255, 230, 0) : rgb(255, 120, 0); break;
           default: col = fl ? rgb(255, 120, 0) : rgb(255, 230, 0); break;  // y
         }
-        int py = y0 + r + (int)lroundf((c - 15) * vxBank * 0.18f);  // inclinaison
+        int py = y0 + r + (int)lroundf((c - 13) * vxBank * 0.18f);  // inclinaison
         gfx->drawPixel(x0 + c, py, col);
       }
-    if (vxDouble) { gfx->drawPixel(x0 + 1, y0 + 4, rgb(255, 220, 0)); gfx->drawPixel(x0 + 29, y0 + 4, rgb(255, 220, 0)); }
+    if (vxDouble) { gfx->drawPixel(x0 + 1, y0 + 1, rgb(255, 220, 0)); gfx->drawPixel(x0 + 25, y0 + 1, rgb(255, 220, 0)); }
   }
   altBooms(palFull);
   // tableau de bord : score, vies, stage, barre de distance
@@ -7953,7 +8028,9 @@ void resetCurrent() {
   if (gGame != G_BUN) zRelease();  // la memoire de BUNKER 3D est rendue aux autres jeux et au Bluetooth
   if (gGame != G_RUN) ruRelease();  // et de RENARD
   if (gGame != G_ISO) iRelease();  // et de SCARABEE 3D
-  if (gGame != G_BUL && gGame != G_VOR) gCvRelease();  // et l'image en memoire de BULLES
+  // image en memoire (32 Ko) pour les jeux qui redessinent tout l'ecran a chaque image : plus de LED qui clignote
+  if (gGame == G_ESQ || gGame == G_CAR || gGame == G_BUN || gGame == G_RUN || gGame == G_ISO || gGame == G_RAL) gCvRelease();
+  else { gCvAlloc(); gfx->fillScreen(0); gNOld = 0; }
   if (gGame != G_RAL) xrRelease();  // et de RALLYE 3D
   if (!gMemFor(gGame)) { gGame = 0; topLoad(); gMemFor(0); }  // memoire insuffisante : on revient au premier jeu
   if (gGame == 0) gReset();
@@ -8137,10 +8214,19 @@ void gameUpdate() {
     else { menuScreen(); return; }
     shown = false;
   }
+  // 3 min sans toucher aux manettes : elles sont eteintes (deconnectees : une manette PS4 s'eteint) et la demo reprend
+  if ((PS4.isConnected() || PAD2.isConnected()) && now - lastInput > PAD_SLEEP_MS) {
+    for (auto p : gPads) if (p && p->isConnected()) p->disconnect();
+    Serial.println("3 min sans activite : manettes eteintes, retour a la demo");
+    gPaused = false;
+    if (!gDemo) toDemo();
+    lastInput = now;
+  }
   if (gPaused) {  // pause : l'image reste figee
     if (gGame) altDraw();
     else gameDraw();
     gOverlay();
+    gCvPresent();  // jeux dessines en memoire : l'image et le cadre de pause sont envoyes
     return;
   }
   if (!gDemo && now - lastInput > IDLE_TO_DEMO_MS) toDemo();
@@ -8173,6 +8259,7 @@ void gameUpdate() {
       demoScoreUntil = 0;
       int ng = random(N_GAMES - 1);
       if (ng >= gGame) ng++;
+      while (!gameOn(ng)) ng = (ng + 1) % N_GAMES;
       gGame = ng;
       topLoad();
       gfx->fillScreen(0);  // entre deux jeux : le logo GAMEHUB 2 s, avec le nom du jeu qui arrive
@@ -8417,7 +8504,8 @@ void menuInput(uint8_t edge) {
   }
   if (edge & 64) { startReq = true; return; }
   if (menuSel == 0 && (edge & (4 | 8))) {  // choix du jeu : gauche / droite
-    gGame = (gGame + ((edge & 4) ? N_GAMES - 1 : 1)) % N_GAMES;
+    do gGame = (gGame + ((edge & 4) ? N_GAMES - 1 : 1)) % N_GAMES;
+    while (!gameOn(gGame));  // jeux retires du build : sautes
     prefs.putUChar("game", gGame);
     topLoad();  // meilleurs scores de ce jeu
     sfxMenu();
@@ -8510,7 +8598,8 @@ void handleSerial() {
       Serial.println("Demo : jeu suivant");
     } else if (cmd == 'j') {  // test : demo du jeu N (0 a N_GAMES - 1)
       int g = atoi(arg);
-      if (*arg && g >= 0 && g < N_GAMES) {
+      if (*arg && g >= 0 && g < N_GAMES && !gameOn(g)) Serial.printf("Jeu %d (%s) retire de ce firmware\n", g, GAME_NAME[g]);
+      else if (*arg && g >= 0 && g < N_GAMES) {
         gGame = g; topLoad(); gDemo = true; startAttract();
         Serial.printf("Demo du jeu %d (%s), memoire libre %u\n", g, GAME_NAME[g], ESP.getFreeHeap());
       } else Serial.printf("Format : j 0 a j %d\n", N_GAMES - 1);
