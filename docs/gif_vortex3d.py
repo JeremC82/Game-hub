@@ -144,10 +144,28 @@ def render(g):
         return P[i][k] + (P[i + 1][k] - P[i][k]) * t
     cxf = lambda dz: W / 2 + (lerp(1, dz) - g.x) * S / dz
     yf = lambda dz: lerp(2, dz)
+    SKY = [[(0, 0, 150), (0, 0, 220), (0, 150, 255), (170, 230, 255)], [(0, 0, 150), (150, 0, 150), (255, 0, 150), (255, 170, 220)],
+           [(0, 0, 150), (0, 150, 150), (0, 230, 150), (200, 255, 220)], [(0, 0, 150), (200, 0, 0), (255, 140, 0), (255, 230, 150)]]
+    y = int(yh) - 22
+    for b, hgt in enumerate((10, 6, 4, 2)):
+        d.rectangle((0, y, W - 1, y + hgt - 1), fill=SKY[st][b])
+        y += hgt
     for i in range(40):
         x = ((i * 53 + 11) * 7 + int(g.head * 220 + 4000) * (1 + (i & 1))) % W
         y = 9 + ((i * 37 + 3) * 13) % int(yh - 6)
-        d.point((x, y), fill=(150, 150, 170) if i % 5 else (255, 255, 255))
+        if y < yh - 22:
+            d.point((x, y), fill=(150, 150, 170) if i % 5 else (255, 255, 255))
+    mx = (int(W * .18 - g.head * 90) % (W + 30)) - 15
+    gx = (int(W * .45 - g.head * 130) % (W + 40)) - 20
+    d.ellipse((mx - 5, 15, mx + 5, 25), fill=(170, 170, 190))
+    d.ellipse((mx - 2, 17, mx + 6, 25), fill=(150, 150, 170))
+    d.point((mx - 2, 18), fill=(255, 255, 255))
+    GBc = [(255, 150, 60), (150, 220, 255), (255, 220, 120), (200, 150, 255)][(st + 1) % 4]
+    d.ellipse((gx - 9, 21, gx + 9, 39), fill=GBc)
+    for k in (-6, -2, 2, 6):
+        hw_ = int(math.sqrt(max(0, 81 - k * k)))
+        d.line((gx - hw_ + 1, 30 + k, gx + hw_ - 1, 30 + k), fill=tuple(v * 2 // 3 for v in GBc))
+    d.point((gx - 4, 25), fill=(255, 255, 255))
     px, py, pr = W * 7 // 10 - int(g.curve * 2000), int(yh) - 4, 16
     pc = PL[st]
     d.ellipse((px - pr, py - pr, px + pr, py + pr), fill=pc)
@@ -192,7 +210,7 @@ def render(g):
                 d.line((cx + w // 2 - 1, gy - h, cx - w // 2, gy - 1), fill=(150, 70, 0))
                 d.rectangle((cx - w // 2, gy - h, cx - w // 2 + w - 1, gy - 1), outline=(150, 70, 0))
         elif t == 1:
-            hw, gap, h = 1.2 * sc, .3 * sc, max(2, int(.5 * sc))
+            hw, gap, h = 1.2 * sc, .3 * sc, max(2, int(.36 * sc))
             xl, xr, g0, g1 = int(cxf(dz) - hw), int(cxf(dz) + hw), cx - int(gap), cx + int(gap)
             for a, b in ((xl, g0), (g1, xr)):
                 if b > a:
@@ -207,7 +225,7 @@ def render(g):
             for p in ((cx, gy - r), (cx - r - 1, gy - r), (cx + r + 1, gy - r), (cx, gy - 2 * r - 1)):
                 d.point(p, fill=lc)
         elif t == 3:
-            w, h, fy = max(3, int(.52 * sc)), max(2, int(.16 * sc)), gy - int(.32 * sc)
+            w, h, fy = max(3, int(.52 * sc)), max(2, int(.16 * sc)), gy - int(.16 * sc)
             d.line((cx - w // 3, gy, cx + w // 3, gy), fill=(0, 0, 0))
             d.rounded_rectangle((cx - w // 2, fy - h // 2, cx - w // 2 + w - 1, fy - h // 2 + h - 1), h // 2, fill=(255, 255, 255) if fl else (190, 195, 210))
             r = max(1, w // 5)
@@ -215,10 +233,10 @@ def render(g):
             for i in range(3):
                 d.point((cx - w // 3 + i * w // 3, fy), fill=(255, 40, 40) if (g.frame // 4 + i) % 3 else (255, 255, 0))
         elif t == 4:
-            r, fy = max(1, int(.1 * sc)) + ((g.frame >> 2) & 1), gy - int(.3 * sc)
+            r, fy = max(1, int(.1 * sc)) + ((g.frame >> 2) & 1), gy - int(.14 * sc)
             d.ellipse((cx - r, fy - r, cx + r, fy + r), fill=(255, 220, 0))
         elif t == 7:
-            w, h, fy = max(5, int(.62 * sc)), max(2, int(.24 * sc)), gy - int(.45 * sc)
+            w, h, fy = max(5, int(.62 * sc)), max(2, int(.24 * sc)), gy - int(.22 * sc)
             d.line((cx - w // 3, gy, cx + w // 3, gy), fill=(0, 0, 0))
             d.polygon([(cx - w // 2, fy), (cx + w // 2, fy), (cx, fy + h)], fill=(200, 60, 255))
             d.line((cx - w // 2, fy, cx + w // 2, fy), fill=(255, 170, 255))
@@ -229,7 +247,7 @@ def render(g):
             d.rectangle((cx - w // 3 - 1, fy - eh, cx - w // 3 - 2 + ew, fy - 1), fill=eng)
             d.rectangle((cx + w // 3 - ew + 1, fy - eh, cx + w // 3, fy - 1), fill=eng)
         elif t == 6:
-            w, h = max(1, int(.18 * sc)), max(3, int(1.0 * sc))
+            w, h = max(1, int(.18 * sc)), max(3, int(.6 * sc))
             d.rectangle((cx - w // 2, gy - h, cx - w // 2 + w - 1, gy - 1), fill=(170, 60, 255))
             d.line((cx - w // 2, gy - h, cx - w // 2, gy - 1), fill=(230, 170, 255))
             for y in range(gy - h, gy, max(2, h // 5)):
@@ -249,14 +267,24 @@ def render(g):
         if dz > 4:
             w, h = max(2, int(.14 * S / dz)), max(3, int(.45 * S / dz))
             x, y = int(cxf(dz) + s[1] * S / dz) - w // 2, int(yf(dz)) - int(.25 * S / dz) - h
-            d.rounded_rectangle((x - 1, y - 1, x + w, y + h), (w + 2) // 2, fill=(0, 170, 255))
-            d.rounded_rectangle((x, y, x + w - 1, y + h - 1), max(0, w // 2 - 1), fill=(200, 255, 255))
+            d.rounded_rectangle((x - 1, y - 1, x + w, y + h), (w + 2) // 2, fill=(255, 30, 20))
+            d.rounded_rectangle((x, y, x + w - 1, y + h - 1), max(0, w // 2 - 1), fill=(255, 140, 0))
+            d.line((x + w // 4, y, x + w // 4 + max(1, w // 2) - 1, y), fill=(255, 230, 0))
     sx, sy = W // 2, int(yf(SHIP))
     jz = int(g.z * S / SHIP * .6)
     sw = 15 - jz // 6
     d.rounded_rectangle((sx - sw, sy - 1, sx + sw, sy + 1), 1, fill=(0, 0, 0))
     x0, y0, fl = sx - 13, sy - 20 - jz, g.frame & 2
     pix = im.load()
+    for r, line in enumerate(SHIP_SPR):  # epaisseur : meme forme 2 points plus bas, teintes sombres
+        for c, ch in enumerate(line):
+            if ch == '.':
+                continue
+            col = (170, 30, 0) if ch in 'oy' else (150, 0, 0) if ch == 'R' else (20, 20, 30) if ch == 'k' else (150, 150, 175)
+            px, py = x0 + c, y0 + r + round((c - 13) * g.bank * .18)
+            for dy_, cc in ((1, col), (2, col if ch == 'k' else (20, 20, 30))):
+                if 0 <= px < W and 0 <= py + dy_ < H:
+                    pix[px, py + dy_] = cc
     for r, line in enumerate(SHIP_SPR):
         for c, ch in enumerate(line):
             if ch == '.':

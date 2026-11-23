@@ -28,7 +28,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "4.29"
+#define GAMES_VERSION "4.30"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -4467,6 +4467,7 @@ void aSpr(const char *const *rows, int w, int h, int x, int y, uint8_t var, bool
 
 void aNewStage() {
   gWave++;
+  aPaint = true;  // nouvelle ambiance : toute la mer est repeinte
   gStageT = 100;
   sndMelody(JINGLE_STAGE, 4);
   aGroups = 0; aSpawnT = 40; aBoss = false; aRolls = max(aRolls, 3);
@@ -4768,7 +4769,15 @@ void aErase(uint16_t sea) {
 // Couleurs de 1945 choisies pour une dalle a 3 bits : chaque composante est eteinte ou au niveau 2 et plus (le niveau 1,
 // trop faible, scintille ou disparait). La mer est au niveau 2, tramee (1 point sur 4 noir) : moins intense, sans scintiller.
 // Mer unie : bleu d'origine en 3 bits (comme avant), bleu nuit en 4 bits et plus (la dalle y a plus de niveaux).
-uint16_t aSea() { return colorBits >= 4 ? rgb(8, 50, 125) : rgb(10, 60, 150); }
+// 4 ambiances, une par stage (en boucle) : tropiques, banquise, volcans, crepuscule ; couleurs : mer, houle, cretes, ecume, reflets
+const uint8_t A_THEME[4][5][3] = {
+  { { 10, 60, 150 }, { 4, 28, 80 }, { 80, 150, 230 }, { 150, 175, 205 }, { 170, 170, 150 } },
+  { { 0, 150, 170 }, { 0, 90, 110 }, { 150, 230, 255 }, { 255, 255, 255 }, { 255, 255, 255 } },
+  { { 0, 0, 150 }, { 0, 0, 70 }, { 150, 0, 200 }, { 200, 120, 255 }, { 255, 120, 0 } },
+  { { 160, 0, 160 }, { 90, 0, 90 }, { 255, 140, 0 }, { 255, 200, 150 }, { 255, 230, 0 } } };
+int aTh() { return (gWave - 1) % 4; }
+uint16_t aThC(int k) { const uint8_t *c = A_THEME[aTh()][k]; return rgb(c[0], c[1], c[2]); }
+uint16_t aSea() { return aTh() == 0 ? (colorBits >= 4 ? rgb(8, 50, 125) : rgb(10, 60, 150)) : aThC(0); }
 void aSeaFill(int x0, int y0, int x1, int y1) {  // remplit de mer le rectangle [x0, x1[ x [y0, y1[
   if (x1 > x0 && y1 > y0) gfx->fillRect(x0, y0, x1 - x0, y1 - y0, aSea());
 }
@@ -4930,7 +4939,14 @@ void aIsland(int i) {
     br[k] = k ? r / 2 + rn(r / 2 + 1) : r;
   }
   static const int8_t OFF[6] = { 4, 2, 0, -2, -4, -6 };
-  uint16_t COL[6] = { rgb(40, 160, 200), rgb(150, 210, 230), rgb(230, 205, 90), rgb(60, 190, 60), rgb(20, 150, 40), rgb(0, 150, 0) };
+  static const uint8_t ISL[4][6][3] = {  // couches de l'exterieur vers le centre, selon l'ambiance du stage
+    { { 40, 160, 200 }, { 150, 210, 230 }, { 230, 205, 90 }, { 60, 190, 60 }, { 20, 150, 40 }, { 0, 150, 0 } },        // ile tropicale
+    { { 0, 200, 230 }, { 200, 240, 255 }, { 255, 255, 255 }, { 220, 235, 255 }, { 170, 200, 240 }, { 255, 255, 255 } },  // banquise
+    { { 150, 0, 0 }, { 255, 100, 0 }, { 150, 150, 150 }, { 190, 190, 190 }, { 255, 60, 0 }, { 255, 220, 0 } },          // volcan
+    { { 255, 140, 0 }, { 255, 200, 150 }, { 255, 180, 60 }, { 0, 150, 0 }, { 0, 170, 60 }, { 0, 190, 0 } } };            // crepuscule
+  const int th = aTh();
+  uint16_t COL[6];
+  for (int l = 0; l < 6; l++) COL[l] = rgb(ISL[th][l][0], ISL[th][l][1], ISL[th][l][2]);
   // l'ile n'est jamais effacee en entier (elle clignotait) : on redessine par-dessus, et on ne rend a la mer que les
   // points qu'elle vient de quitter en descendant (le haut de chaque colonne)
   static int16_t prevY[2] = { -32000, -32000 };
@@ -4961,14 +4977,15 @@ void aIsland(int i) {
   for (int l = 0; l < 6; l++)
     for (int k = 0; k < nb; k++)
       if (br[k] + OFF[l] > 0) aDisc(x0 + bx[k], y0 + by[k], br[k] + OFF[l], COL[l]);
-  int np = 1 + rn(3);
+  int np = (th == 0 || th == 3) ? 1 + rn(3) : 0;  // palmiers : tropiques et crepuscule seulement
   for (int p = 0; p < np; p++) {  // palmiers
     int px = x0 + rn(r) - r / 2, py = y0 + rn(r) - r / 2;
     aP(px, py + 1, rgb(150, 90, 30));
     aP(px - 1, py, rgb(60, 210, 80)); aP(px + 1, py, rgb(60, 210, 80));
     aP(px, py - 1, rgb(60, 210, 80)); aP(px, py, rgb(35, 150, 50));
   }
-  if (r >= 8 && rn(2)) {  // petites maisons au toit rouge
+  if (th == 2 && (gFrame & 8)) aP(x0 + bx[0], y0 + by[0] - 1, rgb(255, 255, 150));  // le cratere rougeoie
+  if (th == 0 && r >= 8 && rn(2)) {  // petites maisons au toit rouge
     int hx = x0 - r / 2 + rn(r / 2), hy = y0 + r / 3;
     aR(hx, hy, 3, 2, rgb(235, 230, 215));
     aH(hx, hy - 1, 3, rgb(205, 55, 40));
@@ -5003,16 +5020,16 @@ void aDraw() {
     if (y < A_TOP + 3 || aOnIsle(x, y)) continue;
     if (kind < 2) {
       int len = 6 + (i % 5);
-      gfx->drawFastHLine(x, y, len, rgb(4, 28, 80));
+      gfx->drawFastHLine(x, y, len, aThC(1));
       gMark(x, y, len, 1);
     } else if (kind < 6) {
-      uint16_t c = kind == 5 ? rgb(150, 175, 205) : rgb(80, 150, 230);
+      uint16_t c = kind == 5 ? aThC(3) : aThC(2);
       gfx->drawPixel(x, y, c); gfx->drawPixel(x + 3, y, c);
       gfx->drawFastHLine(x + 1, y - 1, 2, c);
-      if (kind == 5) gfx->drawPixel(x + 1 + ((gFrame >> 3) & 1), y - 2, rgb(190, 205, 225));
+      if (kind == 5) gfx->drawPixel(x + 1 + ((gFrame >> 3) & 1), y - 2, aThC(3));
       gMark(x, y - 2, 4, 3);
     } else {
-      gPix(x, y, ((gFrame >> 2) + i) % 6 < 2 ? rgb(170, 170, 150) : rgb(80, 150, 230));
+      gPix(x, y, ((gFrame >> 2) + i) % 6 < 2 ? aThC(4) : aThC(2));
     }
   }
   for (int i = 0; i < 2; i++) aIsland(i);
@@ -7511,7 +7528,7 @@ void xrDraw() {
 #define VX_N 16
 #define VX_SH 6
 #define VX_EB 6
-#define VX_LEN 1100.0f  // longueur d'un stage
+#define VX_LEN 1500.0f  // longueur d'un stage
 #define VX_SHIP 6.0f    // distance du vaisseau devant la camera
 VxObj vxO[VX_N];
 struct VxShot { float d, x; bool on; } vxS[VX_SH], vxE[VX_EB];
@@ -7554,11 +7571,14 @@ void vxSpawn() {
     for (auto &o : vxO)
       if (!o.on) { o = { d, x, len, 0, type, hp, true }; return; }
   };
-  bool fighter = false;
-  for (auto &o : vxO) if (o.on && o.type == 7) fighter = true;
-  if (!fighter && random(100) < 10 + 2 * st)  // chasseur : descend des etoiles (len : depart dans le ciel, en x ecran)
-    for (auto &o : vxO)
-      if (!o.on) { o = { d, random(-60, 61) / 100.0f, (float)random(16, W - 16), 0, 7, 3, true }; break; }
+  int fighters = 0;
+  for (auto &o : vxO) if (o.on && o.type == 7) fighters++;
+  if (fighters < 2 && random(100) < 22 + 3 * st) {  // chasseurs : descendent des etoiles (len : depart dans le ciel, en x ecran)
+    int n = (fighters == 0 && random(100) < 35) ? 2 : 1;  // parfois en paire
+    for (int f = 0; f < n; f++)
+      for (auto &o : vxO)
+        if (!o.on) { o = { d + f * 3, f ? 0.5f : -0.5f + random(0, 40) / 100.0f, (float)random(16, W - 16), 0, 7, 3, true }; break; }
+  }
   int r = random(100);
   if (r < 26) add(0, random(-80, 81) / 100.0f, 2, 0);                          // caisse
   else if (r < 40) { add(2, random(-80, 81) / 100.0f, 1, 0); if (st >= 2) add(2, random(-80, 81) / 100.0f, 1, 0); }  // mines
@@ -7575,7 +7595,7 @@ void vxStart() {
   for (auto &s : vxS) s.on = false;
   for (auto &s : vxE) s.on = false;
   vxPos = 0; vxStageD = 0; vxX = 0; vxZ = vxVZ = 0; vxNext = 25; vxCurve = 0; vxCurveT = 0;
-  vxSpd = 0.46f + 0.035f * min(gWave, 8); vxInv = 60;
+  vxSpd = 0.64f + 0.04f * min(gWave, 8); vxInv = 60;
   vxProj();
 }
 void vxReset() {
@@ -7639,9 +7659,9 @@ void vxStep() {
   vxBank += (steer - vxBank) * 0.2f;  // le vaisseau s'incline
   vxX -= vxCurv(vxPos + VX_SHIP) * vxSpd * 4;  // le virage pousse vers l'exterieur
   vxX = constrain(vxX, -1.05f, 1.05f);
-  float base = 0.46f + 0.035f * st;  // plus rapide
-  if (k & 8) vxSpd = min(vxSpd + 0.01f, base + 0.3f);
-  else if (k & 16) vxSpd = max(vxSpd - 0.014f, 0.25f);
+  float base = 0.64f + 0.04f * st;  // encore plus rapide
+  if (k & 8) vxSpd = min(vxSpd + 0.012f, base + 0.35f);
+  else if (k & 16) vxSpd = max(vxSpd - 0.016f, 0.32f);
   else vxSpd += (base - vxSpd) * 0.02f;
   bool jump = (k & 32) != 0;
   if (jump && !vxPrevJump && vxZ == 0) { vxVZ = 0.075f; sndPlay(300, 900, 180, 0.35f, false, 1); }
@@ -7761,11 +7781,34 @@ void vxDraw() {
   static const uint8_t PL[4][3] = { { 230, 120, 40 }, { 60, 170, 255 }, { 220, 60, 200 }, { 150, 220, 255 } };   // planete
   uint16_t ca = rgb(RA[st][0], RA[st][1], RA[st][2]), cb = rgb(RB[st][0], RB[st][1], RB[st][2]), rail = rgb(RL[st][0], RL[st][1], RL[st][2]);
   float yh = vxYH(), S = vxS0();
-  // ciel : etoiles qui glissent avec les virages, planete a anneau sur l'horizon
+  // ciel : degrade de couleur au-dessus de l'horizon (bandes franches en 3 bits), etoiles, 3 planetes
+  {
+    static const uint8_t SKY[4][4][3] = { { { 0, 0, 150 }, { 0, 0, 220 }, { 0, 150, 255 }, { 170, 230, 255 } },
+                                          { { 0, 0, 150 }, { 150, 0, 150 }, { 255, 0, 150 }, { 255, 170, 220 } },
+                                          { { 0, 0, 150 }, { 0, 150, 150 }, { 0, 230, 150 }, { 200, 255, 220 } },
+                                          { { 0, 0, 150 }, { 200, 0, 0 }, { 255, 140, 0 }, { 255, 230, 150 } } };
+    int band[4] = { 10, 6, 4, 2 }, y = (int)yh - 22;
+    for (int b = 0; b < 4; b++) {
+      gfx->fillRect(0, y, W, band[b], rgb(SKY[st][b][0], SKY[st][b][1], SKY[st][b][2]));
+      y += band[b];
+    }
+  }
   for (int i = 0; i < 40; i++) {
     int x = ((i * 53 + 11) * 7 + (int)(vxHead * 220 + 4000) * (1 + (i & 1))) % W, y = 9 + ((i * 37 + 3) * 13) % (int)(yh - 6);
     if (x < 0) x += W;
-    gfx->drawPixel(x, y, (i % 5) ? rgb(150, 150, 170) : palFull[0]);
+    if (y < yh - 22) gfx->drawPixel(x, y, (i % 5) ? rgb(150, 150, 170) : palFull[0]);
+  }
+  {  // planetes lointaines : une lune grise et une geante a bandes, qui glissent plus lentement que les etoiles
+    int mx = ((int)(W * 0.18f - vxHead * 90) % (W + 30) + W + 30) % (W + 30) - 15, gx = ((int)(W * 0.45f - vxHead * 130) % (W + 40) + W + 40) % (W + 40) - 20;
+    gfx->fillCircle(mx, 20, 5, rgb(170, 170, 190));
+    gfx->fillCircle(mx + 2, 21, 4, rgb(150, 150, 170));
+    gfx->drawPixel(mx - 2, 18, rgb(255, 255, 255));
+    gfx->fillCircle(mx - 1, 22, 1, rgb(150, 150, 170));
+    static const uint8_t GB[4][3] = { { 255, 150, 60 }, { 150, 220, 255 }, { 255, 220, 120 }, { 200, 150, 255 } };
+    const uint8_t *gc = GB[(st + 1) % 4];
+    gfx->fillCircle(gx, 30, 9, rgb(gc[0], gc[1], gc[2]));
+    for (int k = -6; k <= 6; k += 4) gfx->drawFastHLine(gx - (int)sqrtf(max(0, 81 - k * k)) + 1, 30 + k, 2 * (int)sqrtf(max(0, 81 - k * k)) - 1, rgb(gc[0] * 2 / 3, gc[1] * 2 / 3, gc[2] * 2 / 3));
+    gfx->drawPixel(gx - 4, 25, rgb(255, 255, 255));
   }
   {
     int px = W * 7 / 10 - (int)(vxCurve * 2000), py = (int)yh - 4, pr = H >= 128 ? 16 : 10;
@@ -7823,7 +7866,7 @@ void vxDraw() {
       }
       case 1: {  // mur : toute la route sauf l'ouverture
         float hw = 1.2f * sc, gap = 0.3f * sc;
-        int h = max(2, (int)(0.5f * sc)), xl = (int)(vxCX(dz) - hw), xr = (int)(vxCX(dz) + hw), g0 = cx - (int)gap, g1 = cx + (int)gap;
+        int h = max(2, (int)(0.36f * sc)), xl = (int)(vxCX(dz) - hw), xr = (int)(vxCX(dz) + hw), g0 = cx - (int)gap, g1 = cx + (int)gap;
         uint16_t wc = rgb(255, 40, 60), wd = rgb(160, 0, 30);
         if (g0 > xl) { gfx->fillRect(xl, gy - h, g0 - xl, h, wc); gfx->drawFastHLine(xl, gy - h, g0 - xl, rgb(255, 180, 180)); for (int x = xl + 2; x < g0; x += 4) gfx->drawFastVLine(x, gy - h + 1, h - 1, wd); }
         if (xr > g1) { gfx->fillRect(g1, gy - h, xr - g1, h, wc); gfx->drawFastHLine(g1, gy - h, xr - g1, rgb(255, 180, 180)); for (int x = g1 + 2; x < xr; x += 4) gfx->drawFastVLine(x, gy - h + 1, h - 1, wd); }
@@ -7838,7 +7881,7 @@ void vxDraw() {
         break;
       }
       case 3: {  // soucoupe : ombre, coque grise, dome cyan, feux qui tournent
-        int w = max(3, (int)(0.52f * sc)), h = max(2, (int)(0.16f * sc)), fy = gy - (int)(0.32f * sc);
+        int w = max(3, (int)(0.52f * sc)), h = max(2, (int)(0.16f * sc)), fy = gy - (int)(0.16f * sc);
         gfx->drawFastHLine(cx - w / 3, gy, 2 * w / 3, rgb(0, 0, 0));
         gfx->fillRoundRect(cx - w / 2, fy - h / 2, w, h, h / 2, o.flash ? fl : rgb(190, 195, 210));
         gfx->fillCircle(cx, fy - h / 2, max(1, w / 5), o.flash ? fl : rgb(0, 220, 255));
@@ -7846,7 +7889,7 @@ void vxDraw() {
         break;
       }
       case 4: {  // orbe : boule jaune qui pulse, en l'air
-        int r = max(1, (int)(0.1f * sc)) + ((gFrame >> 2) & 1), fy = gy - (int)(0.3f * sc);
+        int r = max(1, (int)(0.1f * sc)) + ((gFrame >> 2) & 1), fy = gy - (int)(0.14f * sc);
         gfx->fillCircle(cx, fy, r, rgb(255, 220, 0));
         gfx->drawPixel(cx - r / 2, fy - r / 2, palFull[0]);
         gfx->drawFastHLine(cx - 1, gy, 3, rgb(0, 0, 0));
@@ -7854,7 +7897,7 @@ void vxDraw() {
       }
       case 7: {  // chasseur : traine lumineuse en descendant des etoiles, puis aile en fleche violette au-dessus de la route
         if (o.ph == 0) {
-          float t = o.t / 60.0f, e = t * t, ex = vxCX(46) + o.x * S / 46, ey = vxY(46) - 0.45f * S / 46;
+          float t = o.t / 60.0f, e = t * t, ex = vxCX(46) + o.x * S / 46, ey = vxY(46) - 0.22f * S / 46;
           int x = (int)(o.len + (ex - o.len) * e), y = (int)(10 + (ey - 10) * e);
           for (int k = 1; k <= 4; k++) {  // traine
             float tk = max(0.0f, t - k * 0.05f), ek = tk * tk;
@@ -7865,7 +7908,7 @@ void vxDraw() {
           gfx->drawPixel(x, y - 1, (gFrame & 2) ? rgb(255, 255, 255) : rgb(255, 220, 0));
           break;
         }
-        int w = max(5, (int)(0.62f * sc)), h = max(2, (int)(0.24f * sc)), fy = gy - (int)(0.45f * sc);
+        int w = max(5, (int)(0.62f * sc)), h = max(2, (int)(0.24f * sc)), fy = gy - (int)(0.22f * sc);
         uint16_t body = o.flash ? fl : rgb(200, 60, 255), edge = o.flash ? fl : rgb(255, 170, 255);
         gfx->drawFastHLine(cx - w / 3, gy, 2 * w / 3, rgb(0, 0, 0));  // ombre
         gfx->fillTriangle(cx - w / 2, fy, cx + w / 2, fy, cx, fy + h, body);
@@ -7877,7 +7920,7 @@ void vxDraw() {
         break;
       }
       case 6: {  // pilier violet a anneaux
-        int w = max(1, (int)(0.18f * sc)), h = max(3, (int)(1.0f * sc));
+        int w = max(1, (int)(0.18f * sc)), h = max(3, (int)(0.6f * sc));
         gfx->fillRect(cx - w / 2, gy - h, w, h, rgb(170, 60, 255));
         gfx->drawFastVLine(cx - w / 2, gy - h, h, rgb(230, 170, 255));
         for (int y = gy - h; y < gy; y += max(2, h / 5)) gfx->drawFastHLine(cx - w / 2, y, w, rgb(255, 255, 255));
@@ -7885,14 +7928,15 @@ void vxDraw() {
       }
     }
   }
-  // tirs : traits qui filent vers l'horizon ; tirs ennemis rouges
+  // tirs : traits rouge et orange qui filent vers l'horizon ; tirs ennemis
   for (auto &s : vxS)
     if (s.on) {  // tirs : gros traits lumineux (coeur blanc, bord cyan)
       float dz = s.d - vxPos;
       if (dz > 4.0f) {
         int w = max(2, (int)(0.14f * S / dz)), h = max(3, (int)(0.45f * S / dz)), x = (int)(vxCX(dz) + s.x * S / dz) - w / 2, y = (int)vxY(dz) - (int)(0.25f * S / dz) - h;
-        gfx->fillRoundRect(x - 1, y - 1, w + 2, h + 2, (w + 2) / 2, rgb(0, 170, 255));
-        gfx->fillRoundRect(x, y, w, h, w / 2, rgb(200, 255, 255));
+        gfx->fillRoundRect(x - 1, y - 1, w + 2, h + 2, (w + 2) / 2, rgb(255, 30, 20));  // bord rouge
+        gfx->fillRoundRect(x, y, w, h, w / 2, rgb(255, 140, 0));  // coeur orange
+        gfx->drawFastHLine(x + w / 4, y, max(1, w / 2), rgb(255, 230, 0));  // pointe jaune
       }
     }
   for (auto &e : vxE)
@@ -7905,6 +7949,15 @@ void vxDraw() {
     gfx->fillRoundRect(sx - sw, sy - 1, 2 * sw + 1, 3, 1, rgb(0, 0, 0));
     int x0 = sx - 13, y0 = sy - 20 - jz;
     bool fl = gFrame & 2;
+    for (int r = 0; r < 21; r++)  // epaisseur : la meme forme, 2 points plus bas, en teintes sombres
+      for (int c = 0; c < 27; c++) {
+        char ch = VX_SHIP_SPR[r][c];
+        if (ch == '.') continue;
+        uint16_t col = (ch == 'o' || ch == 'y') ? rgb(170, 30, 0) : ch == 'R' ? rgb(150, 0, 0) : ch == 'k' ? rgb(20, 20, 30) : rgb(150, 150, 175);
+        int py = y0 + r + (int)lroundf((c - 13) * vxBank * 0.18f);
+        gfx->drawPixel(x0 + c, py + 1, col);
+        gfx->drawPixel(x0 + c, py + 2, ch == 'k' ? col : rgb(20, 20, 30));
+      }
     for (int r = 0; r < 21; r++)
       for (int c = 0; c < 27; c++) {
         char ch = VX_SHIP_SPR[r][c];
