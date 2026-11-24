@@ -274,11 +274,12 @@ def render(g):
     for s in g.shots:
         dz = s[0] - g.pos
         if dz > 4:
-            w, h = max(2, int(.14 * S / dz)), max(3, int(.45 * S / dz))
-            x, y = int(cxf(dz) + s[1] * S / dz) - w // 2, int(yf(dz)) - int(.25 * S / dz) - h
-            d.rounded_rectangle((x - 1, y - 1, x + w, y + h), (w + 2) // 2, fill=(255, 30, 20))
-            d.rounded_rectangle((x, y, x + w - 1, y + h - 1), max(0, w // 2 - 1), fill=(255, 140, 0))
-            d.line((x + w // 4, y, x + w // 4 + max(1, w // 2) - 1, y), fill=(255, 230, 0))
+            r = max(1, int(.13 * S / dz))  # boules jaunes (V4.35)
+            x, y = int(cxf(dz) + s[1] * S / dz), int(yf(dz)) - int(.3 * S / dz) - r
+            d.ellipse((x - r - 1, y - r - 1, x + r + 1, y + r + 1), fill=(255, 140, 0))
+            d.ellipse((x - r, y - r, x + r, y + r), fill=(255, 230, 0))
+            if r >= 2:
+                d.point((x - r // 2, y - r // 2), fill=(255, 255, 255))
     sx, sy = W // 2, int(yf(SHIP))
     jz = int(g.z * S / SHIP * .6)
     sw = 15 - jz // 6

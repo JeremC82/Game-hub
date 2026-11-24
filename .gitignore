@@ -2,3 +2,4 @@ build/
 *.bin
 !firmware/*.bin
 games/secrets.h
+docs/__pycache__/

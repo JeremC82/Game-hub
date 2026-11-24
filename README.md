@@ -38,7 +38,7 @@ Dans tous les jeux : **OPTIONS ou L2 = pause** ; en pause, **○ revient au menu
 | 13 | TURBO ROUTE | [TURBO ROUTE](#turbo-route) | gauche / droite : braquer, **✕ / R2 / haut accélérer**, **bas freiner**, stick droit : accélérer / freiner, **○ turbo** | pièce 250 ; voiture doublée 50 ; bidon de turbo ; police semée 2000, police KO 3000 ; secondes restantes × 100 | sans fin ; 4 décors en boucle ; distance plafonnée au stage 6, circulation au stage 8 |
 | 14 | RENARD | [RENARD](#renard) | **✕ ou haut sauter** (tenir : plus haut), **bas se baisser** (en l'air : retomber vite) | gemme +100 ; étoile : invincible 5 s (traverse tout, +50 par obstacle) | sans fin ; stage tous les 1000 points ; vitesse maximale atteinte peu à peu ; jour et nuit en alternance |
 | 15 | PAC MANIA | [SCARABEE 3D](#scarabee-3d) | croix / stick, **✕ ou ○ sauter** | comme LABYRINTHE (grosse graine, créatures 200 à 1600, créature sautée +100) | sans fin ; couleurs du décor différentes à chaque stage ; vitesse plafonnée au stage 8 |
-| 16 | RALLYE 3D | [RALLYE 3D](#rallye-3d) | **croix / stick : direction à l'écran** (la voiture y va et accélère), **✕ / R2 accélérer**, **○ freiner**, stick droit : accélérer / freiner | tour bouclé 500 ; balise 10 ; arrivée : 1000 × stage × (4 − place) | sans fin ; 3 tours contre 3 adversaires, finir dans les 3 premiers pour passer ; 4 décors en boucle, circuit en miroir un stage sur deux ; adversaires plafonnés au stage 8 |
+| 16 | RALLYE 3D | [RALLYE 3D](#rallye-3d) | **croix / stick : direction à l'écran** (la voiture y va et accélère), **✕ / R2 accélérer**, **○ freiner**, stick droit : accélérer / freiner | tour bouclé 500 ; balise 10 ; arrivée : 1000 × stage × (5 − place) | sans fin ; 3 tours contre 3 adversaires, finir dans les 3 premiers pour passer (**les 2 premiers dès le stage 3**, sauf en facile) ; 4 décors en boucle, circuit en miroir un stage sur deux ; adversaires plus rapides jusqu'au stage 7 ; **2 joueurs** (écran commun) |
 | 17 | VORTEX 3D | [VORTEX 3D](#vortex-3d) | gauche / droite (stick), **haut / bas : vitesse**, **✕ tirer**, **○ sauter** | caisse 50, mine 30, soucoupe 300, orbe 200 (double tir 10 s) ; fin de stage 1000 × stage | sans fin ; une distance par stage ; trous dans la route à partir du stage 2 ; vitesse et obstacles plafonnés au stage 8 |
 
 
@@ -49,7 +49,7 @@ Depuis la V3.84, le Game-hub utilise **Bluepad32** : jusqu'à **4 manettes Bluet
 - **Menu « JOUEURS 1 / 2 »** (2e ligne, une étoile par manette connectée) : seuls les jeux à deux joueurs utilisent la 2e manette.
   - **RAQUETTES** : match à deux (raquette de droite pour le joueur 2), **le premier à 7 points gagne**.
   - **SPACE DEFENDER** : coopération, un 2e vaisseau **vert** pour le joueur 2, vies et score communs ; les ennemis piquent sur l'un ou l'autre ; la manette du joueur touché vibre.
-- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V4.33_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
+- **Mise à jour depuis la V3.70 ou avant** : flasher une fois `firmware/GameHub_V4.35_complet.bin` à **0x0** (le démarrage change), puis réassocier les manettes (voir « Manettes » plus bas).
 - **Mémoire** : environ 81 Ko libres avec 2 dalles en 3 bits et deux manettes connectées.
 
 # SPACE DEFENDER
@@ -320,8 +320,9 @@ Le labyrinthe du scarabée (mêmes règles que LABYRINTHE, « PAC MANIA » au me
 Une course sur circuit originale (V4.14) **vue en relief et en biais**, comme SCARABEE 3D : ta voiture rouge contre 3 adversaires (bleu, jaune, blanc), 3 tours.
 - **Commandes (V4.29) :** **croix ou stick gauche : la voiture va dans la direction poussée** (haut = haut de l'écran, diagonales comprises), s'y tourne en douceur et accélère ; **✕ / R2 accélérer**, **○ freiner** ; le stick droit accélère (haut) et freine (bas).
 - **Pilotage :** dans l'herbe la voiture ralentit et secoue ; contre un arbre ou un immeuble elle s'arrête (l'image tremble, la manette vibre) ; les voitures se poussent.
-- **Course :** départ 3, 2, 1, GO ; le classement (1ER, 2E...) s'affiche en haut à droite. **Dans les 3 premiers :** stage suivant et bonus ; **4e :** une vie perdue, on recommence la course.
-- **Progression :** adversaires plus rapides à chaque stage, 4 décors (verdure, désert, neige, volcan), **circuit en miroir** un stage sur deux, arbres et immeubles placés autrement.
+- **Course :** départ 3, 2, 1, GO ; le classement (1ER, 2E...) s'affiche en haut à droite. **Dans les 3 premiers** (**les 2 premiers à partir du stage 3**, sauf en facile, V4.34) : stage suivant et bonus ; sinon une vie perdue, on recommence la course.
+- **2 joueurs (V4.34) :** menu JOUEURS 2 et une 2e manette : **J2 conduit la voiture bleue** (mêmes commandes) contre les 2 autres. **Écran commun** qui suit le joueur en tête ; celui qui sort de l'écran est **replacé juste derrière l'autre** et attend un peu en clignotant. Les places des deux joueurs s'affichent en haut à droite (J1 en rouge, J2 en bleu) ; vies et score communs ; il suffit qu'un des deux soit qualifié.
+- **Progression (V4.34 : plus difficile) :** adversaires plus rapides à chaque stage, jusqu'à la vitesse de ta voiture au stage 7 (plus encore en difficile), 4 décors (verdure, désert, neige, volcan), **circuit en miroir** un stage sur deux, arbres et immeubles placés autrement.
 - **Graphisme :** route lisse aux virages arrondis, bordures rouges et blanches, pointillés au centre, ligne d'arrivée en damier ; arbres ronds et immeubles aux fenêtres éclairées avec leurs ombres ; voitures en volume (ombre, caisse, vitres, toit, phares, feux) qui tournent vraiment. La vue défile et regarde devant la voiture. Image dessinée en mémoire (32 Ko pendant le jeu seulement) : pas de scintillement.
 
 ![RALLYE 3D : verdure, désert, neige, volcan](docs/rallye3d-rendus.png)
@@ -334,7 +335,7 @@ Un tir sur route en 3D original (V4.21 à V4.25, plus rapide et nouveau vaisseau
 - **Commandes :** gauche / droite (ou stick) pour se déplacer, **haut / bas pour la vitesse**, **✕ pour tirer**, **○ pour sauter**. Dans les virages, la route te pousse vers l'extérieur.
 - **Obstacles :** caisses (2 tirs, ou sauter par-dessus), mines (sauter ou tirer), **murs** avec une ouverture où passer, **piliers** violets indestructibles à éviter, **trous** dans la route (à sauter, à partir du stage 2), **soucoupes** qui reculent devant toi et tirent ; **orbe** jaune : double tir 10 s.
 - **Stages :** une distance à parcourir (barre verte en haut), puis stage suivant : plus vite, plus d'obstacles, autres couleurs (route, rails, planète).
-- **Graphisme :** route en bandes de couleur et bandes noires (moitié moins de LED allumées : moins de courant pour les dalles), rails néon, voies en pointillés, objets à l'échelle de la distance ; vaisseau original (armature en X en métal avec son épaisseur, 4 réacteurs incandescents qui pulsent, verrière cyan) qui s'incline dans les virages, gros missiles rouge et orange ; ciel en dégradé sur tout le haut de l'écran et reflet jusqu'en bas (couleurs du stage, V4.32), planète à anneau, lune et géante à bandes en fond (V4.30) ; jeu plus rapide, objets plus près de la route, chasseurs plus nombreux (jusqu'à 2 à la fois) ; **chasseurs** (V4.28) qui descendent des étoiles, se posent au bout de la route, foncent, se placent en face et tirent avant de repartir (3 tirs, 400 points), son ombre sur la route quand il saute. Image dessinée en mémoire (32 Ko pendant le jeu seulement) : pas de scintillement.
+- **Graphisme :** route en bandes de couleur et bandes noires (moitié moins de LED allumées : moins de courant pour les dalles), rails néon, voies en pointillés, objets à l'échelle de la distance ; vaisseau original avec un **fuselage central** (V4.35 : nez, verrière cyan, dos métal à bande rouge, réacteur arrière qui crache), armature en X en métal avec son épaisseur et 2 réacteurs latéraux incandescents, qui s'incline dans les virages ; **tirs en boules jaunes** lumineuses (halo orange, reflet blanc, V4.35) ; ciel en dégradé sur tout le haut de l'écran et reflet jusqu'en bas (couleurs du stage, V4.32), planète à anneau, lune et géante à bandes en fond (V4.30) ; jeu plus rapide, objets plus près de la route, chasseurs plus nombreux (jusqu'à 2 à la fois) ; **chasseurs** (V4.28) qui descendent des étoiles, se posent au bout de la route, foncent, se placent en face et tirent avant de repartir (3 tirs, 400 points), son ombre sur la route quand il saute. Image dessinée en mémoire (32 Ko pendant le jeu seulement) : pas de scintillement.
 
 ![VORTEX 3D : stages 1, 2 et 3](docs/vortex3d-rendus.png)
 
@@ -497,8 +498,8 @@ Les réglages (dalles, luminosité, scores, niveau, adresse de la manette, volum
 
 | Binaire | Adresse | MD5 |
 |---|---|---|
-| [firmware/GameHub_V4.33_complet.bin](firmware/GameHub_V4.33_complet.bin) | 0x0 | `5d4b49d46f57affce7eccb9702b251c3` |
-| [firmware/GameHub_V4.33.bin](firmware/GameHub_V4.33.bin) | 0x10000 | `442a541a5fe8a4ec7a0bb273c83bff3b` |
+| [firmware/GameHub_V4.35_complet.bin](firmware/GameHub_V4.35_complet.bin) | 0x0 | `bdb54b7191ec7b09b3233cf6b9fa9091` |
+| [firmware/GameHub_V4.35.bin](firmware/GameHub_V4.35.bin) | 0x10000 | `1cec69baf2e4a5c6d6c69d79bfec9c69` |
 
 Avec l'Arduino IDE, choisis le schéma de partition **Huge APP (3MB No OTA/1MB SPIFFS)** dans Outils → Partition Scheme.
 

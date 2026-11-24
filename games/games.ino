@@ -28,7 +28,7 @@
 #include "game_types.h"
 extern "C" void BTM_SetDefaultLinkPolicy(uint16_t settings);  // pile Bluetooth (Bluedroid) : sans mode veille
 
-#define GAMES_VERSION "4.33"
+#define GAMES_VERSION "4.35"
 
 // ---------------------------------------------------------------- brochage (identique a l'horloge)
 #define R1_PIN 25
@@ -7124,8 +7124,11 @@ void iDraw() {
 // Course sur circuit vue en relief et en biais (comme SCARABEE 3D) : ta voiture rouge contre 3 adversaires, 3 tours.
 // Croix ou stick : la voiture va dans la direction poussee (haut = haut de l'ecran) et accelere ; X / R2 accelerer,
 // rond freiner (stick droit : accelerer / freiner).
-// Dans l'herbe, on ralentit ; arbres et immeubles arretent la voiture. Dans les 3 premiers : stage suivant
-// (adversaires plus rapides, autre decor, circuit en miroir un stage sur deux) ; 4e : une vie perdue, on recommence.
+// Dans l'herbe, on ralentit ; arbres et immeubles arretent la voiture. Dans les 3 premiers (les 2 premiers a partir du
+// stage 3, sauf en facile) : stage suivant (adversaires plus rapides, autre decor, circuit en miroir un stage sur deux) ;
+// sinon une vie perdue, on recommence.
+// A 2 joueurs (V4.34, menu JOUEURS 2 et 2e manette) : J2 conduit la voiture bleue ; ecran commun qui suit le joueur en tete,
+// celui qui sort de l'ecran est replace derriere l'autre et attend un peu ; il suffit qu'un des deux soit qualifie.
 #define XR_C 30
 #define XR_R 20
 #define XR_TW 10  // largeur d'une case, profondeur, decalage de biais par rangee
@@ -7142,8 +7145,10 @@ struct XMem { uint8_t t[XR_R][XR_C]; };  // 0 herbe, 2 immeuble, 3 arbre (la rou
 XCar xrCar[XR_N];
 GFXcanvas16 *xrCv = nullptr;
 float xrCamX = -9999, xrCamY = 0;
-int xrGo = 0, xrEnd = 0, xrPlace = 0, xrFinCount = 0, xrBump = 0;
-bool xrMir = false;
+int xrGo = 0, xrEnd = 0, xrPlace = 0, xrFinCount = 0, xrBump = 0, xrLead = 0;
+bool xrMir = false, xr2p = false;
+uint8_t xrPen[XR_N];  // replacement (2 joueurs) : images d'attente
+bool xrHum(int i) { return !gDemo && (i == 0 || (i == 1 && xr2p)); }
 void xrRelease() { if (xrCv) { delete xrCv; xrCv = nullptr; } }
 float xrWX(int i) { return xrMir ? XR_C - XR_WP[i][0] : XR_WP[i][0]; }
 float xrWY(int i) { return XR_WP[i][1]; }
@@ -7187,13 +7192,15 @@ void xrStart() {  // depart d'une course : grille derriere la ligne
     c.y = xrWY(0) - sinf(a) * back + cosf(a) * side;
     c.a = a; c.v = 0; c.wp = 1; c.lap = 0; c.col = COL[i]; c.fin = 0;
   }
-  xrGo = 130; xrEnd = 0; xrPlace = 0; xrFinCount = 0; xrBump = 0;
+  xrGo = 130; xrEnd = 0; xrPlace = 0; xrFinCount = 0; xrBump = 0; xrLead = 0;
+  memset(xrPen, 0, sizeof(xrPen));
 }
 void xrReset() {
   gLives = (!gDemo && gDiff == 0) ? 5 : 3;
   gPaused = false;
   gScore = 0; gWave = 1; gDead = 0; gBonus = 0; gLifeUp = false;
   gStageT = 0;
+  xr2p = !gDemo && gPlayers == 2 && PAD2.isConnected();
   if (!xrCv) {
     xrCv = new GFXcanvas16(W, H);
     if (!xrCv->getBuffer()) { delete xrCv; xrCv = nullptr; Serial.println("RALLYE 3D : memoire insuffisante"); }
@@ -7221,6 +7228,39 @@ void xrPilot(const XCar &c, int i, float &steer, bool &gas, bool &brake) {  // p
   steer = constrain(da * 2.5f, -1.0f, 1.0f);
   gas = fabsf(da) < 0.9f || c.v < 0.06f;
   brake = fabsf(da) > 1.3f && c.v > 0.1f;
+}
+// direction directe : la voiture va la ou pousse la croix ou le stick (haut = haut de l'ecran), elle s'y tourne
+// en douceur et accelere ; X / R2 accelere sans changer de cap, rond freine (stick droit : accelerer / freiner)
+void xrHuman(XCar &c, uint8_t k, int sx, int sy, int rsy, bool &gas, bool &brake) {
+  float dx = 0, dy = 0;
+  if (sx * sx + sy * sy > 45 * 45) { dx = sx; dy = -sy; }
+  else { dx = ((k & 2) ? 1 : 0) - ((k & 1) ? 1 : 0); dy = ((k & 16) ? 1 : 0) - ((k & 8) ? 1 : 0); }
+  if (dx != 0 || dy != 0) {
+    float wy = dy / XR_TD, wx = (dx + XR_SK * wy) / XR_TW;  // direction de l'ecran -> direction sur le circuit (vue en biais)
+    float da = atan2f(wy, wx) - c.a;
+    while (da > 3.14159f) da -= 6.28318f;
+    while (da < -3.14159f) da += 6.28318f;
+    float rate = 0.05f + 0.35f * min(1.0f, fabsf(c.v) / 0.12f) * 0.1f;  // tourne meme presque a l'arret
+    c.a += constrain(da, -rate, rate);
+    gas = fabsf(da) < 2.2f;  // demi-tour : on tourne d'abord
+  }
+  if (k & 4) gas = true;
+  brake = (k & 32) != 0;
+  float rs = rsy / 127.0f;
+  if (rs > 0.2f) gas = true;
+  else if (rs < -0.2f) brake = true;
+}
+void xrRespawn(int t, int l) {  // 2 joueurs : celui qui sort de l'ecran revient juste derriere l'autre
+  XCar &c = xrCar[t];
+  const XCar &L = xrCar[l];
+  float x = L.x, y = L.y;
+  for (float back = 1.2f; back > 0.2f; back -= 0.3f) {
+    float bx = L.x - cosf(L.a) * back, by = L.y - sinf(L.a) * back;
+    if (xrTile(bx, by) < 2 && xrRoadD(bx, by) < XR_RW + 0.2f) { x = bx; y = by; break; }
+  }
+  c.x = x; c.y = y; c.a = L.a; c.v = 0; c.wp = L.wp; c.lap = L.lap;
+  xrPen[t] = 45;
+  sndPlay(500, 200, 200, 0.35f, false, 1);
 }
 void xrPhys(XCar &c, float steer, bool gas, bool brake, float maxV, bool me) {
   float turn = min(1.0f, fabsf(c.v) / 0.06f) * (c.v >= 0 ? 1 : -1);
@@ -7262,52 +7302,34 @@ void xrStep() {
     if (xrGo == 0) sndPlay(1320, 1320, 250, 0.4f, false, 1);
     return;
   }
-  uint8_t k = keysPs4;
-  int lvl = min(gWave, 8);
+  int lvl = min(gWave, 7);
   for (int i = 0; i < XR_N; i++) {
     XCar &c = xrCar[i];
     float steer = 0; bool gas = false, brake = false;
     float maxV;
-    if (i == 0 && !gDemo && !c.fin) {  // toi
+    bool hum = xrHum(i);
+    if (hum && xrPen[i] > 0) { xrPen[i]--; c.v = 0; continue; }  // replace : il attend
+    if (hum && !c.fin) {  // un joueur
       maxV = 0.165f;
-      // direction directe : la voiture va la ou pousse la croix ou le stick (haut = haut de l'ecran), elle s'y tourne
-      // en douceur et accelere ; X / R2 accelere sans changer de cap, rond freine (stick droit : accelerer / freiner)
-      int sx = PS4.LStickX(), sy = PS4.LStickY();
-      float dx = 0, dy = 0;
-      if (sx * sx + sy * sy > 45 * 45) { dx = sx; dy = -sy; }
-      else { dx = ((k & 2) ? 1 : 0) - ((k & 1) ? 1 : 0); dy = ((k & 16) ? 1 : 0) - ((k & 8) ? 1 : 0); }
-      bool dir = dx != 0 || dy != 0;
-      if (dir) {
-        float wy = dy / XR_TD, wx = (dx + XR_SK * wy) / XR_TW;  // direction de l'ecran -> direction sur le circuit (vue en biais)
-        float da = atan2f(wy, wx) - c.a;
-        while (da > 3.14159f) da -= 6.28318f;
-        while (da < -3.14159f) da += 6.28318f;
-        float rate = 0.05f + 0.35f * min(1.0f, fabsf(c.v) / 0.12f) * 0.1f;  // tourne meme presque a l'arret
-        c.a += constrain(da, -rate, rate);
-        gas = fabsf(da) < 2.2f;  // demi-tour : on tourne d'abord
-      }
-      if (k & 4) gas = true;
-      brake = (k & 32) != 0;
-      float rs = PS4.RStickY() / 127.0f;
-      if (rs > 0.2f) gas = true;
-      else if (rs < -0.2f) brake = true;
-      steer = 0;
+      if (i == 0) xrHuman(c, keysPs4, PS4.LStickX(), PS4.LStickY(), PS4.RStickY(), gas, brake);
+      else xrHuman(c, keysP2, PAD2.LStickX(), PAD2.LStickY(), PAD2.RStickY(), gas, brake);
     } else {
       xrPilot(c, i, steer, gas, brake);
-      maxV = i == 0 ? 0.15f : 0.118f + 0.005f * lvl + 0.006f * (gEffDiff() - 1) + (i - 2) * 0.004f;
+      // V4.34 : adversaires plus rapides (jusqu'a la vitesse d'un joueur au stage 7), un peu plus en difficile
+      maxV = (i == 0 && gDemo) ? 0.15f : min(0.165f, 0.126f + 0.0065f * lvl + 0.007f * (gEffDiff() - 1) + (i - 2) * 0.004f);
       if (c.fin) { gas = false; brake = c.v > 0.03f; }
     }
-    xrPhys(c, steer, gas, brake, maxV, i == 0);
+    xrPhys(c, steer, gas, brake, maxV, hum || (gDemo && i == 0));
     float dx = xrWX(c.wp) - c.x, dy = xrWY(c.wp) - c.y;
-    if (dx * dx + dy * dy < (i == 0 ? 7.0f : 4.8f)) {  // balise atteinte
+    if (dx * dx + dy * dy < (hum ? 7.0f : 4.8f)) {  // balise atteinte
       if (c.wp == 0) {
         c.lap++;
-        if (i == 0 && !c.fin) { gScore += 500; if (c.lap < XR_LAPS) sndMelody(JINGLE_STAGE, 3); }
+        if (hum && !c.fin) { gScore += 500; if (c.lap < XR_LAPS) sndMelody(JINGLE_STAGE, 3); }
         if (c.lap >= XR_LAPS && !c.fin) {
           c.fin = ++xrFinCount;
-          if (i == 0) { xrPlace = c.fin; xrEnd = 140; sndMelody(JINGLE_STAGE, 4); }
+          if (hum || (gDemo && i == 0)) sndMelody(JINGLE_STAGE, 4);
         }
-      } else if (i == 0) gScore += 10;
+      } else if (hum) gScore += 10;
       c.wp = (c.wp + 1) % XR_NWP;
     }
   }
@@ -7319,24 +7341,44 @@ void xrStep() {
         float push = (0.6f - d) / 2 / d;
         a.x -= dx * push; a.y -= dy * push; b.x += dx * push; b.y += dy * push;
         a.v *= 0.92f; b.v *= 0.92f;
-        if (i == 0 && gFrame % 6 == 0) sndPlay(300, 150, 60, 0.3f, true, 1);
+        if ((i == 0 || (i == 1 && xr2p)) && gFrame % 6 == 0) sndPlay(300, 150, 60, 0.3f, true, 1);
       }
     }
   if (xrBump > 0) xrBump--;
   if (!gDemo && gScore > gHi) gHi = gScore;
-  XCar &me = xrCar[0];
+  // joueurs : la camera suit celui en tete (pas encore arrive) ; a 2, celui qui sort de l'ecran est replace
+  int nh = xr2p ? 2 : 1, best = 99;
+  bool allFin = true;
+  xrLead = 0;
+  for (int i = 0; i < nh; i++) {
+    XCar &h = xrCar[i];
+    if (!h.fin && xrFinCount >= XR_N - 1) h.fin = ++xrFinCount;  // tous les autres sont arrives : dernier
+    if (h.fin) best = min(best, (int)h.fin);
+    else allFin = false;
+  }
+  if (nh == 2) {
+    const XCar &a = xrCar[0], &b = xrCar[1];
+    xrLead = (a.fin && !b.fin) ? 1 : (!a.fin && b.fin) ? 0 : (a.fin && b.fin) ? (b.fin < a.fin ? 1 : 0) : (xrProg(b) > xrProg(a) ? 1 : 0);
+    int t = 1 - xrLead;
+    XCar &tc = xrCar[t];
+    if (!a.fin && !b.fin && xrPen[t] == 0 && xrCamX > -9000) {
+      float sx = xrPX(tc.x, tc.y), sy = xrPY(tc.y);
+      if (sx < -8 || sx > W + 8 || sy < 6 || sy > H + 8) xrRespawn(t, xrLead);
+    }
+  }
+  XCar &me = xrCar[xrLead];
+  if (!gDemo && allFin && xrEnd == 0 && !xrPlace) { xrPlace = best; xrEnd = 130; }
+  if (gDemo && me.fin && xrEnd == 0 && !xrPlace) { xrPlace = me.fin; xrEnd = 130; }
   if (xrEnd > 0 && --xrEnd == 0) {  // arrivee : classement
-    if (xrPlace <= 3) {
+    int need = (gEffDiff() == 0 || gWave < 3) ? 3 : 2;  // V4.34 : les 2 premiers a partir du stage 3 (sauf en facile)
+    if (xrPlace <= need) {
       gWave++;
       gStageT = 100;
-      altStageClear(1000UL * (gWave - 1) * (4 - xrPlace));
+      altStageClear(1000UL * (gWave - 1) * (5 - xrPlace));
       sndMelody(JINGLE_STAGE, 4);
       xrStart();
     } else altLoseLife(W / 2, H / 2);
     return;
-  }
-  if (!me.fin && xrFinCount >= XR_N - 1) {  // les 3 autres sont arrives : 4e
-    me.fin = ++xrFinCount; xrPlace = me.fin; xrEnd = 100;
   }
   // bruit du moteur : plus aigu quand tu vas vite
   if (gFrame % 3 == 0 && !me.fin) {
@@ -7379,7 +7421,7 @@ void xrDraw() {
   uint16_t palFull[9];
   for (int i = 0; i < 9; i++) palFull[i] = rgb(G_PAL_RGB[i][0], G_PAL_RGB[i][1], G_PAL_RGB[i][2]);
   const int VH = H - 8;
-  const XCar &me = xrCar[0];
+  const XCar &me = xrCar[xrLead];  // la camera suit le joueur en tete
   float MW = XR_C * XR_TW + XR_R * XR_SK, MH = XR_TOP - 8 + XR_R * XR_TD + 6;
   float px = xrPX(me.x, me.y) + xrCamX, py = xrPY(me.y) + xrCamY;
   float la = me.v * 60;  // la vue regarde un peu devant la voiture
@@ -7489,21 +7531,36 @@ void xrDraw() {
         }
       }
     for (int i = XR_N - 1; i >= 0; i--)
-      if (constrain((int)floorf(xrCar[i].y), 0, XR_R - 1) == r) xrCarDraw(c, xrCar[i]);
+      if (constrain((int)floorf(xrCar[i].y), 0, XR_R - 1) == r && !(xrPen[i] && (gFrame & 4))) xrCarDraw(c, xrCar[i]);  // replace : clignote
   }
   // tableau de bord : tour, score, place
   c.fillRect(0, 0, W, 8, 0);
   char buf[16];
-  int place = 1;
-  for (int i = 1; i < XR_N; i++) if (xrProg(xrCar[i]) > xrProg(me)) place++;
-  if (me.fin) place = xrPlace;
+  auto placeOf = [&](int j) {
+    const XCar &q = xrCar[j];
+    if (q.fin) return (int)q.fin;
+    int pl = 1;
+    for (int i = 0; i < XR_N; i++) if (i != j && xrProg(xrCar[i]) > xrProg(q)) pl++;
+    return pl;
+  };
+  int place = xrPlace && xrEnd > 0 ? xrPlace : placeOf(xrLead);
   snprintf(buf, sizeof(buf), "TOUR%d", min(XR_LAPS, me.lap + 1));
   tinyText(c, 1, 1, buf, rgb(255, 220, 0));
   snprintf(buf, sizeof(buf), "%lu", (unsigned long)gScore);
   tinyText(c, (W - tinyWidth(buf)) / 2, 1, buf, rgb(230, 230, 230));
-  snprintf(buf, sizeof(buf), place == 1 ? "1ER" : "%dE", place);
-  tinyText(c, W - 1 - tinyWidth(buf), 1, buf, place == 1 ? rgb(255, 220, 0) : rgb(255, 60, 60));
-  for (int i = 0; i < min(4, max(0, gLives)); i++) c.fillRect(W - 22 - i * 5, 2, 3, 3, rgb(255, 40, 40));  // vies
+  if (xr2p) {  // places des deux joueurs : J1 en rouge, J2 en bleu ; vies apres le tour
+    int p1 = placeOf(0), p2 = placeOf(1);
+    snprintf(buf, sizeof(buf), p2 == 1 ? "1ER" : "%dE", p2);
+    int x2 = W - 1 - tinyWidth(buf);
+    tinyText(c, x2, 1, buf, rgb(60, 140, 255));
+    snprintf(buf, sizeof(buf), p1 == 1 ? "1ER" : "%dE", p1);
+    tinyText(c, x2 - 4 - tinyWidth(buf), 1, buf, rgb(255, 60, 60));
+    for (int i = 0; i < min(4, max(0, gLives)); i++) c.fillRect(26 + i * 5, 2, 3, 3, rgb(255, 40, 40));
+  } else {
+    snprintf(buf, sizeof(buf), place == 1 ? "1ER" : "%dE", place);
+    tinyText(c, W - 1 - tinyWidth(buf), 1, buf, place == 1 ? rgb(255, 220, 0) : rgb(255, 60, 60));
+    for (int i = 0; i < min(4, max(0, gLives)); i++) c.fillRect(W - 22 - i * 5, 2, 3, 3, rgb(255, 40, 40));  // vies
+  }
   // depart et arrivee en grand
   c.setTextSize(2);
   if (xrGo > 0) {
@@ -7512,7 +7569,7 @@ void xrDraw() {
     c.setCursor((W - (int)strlen(s) * 12) / 2, H / 2 - 20);
     c.print(s);
   }
-  if (me.fin && xrEnd > 0) {
+  if (xrPlace && xrEnd > 0) {  // arrivee : la meilleure place (a 2 : celle du mieux classe)
     snprintf(buf, sizeof(buf), place == 1 ? "1ER" : "%dE", place);
     c.setTextColor((gFrame & 8) ? rgb(255, 220, 0) : rgb(255, 255, 255));
     c.setCursor((W - (int)strlen(buf) * 12) / 2, H / 2 - 20);
@@ -7542,7 +7599,7 @@ int vxCool = 0, vxDouble = 0, vxInv = 0, vxFlashT = 0;
 bool vxPrevJump = false;
 float vxS0() { return W * 2.25f; }                                  // echelle horizontale a distance 1
 float vxYH() { return H * 0.30f; }                                  // ligne d'horizon
-const char *const VX_SHIP_SPR[21] = { "...........................", ".Rkk...................kkR.", ".LLLk.......ooo.......kLLL.", "..kLLk.....oWyyo.....kLLk..", "....LLk....oyyyo....kLL....", ".....LLkk..oyyyo..kkLL.....", "......LLLk..ooo..kLLL......", ".......kLLkkLLLkkLLk.......", ".....ooo.kkLLLSSkk.ooo.....", "....oWyyoLLLLCSSSsoWyyo....", "....oyyyoLLLCccSssoyyyo....", "....oyyyoLLSScSsssoyyyo....", ".....ooo.kkSSSsskk.ooo.....", ".......kSSkkSsskkSSk.......", "......SSSk..ooo..kSSS......", ".....SSkk..oWyyo..kkSS.....", "....SSk....oyyyo....kSS....", "..kSSk.....oyyyo.....kSSk..", ".SSSk.......ooo.......kSSS.", ".Rkk...................kkR.", "..........................." };  // ton vaisseau (original) : armature en X, 4 reacteurs incandescents, verriere
+const char *const VX_SHIP_SPR[21] = { "...........................", ".Rkk.........L.........kkR.", ".LLLk.......LLS.......kLLL.", "..kLLk......LLS......kLLk..", "....LLk....kLCSk....kLL....", ".....LLkk..kCCck..kkLL.....", "......LLLk.kCCck.kLLL......", ".......kLLkLLCSskLLk.......", ".....ooo.kkLLLSskk.ooo.....", "....oWyyoLkLLRSsksoWyyo....", "....oyyyoLkLLRSsksoyyyo....", "....oyyyoLkLLRSsksoyyyo....", ".....ooo.kkLLRSskk.ooo.....", ".......kSSkLLSSskSSk.......", "......SSSk.kLSSk.kSSS......", ".....SSkk..kLSSk..kkSS.....", "....SSk....kLSSk....kSS....", "..kSSk.....koyok.....kSSk..", ".SSSk.......oWo.......kSSS.", ".Rkk.........y.........kkR.", "..........................." };  // ton vaisseau (original) : fuselage central (nez, verriere, dos a bande rouge, reacteur arriere), armature en X, 2 reacteurs lateraux (V4.35)
 // route : virages (courbure qui s'accumule) et bosses ; projection recalculee a chaque image (echantillons de pres a loin)
 #define VX_NP 56
 float vxPZ[VX_NP], vxPXw[VX_NP], vxPYs[VX_NP], vxHead = 0;
@@ -7938,15 +7995,15 @@ void vxDraw() {
       }
     }
   }
-  // tirs : traits rouge et orange qui filent vers l'horizon ; tirs ennemis
+  // tirs : boules jaunes qui filent vers l'horizon ; tirs ennemis
   for (auto &s : vxS)
-    if (s.on) {  // tirs : gros traits lumineux (coeur blanc, bord cyan)
+    if (s.on) {  // tirs : boules jaunes lumineuses (V4.35) : halo orange, coeur jaune, reflet blanc
       float dz = s.d - vxPos;
       if (dz > 4.0f) {
-        int w = max(2, (int)(0.14f * S / dz)), h = max(3, (int)(0.45f * S / dz)), x = (int)(vxCX(dz) + s.x * S / dz) - w / 2, y = (int)vxY(dz) - (int)(0.25f * S / dz) - h;
-        gfx->fillRoundRect(x - 1, y - 1, w + 2, h + 2, (w + 2) / 2, rgb(255, 30, 20));  // bord rouge
-        gfx->fillRoundRect(x, y, w, h, w / 2, rgb(255, 140, 0));  // coeur orange
-        gfx->drawFastHLine(x + w / 4, y, max(1, w / 2), rgb(255, 230, 0));  // pointe jaune
+        int r = max(1, (int)(0.13f * S / dz)), x = (int)(vxCX(dz) + s.x * S / dz), y = (int)vxY(dz) - (int)(0.3f * S / dz) - r;
+        gfx->fillCircle(x, y, r + 1, rgb(255, 140, 0));
+        gfx->fillCircle(x, y, r, rgb(255, 230, 0));
+        if (r >= 2) gfx->drawPixel(x - r / 2, y - r / 2, rgb(255, 255, 255));
       }
     }
   for (auto &e : vxE)
